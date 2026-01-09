@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мужской раздел</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/mens.js" defer></script>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="section">
+                <img src="/img/logo.png" alt="logo" id="logo">
+                <div class="central-top-section">
+                    <img src="/img/location.svg" alt="location">
+                    <p>Брест, ул. л-та Рябцева, 44</p>
+                </div>
+                <div class="right-top-section">
+                    <img src="/img/like.svg" alt="like" id="favorites-link">
+                    <img src="/img/cart.svg" alt="shopping cart" id="cart">
+                </div>
+            </div>
+        </header>
+
+        <p class="secTitle">Мужская одежда</p>
+
+        <div class="filters">
+            <div class="sort-section">
+                <label for="sort-select">Сортировка:</label>
+                <select id="sort-select">
+                    <option value="name">По названию</option>
+                    <option value="id">По популярности</option>
+                </select>
+            </div>
+            <div class="sort-section">
+                <label for="filter-select">Фильтры:</label>
+                <select id="filter-select">
+                    <option value="all">Все категории</option>
+                    <option value="popular">Популярные</option>
+                    <option value="outerwear">Верхняя одежда</option>
+                    <option value="underwear">Нижняя одежда</option>
+                    <option value="accessories">Аксессуары</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="itemsContainer">
+            <div class="itemsSection">
+                <p>Популярные товары</p>
+                <div class="effect-section">
+                    <div class="items" id="popular-items">
+                    </div>
+                </div>
+            </div>
+
+            <div class="itemsSection">
+                <p>Верхняя одежда</p>
+                <div class="effect-section">
+                    <div class="items" id="outerwear-items">
+                    </div>
+                </div>
+            </div>
+
+            <div class="itemsSection">
+                <p>Нижняя одежда</p>
+                <div class="effect-section">
+                    <div class="items" id="underwear-items">
+                    </div>
+                </div>
+            </div>
+
+            <div class="itemsSection">
+                <p>Аксессуары</p>
+                <div class="effect-section">
+                    <div class="items" id="accessories-items">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <img src="/img/logo.png" alt="ООО КВПС" class="footer-logo">
+                    <p class="footer-description">Производитель качественной спецодежды в Бресте</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Контакты</h4>
+                    <p class="footer-contact">📍 ул. л-та Рябцева, 44, Брест</p>
+                    <p class="footer-contact">📞 +375 (162) 58-09-31</p>
+                    <p class="footer-contact">✉️ sbyt@kpvs.by</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Информация</h4>
+                    <p>Доставка по Беларуси</p>
+                    <p>Индивидуальный пошив</p>
+                    <p>Гарантия качества</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 ООО "КПВС". Все права защищены.</p>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
