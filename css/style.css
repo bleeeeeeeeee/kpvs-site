@@ -241,7 +241,7 @@ body {
     border: none;
     border-radius: 0.25rem;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
     font-weight: 600;
     color: white;
     width: 95%;
@@ -250,7 +250,7 @@ body {
 }
 
 .itemsContainer .itemsSection .effect-section .items .card .card-img-container .card-hover-btn:hover {
-    transform: scale(1.05);
+    transform: scale(1.02);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
@@ -598,10 +598,10 @@ body {
     height: 3rem;
     margin-top: 1rem;
     margin-bottom: 0.5rem;
-    background: radial-gradient(circle, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03));
     padding: 0.5rem;
     border-radius: 0.5rem;
-    box-shadow: 0 0 20px rgba(182, 197, 63, 0.3);
+    /* box-shadow: 0 0 20px rgba(182, 197, 63, 0.3); */
     backdrop-filter: blur(10px);
 }
 
