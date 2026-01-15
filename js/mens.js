@@ -4,14 +4,8 @@ let currentFilter = 'all';
 
 async function loadProducts() {
     try {
-        const response = await fetch('/products.json');
-        const data = await response.json();
-        allProducts = [
-            ...data.mens.popular.map(item => ({ ...item, category: 'popular' })),
-            ...data.mens.outerwear.map(item => ({ ...item, category: 'outerwear' })),
-            ...data.mens.underwear.map(item => ({ ...item, category: 'underwear' })),
-            ...data.mens.accessories.map(item => ({ ...item, category: 'accessories' }))
-        ];
+        const res = await fetch('/api/products/mens');
+        allProducts = await res.json();
         renderProducts();
     } catch (error) {
         console.error('Error loading products:', error);
@@ -77,7 +71,7 @@ function getCategoryName(cat) {
 }
 
 function createCard(item) {
-    const isFavorite = getFavorites().includes(item.id);
+    const isFavorite = getFavorites().some(fav => fav.id === item.id);
     const card = document.createElement('div');
     card.className = 'card';
     card.setAttribute('data-id', item.id);
@@ -99,8 +93,9 @@ function createCard(item) {
 
 function addToCart(productId) {
     let cart = getCart();
-    if (!cart.includes(productId)) {
-        cart.push(productId);
+    const exists = cart.some(item => item.id === productId);
+    if (!exists) {
+        cart.push({ id: productId, source: 'mens' });
         localStorage.setItem('cart', JSON.stringify(cart));
         showNotification('Товар добавлен в корзину');
     } else {
@@ -122,16 +117,20 @@ function inquirePriceFromCart() {
         return;
     }
     
-    const products = getProductsByIds(cart);
-    const productNames = products.map(p => p.name).join(', ');
-    const subject = encodeURIComponent('Запрос цены на товары из корзины');
-    const body = encodeURIComponent(`Здравствуйте! Прошу предоставить информацию о ценах на следующие товары:\n\n${productNames}\n\nСпасибо!`);
-    const email = 'info@kpvs.by';
-    window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+    const ids = cart.map(item => item.id);
+    getProductsByIds(ids).then(products => {
+        const productNames = products.map(p => p.name).join(', ');
+        const subject = encodeURIComponent('Запрос цены на товары из корзины');
+        const body = encodeURIComponent(`Здравствуйте! Прошу предоставить информацию о ценах на следующие товары:\n\n${productNames}\n\nСпасибо!`);
+        const email = 'info@kpvs.by';
+        window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
+    });
 }
 
 function getProductsByIds(ids) {
-    return allProducts.filter(p => ids.includes(p.id));
+    return Promise.all(ids.map(id => 
+        fetch(`/api/product/${id}`).then(r => r.json())
+    ));
 }
 
 function showNotification(message) {
@@ -150,12 +149,12 @@ function showNotification(message) {
 
 function toggleFavorite(productId, buttonElement = null) {
     let favorites = getFavorites();
-    const wasFavorite = favorites.includes(productId);
+    const wasFavorite = favorites.some(item => item.id === productId);
     
     if (wasFavorite) {
-        favorites = favorites.filter(id => id !== productId);
+        favorites = favorites.filter(item => item.id !== productId);
     } else {
-        favorites.push(productId);
+        favorites.push({ id: productId, source: 'mens' });
     }
     localStorage.setItem('favorites', JSON.stringify(favorites));
     
@@ -250,101 +249,143 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function openFavoritesModal() {
     const favorites = getFavorites();
-    const products = getProductsByIds(favorites);
+    const ids = favorites.map(item => item.id);
     
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Избранное</h2>
-                <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+    if (ids.length === 0) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Избранное</h2>
+                    <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="empty-message">У вас пока нет товаров в избранном</p>
+                </div>
             </div>
-            <div class="modal-body">
-                ${favorites.length === 0 
-                    ? '<p class="empty-message">У вас пока нет товаров в избранном</p>'
-                    : `<div class="modal-items">
-                        ${products.map(product => `
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+        return;
+    }
+    
+    getProductsByIds(ids).then(products => {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Избранное</h2>
+                    <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="modal-items">
+                        ${products.map((product, idx) => {
+                            const source = favorites[idx].source === 'mens' ? '(мужское)' : '(женское)';
+                            return `
                             <div class="modal-item">
                                 <img src="${product.image}" alt="${product.name}" class="modal-item-img">
                                 <div class="modal-item-info">
-                                    <h3>${product.name}</h3>
+                                    <h3>${product.name} <small>${source}</small></h3>
                                     <div class="modal-item-actions">
                                         <button class="btn-add-to-cart" onclick="addToCart(${product.id}); this.closest('.modal-item').querySelector('.btn-add-to-cart').textContent = 'В корзине'; this.closest('.modal-item').querySelector('.btn-add-to-cart').disabled = true;">В корзину</button>
                                         <button class="btn-remove" onclick="removeFromFavorites(${product.id}); this.closest('.modal-item').remove(); if(document.querySelectorAll('.modal-item').length === 0) { document.querySelector('.modal-body').innerHTML = '<p class=\\'empty-message\\'>У вас пока нет товаров в избранном</p>'; }">Удалить</button>
                                     </div>
                                 </div>
                             </div>
-                        `).join('')}
-                    </div>`
-                }
+                        `;
+                        }).join('')}
+                    </div>
+                </div>
             </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    setTimeout(() => modal.classList.add('show'), 10);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.remove();
-        }
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
     });
 }
 
 function openCartModal() {
     const cart = getCart();
-    const products = getProductsByIds(cart);
+    const ids = cart.map(item => item.id);
     
-    const modal = document.createElement('div');
-    modal.className = 'modal';
-    modal.innerHTML = `
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Корзина</h2>
-                <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+    if (ids.length === 0) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Корзина</h2>
+                    <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <p class="empty-message">Корзина пуста</p>
+                </div>
             </div>
-            <div class="modal-body">
-                ${cart.length === 0 
-                    ? '<p class="empty-message">Корзина пуста</p>'
-                    : `<div class="modal-items">
-                        ${products.map(product => `
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+        return;
+    }
+    
+    getProductsByIds(ids).then(products => {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>Корзина</h2>
+                    <button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="modal-items">
+                        ${products.map((product, idx) => {
+                            const source = cart[idx].source === 'mens' ? '(мужское)' : '(женское)';
+                            return `
                             <div class="modal-item">
                                 <img src="${product.image}" alt="${product.name}" class="modal-item-img">
                                 <div class="modal-item-info">
-                                    <h3>${product.name}</h3>
+                                    <h3>${product.name} <small>${source}</small></h3>
                                     <div class="modal-item-actions">
-                                        <button class="btn-remove" onclick="removeFromCart(${product.id}); this.closest('.modal-item').remove(); if(document.querySelectorAll('.modal-item').length === 0) { document.querySelector('.modal-body').innerHTML = '<p class=\\'empty-message\\'>Корзина пуста</p>'; document.querySelector('.cart-inquire-btn').style.display = 'none'; }">Удалить</button>
+                                        <button class="btn-remove" onclick="removeFromCart(${product.id}); this.closest('.modal-item').remove(); if(document.querySelectorAll('.modal-item').length === 0) { document.querySelector('.modal-body').innerHTML = '<p class=\\'empty-message\\'>Корзина пуста</p>'; }">Удалить</button>
                                     </div>
                                 </div>
                             </div>
-                        `).join('')}
+                        `;
+                        }).join('')}
                     </div>
                     <div class="cart-actions">
                         <button class="cart-inquire-btn" onclick="inquirePriceFromCart(); this.closest('.modal').remove();">Узнать цену на все товары</button>
-                    </div>`
-                }
+                    </div>
+                </div>
             </div>
-        </div>
-    `;
-    document.body.appendChild(modal);
-    setTimeout(() => modal.classList.add('show'), 10);
-    
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            modal.remove();
-        }
+        `;
+        document.body.appendChild(modal);
+        setTimeout(() => modal.classList.add('show'), 10);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
     });
 }
 
 function removeFromFavorites(productId) {
     let favorites = getFavorites();
-    favorites = favorites.filter(id => id !== productId);
+    favorites = favorites.filter(item => item.id !== productId);
     localStorage.setItem('favorites', JSON.stringify(favorites));
 }
 
 function removeFromCart(productId) {
     let cart = getCart();
-    cart = cart.filter(id => id !== productId);
+    cart = cart.filter(item => item.id !== productId);
     localStorage.setItem('cart', JSON.stringify(cart));
     showNotification('Товар удален из корзины');
 }

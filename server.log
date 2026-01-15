@@ -1,0 +1,36 @@
+
+> kpvs-site@1.0.0 start
+> node server.js
+
+✓ DB already initialized
+✓ DB already initialized
+✓ Server running on http://localhost:3000
+GET /api/products/mens
+Fetching products for gender: mens
+Returning 28 products
+GET /api/products/womens
+Fetching products for gender: womens
+Returning 28 products
+GET /api/products/mens
+Fetching products for gender: mens
+Returning 28 products
+GET /
+GET /api/products/womens
+Fetching products for gender: womens
+Returning 28 products
+Error: ENOENT: no such file or directory, stat '/Users/bl/Programming/Projects/prakt(kpvs-site)/services.html'
+GET /api/products/womens
+Fetching products for gender: womens
+Returning 28 products
+GET /api/products/mens
+Fetching products for gender: mens
+Returning 28 products
+GET /api/products/womens
+Fetching products for gender: womens
+Returning 28 products
+GET /api/products/mens
+Fetching products for gender: mens
+Returning 28 products
+GET /api/products/mens
+Fetching products for gender: mens
+Returning 28 products

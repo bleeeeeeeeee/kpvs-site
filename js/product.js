@@ -8,24 +8,15 @@ async function loadProduct() {
     }
 
     try {
-        const response = await fetch('/products.json');
-        const data = await response.json();
+        const res = await fetch(`/api/product/${productId}`);
+        const product = await res.json();
 
-        let product = null;
-        for (const gender in data) {
-            for (const category in data[gender]) {
-                product = data[gender][category].find(item => item.id === productId);
-                if (product) break;
-            }
-            if (product) break;
-        }
-
-        if (!product) {
+        if (!product || !product.id) {
             document.getElementById('product-details').innerHTML = '<p>Товар не найден.</p>';
             return;
         }
 
-        const isFavorite = getFavorites().includes(productId);
+        const isFavorite = getFavorites().some(fav => fav.id === productId);
 
         document.getElementById('product-details').innerHTML = `
             <div class="product-page">
@@ -67,19 +58,9 @@ async function loadProduct() {
 
 async function getProductsByIds(ids) {
     try {
-        const response = await fetch('/products.json');
-        const data = await response.json();
-        const allProducts = [
-            ...data.mens?.popular?.map(item => ({ ...item, category: 'popular' })) || [],
-            ...data.mens?.outerwear?.map(item => ({ ...item, category: 'outerwear' })) || [],
-            ...data.mens?.underwear?.map(item => ({ ...item, category: 'underwear' })) || [],
-            ...data.mens?.accessories?.map(item => ({ ...item, category: 'accessories' })) || [],
-            ...data.womens?.popular?.map(item => ({ ...item, category: 'popular' })) || [],
-            ...data.womens?.outerwear?.map(item => ({ ...item, category: 'outerwear' })) || [],
-            ...data.womens?.underwear?.map(item => ({ ...item, category: 'underwear' })) || [],
-            ...data.womens?.accessories?.map(item => ({ ...item, category: 'accessories' })) || []
-        ];
-        return allProducts.filter(p => ids.includes(p.id));
+        return Promise.all(ids.map(id => 
+            fetch(`/api/product/${id}`).then(r => r.json())
+        ));
     } catch (error) {
         console.error('Error loading products:', error);
         return [];
@@ -88,8 +69,9 @@ async function getProductsByIds(ids) {
 
 function addToCart(productId) {
     let cart = getCart();
-    if (!cart.includes(productId)) {
-        cart.push(productId);
+    const exists = cart.some(item => item.id === productId);
+    if (!exists) {
+        cart.push({ id: productId, source: 'product' });
         localStorage.setItem('cart', JSON.stringify(cart));
         showNotification('Товар добавлен в корзину');
     } else {
@@ -237,12 +219,12 @@ function removeFromFavorites(productId) {
 
 function toggleFavorite(productId, buttonElement = null) {
     let favorites = getFavorites();
-    const wasFavorite = favorites.includes(productId);
+    const wasFavorite = favorites.some(item => item.id === productId);
     
     if (wasFavorite) {
-        favorites = favorites.filter(id => id !== productId);
+        favorites = favorites.filter(item => item.id !== productId);
     } else {
-        favorites.push(productId);
+        favorites.push({ id: productId, source: 'product' });
     }
     localStorage.setItem('favorites', JSON.stringify(favorites));
 
