@@ -1,0 +1,78 @@
+{
+  "mens": {
+    "popular": [
+      {"id": 1, "name": "Популярный товар 1", "image": "/img/item.png", "description": "Описание товара 1", "materials": "Материал: Хлопок 100%", "price": "По запросу"},
+      {"id": 2, "name": "Популярный товар 2", "image": "/img/item.png", "description": "Описание товара 2", "materials": "Материал: Полиэстер", "price": "По запросу"},
+      {"id": 3, "name": "Популярный товар 3", "image": "/img/item.png", "description": "Описание товара 3", "materials": "Материал: Смесь", "price": "По запросу"},
+      {"id": 4, "name": "Популярный товар 4", "image": "/img/item.png", "description": "Описание товара 4", "materials": "Материал: Хлопок", "price": "По запросу"},
+      {"id": 5, "name": "Популярный товар 5", "image": "/img/item.png", "description": "Описание товара 5", "materials": "Материал: Синтетика", "price": "По запросу"},
+      {"id": 6, "name": "Популярный товар 6", "image": "/img/item.png", "description": "Описание товара 6", "materials": "Материал: Хлопок", "price": "По запросу"},
+      {"id": 7, "name": "Популярный товар 7", "image": "/img/item.png", "description": "Описание товара 7", "materials": "Материал: Полиэстер", "price": "По запросу"}
+    ],
+    "outerwear": [
+      {"id": 8, "name": "Куртка 1", "image": "/img/item.png", "description": "Теплая куртка для работы", "materials": "Материал: Водонепроницаемая ткань", "price": "По запросу"},
+      {"id": 9, "name": "Куртка 2", "image": "/img/item.png", "description": "Куртка с капюшоном", "materials": "Материал: Синтетика", "price": "По запросу"},
+      {"id": 10, "name": "Куртка 3", "image": "/img/item.png", "description": "Легкая куртка", "materials": "Материал: Хлопок", "price": "По запросу"},
+      {"id": 11, "name": "Куртка 4", "image": "/img/item.png", "description": "Зимняя куртка", "materials": "Материал: Утепленная ткань", "price": "По запросу"},
+      {"id": 12, "name": "Куртка 5", "image": "/img/item.png", "description": "Рабочая куртка", "materials": "Материал: Прочная ткань", "price": "По запросу"},
+      {"id": 13, "name": "Куртка 6", "image": "/img/item.png", "description": "Куртка с карманами", "materials": "Материал: Смесь", "price": "По запросу"},
+      {"id": 14, "name": "Куртка 7", "image": "/img/item.png", "description": "Универсальная куртка", "materials": "Материал: Полиэстер", "price": "По запросу"}
+    ],
+    "underwear": [
+      {"id": 15, "name": "Брюки 1", "image": "/img/item.png", "description": "Комфортные брюки", "materials": "Материал: Хлопок", "price": "По запросу"},
+      {"id": 16, "name": "Брюки 2", "image": "/img/item.png", "description": "Рабочие брюки", "materials": "Материал: Прочная ткань", "price": "По запросу"},
+      {"id": 17, "name": "Брюки 3", "image": "/img/item.png", "description": "Брюки с карманами", "materials": "Материал: Синтетика", "price": "По запросу"},
+      {"id": 18, "name": "Брюки 4", "image": "/img/item.png", "description": "Легкие брюки", "materials": "Материал: Хлопок", "price": "По запросу"},
+      {"id": 19, "name": "Брюки 5", "image": "/img/item.png", "description": "Утепленные брюки", "materials": "Материал: Смесь", "price": "По запросу"},
+      {"id": 20, "name": "Брюки 6", "image": "/img/item.png", "description": "Брюки для зимы", "materials": "Материал: Утепленная ткань", "price": "По запросу"},
+      {"id": 21, "name": "Брюки 7", "image": "/img/item.png", "description": "Классические брюки", "materials": "Материал: Полиэстер", "price": "По запросу"}
+    ],
+    "accessories": [
+      {"id": 22, "name": "Аксессуар 1", "image": "/img/item.png", "description": "Полезный аксессуар", "materials": "Материал: Пластик", "price": "По запросу"},
+      {"id": 23, "name": "Аксессуар 2", "image": "/img/item.png", "description": "Аксессуар для работы", "materials": "Материал: Металл", "price": "По запросу"},
+      {"id": 24, "name": "Аксессуар 3", "image": "/img/item.png", "description": "Удобный аксессуар", "materials": "Материал: Ткань", "price": "По запросу"},
+      {"id": 25, "name": "Аксессуар 4", "image": "/img/item.png", "description": "Аксессуар с карманами", "materials": "Материал: Синтетика", "price": "По запросу"},
+      {"id": 26, "name": "Аксессуар 5", "image": "/img/item.png", "description": "Многофункциональный", "materials": "Материал: Прочная ткань", "price": "По запросу"},
+      {"id": 27, "name": "Аксессуар 6", "image": "/img/item.png", "description": "Легкий аксессуар", "materials": "Материал: Хлопок", "price": "По запросу"},
+      {"id": 28, "name": "Аксессуар 7", "image": "/img/item.png", "description": "Аксессуар для комфорта", "materials": "Материал: Смесь", "price": "По запросу"}
+    ]
+  },
+  "womens": {
+    "popular": [
+      {"id": 29, "name": "Популярный товар 1", "image": "/img/item.png", "description": "Описание товара 1", "materials": "Материал: Хлопок 100%", "price": "По запросу"},
+      {"id": 30, "name": "Популярный товар 2", "image": "/img/item.png", "description": "Описание товара 2", "materials": "Материал: Полиэстер", "price": "По запросу"},
+      {"id": 31, "name": "Популярный товар 3", "image": "/img/item.png", "description": "Описание товара 3", "materials": "Материал: Смесь", "price": "По запросу"},
+      {"id": 32, "name": "Популярный товар 4", "image": "/img/item.png", "description": "Описание товара 4", "materials": "Материал: Хлопок", "price": "По запросу"},
+      {"id": 33, "name": "Популярный товар 5", "image": "/img/item.png", "description": "Описание товара 5", "materials": "Материал: Синтетика", "price": "По запросу"},
+      {"id": 34, "name": "Популярный товар 6", "image": "/img/item.png", "description": "Описание товара 6", "materials": "Материал: Хлопок", "price": "По запросу"},
+      {"id": 35, "name": "Популярный товар 7", "image": "/img/item.png", "description": "Описание товара 7", "materials": "Материал: Полиэстер", "price": "По запросу"}
+    ],
+    "outerwear": [
+      {"id": 36, "name": "Куртка 1", "image": "/img/item.png", "description": "Теплая куртка для работы", "materials": "Материал: Водонепроницаемая ткань", "price": "По запросу"},
+      {"id": 37, "name": "Куртка 2", "image": "/img/item.png", "description": "Куртка с капюшоном", "materials": "Материал: Синтетика", "price": "По запросу"},
+      {"id": 38, "name": "Куртка 3", "image": "/img/item.png", "description": "Легкая куртка", "materials": "Материал: Хлопок", "price": "По запросу"},
+      {"id": 39, "name": "Куртка 4", "image": "/img/item.png", "description": "Зимняя куртка", "materials": "Материал: Утепленная ткань", "price": "По запросу"},
+      {"id": 40, "name": "Куртка 5", "image": "/img/item.png", "description": "Рабочая куртка", "materials": "Материал: Прочная ткань", "price": "По запросу"},
+      {"id": 41, "name": "Куртка 6", "image": "/img/item.png", "description": "Куртка с карманами", "materials": "Материал: Смесь", "price": "По запросу"},
+      {"id": 42, "name": "Куртка 7", "image": "/img/item.png", "description": "Универсальная куртка", "materials": "Материал: Полиэстер", "price": "По запросу"}
+    ],
+    "underwear": [
+      {"id": 43, "name": "Брюки 1", "image": "/img/item.png", "description": "Комфортные брюки", "materials": "Материал: Хлопок", "price": "По запросу"},
+      {"id": 44, "name": "Брюки 2", "image": "/img/item.png", "description": "Рабочие брюки", "materials": "Материал: Прочная ткань", "price": "По запросу"},
+      {"id": 45, "name": "Брюки 3", "image": "/img/item.png", "description": "Брюки с карманами", "materials": "Материал: Синтетика", "price": "По запросу"},
+      {"id": 46, "name": "Брюки 4", "image": "/img/item.png", "description": "Легкие брюки", "materials": "Материал: Хлопок", "price": "По запросу"},
+      {"id": 47, "name": "Брюки 5", "image": "/img/item.png", "description": "Утепленные брюки", "materials": "Материал: Смесь", "price": "По запросу"},
+      {"id": 48, "name": "Брюки 6", "image": "/img/item.png", "description": "Брюки для зимы", "materials": "Материал: Утепленная ткань", "price": "По запросу"},
+      {"id": 49, "name": "Брюки 7", "image": "/img/item.png", "description": "Классические брюки", "materials": "Материал: Полиэстер", "price": "По запросу"}
+    ],
+    "accessories": [
+      {"id": 50, "name": "Аксессуар 1", "image": "/img/item.png", "description": "Полезный аксессуар", "materials": "Материал: Пластик", "price": "По запросу"},
+      {"id": 51, "name": "Аксессуар 2", "image": "/img/item.png", "description": "Аксессуар для работы", "materials": "Материал: Металл", "price": "По запросу"},
+      {"id": 52, "name": "Аксессуар 3", "image": "/img/item.png", "description": "Удобный аксессуар", "materials": "Материал: Ткань", "price": "По запросу"},
+      {"id": 53, "name": "Аксессуар 4", "image": "/img/item.png", "description": "Аксессуар с карманами", "materials": "Материал: Синтетика", "price": "По запросу"},
+      {"id": 54, "name": "Аксессуар 5", "image": "/img/item.png", "description": "Многофункциональный", "materials": "Материал: Прочная ткань", "price": "По запросу"},
+      {"id": 55, "name": "Аксессуар 6", "image": "/img/item.png", "description": "Легкий аксессуар", "materials": "Материал: Хлопок", "price": "По запросу"},
+      {"id": 56, "name": "Аксессуар 7", "image": "/img/item.png", "description": "Аксессуар для комфорта", "materials": "Материал: Смесь", "price": "По запросу"}
+    ]
+  }
+}

@@ -72,6 +72,7 @@ function getCategoryName(cat) {
 
 function createCard(item) {
     const isFavorite = getFavorites().some(fav => fav.id === item.id);
+    const isInCart = getCart().some(cartItem => cartItem.id === item.id);
     const card = document.createElement('div');
     card.className = 'card';
     card.setAttribute('data-id', item.id);
@@ -83,7 +84,9 @@ function createCard(item) {
                 <button class="card-favorite-btn card-hover-btn ${isFavorite ? 'in-favorites' : ''}" onclick="event.stopPropagation(); toggleFavorite(${item.id}, this)">
                     ${isFavorite ? 'Удалить из избранного' : 'В избранное'}
                 </button>
-                <button class="card-cart-btn card-hover-btn" onclick="event.stopPropagation(); addToCart(${item.id})">В корзину</button>
+                <button class="card-cart-btn card-hover-btn ${isInCart ? 'in-cart' : ''}" onclick="event.stopPropagation(); toggleCart(${item.id}, this)">
+                    ${isInCart ? 'Удалить из корзины' : 'В корзину'}
+                </button>
             </div>
         </div>
         <p class="card-name">${item.name}</p>
@@ -91,15 +94,24 @@ function createCard(item) {
     return card;
 }
 
-function addToCart(productId) {
+function toggleCart(productId, buttonElement) {
     let cart = getCart();
-    const exists = cart.some(item => item.id === productId);
-    if (!exists) {
+    const existingIndex = cart.findIndex(item => item.id === productId);
+    
+    if (existingIndex === -1) {
+        // Добавляем в корзину
         cart.push({ id: productId, source: 'mens' });
         localStorage.setItem('cart', JSON.stringify(cart));
         showNotification('Товар добавлен в корзину');
+        buttonElement.textContent = 'Удалить из корзины';
+        buttonElement.classList.add('in-cart');
     } else {
-        showNotification('Товар уже в корзине');
+        // Удаляем из корзины
+        cart.splice(existingIndex, 1);
+        localStorage.setItem('cart', JSON.stringify(cart));
+        showNotification('Товар удален из корзины');
+        buttonElement.textContent = 'В корзину';
+        buttonElement.classList.remove('in-cart');
     }
 }
 
