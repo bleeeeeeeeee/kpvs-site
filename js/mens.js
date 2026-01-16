@@ -183,6 +183,27 @@ function toggleFavorite(productId, buttonElement = null) {
     showNotification(wasFavorite ? 'Товар удален из избранного' : 'Товар добавлен в избранное');
 }
 
+function toggleCartFromModal(productId, buttonElement) {
+    let cart = getCart();
+    const existingIndex = cart.findIndex(item => item.id === productId);
+    
+    if (existingIndex === -1) {
+        // Добавляем в корзину
+        cart.push({ id: productId, source: 'mens' });
+        localStorage.setItem('cart', JSON.stringify(cart));
+        showNotification('Товар добавлен в корзину');
+        buttonElement.textContent = 'Удалить из корзины';
+        buttonElement.classList.add('in-cart');
+    } else {
+        // Удаляем из корзины
+        cart.splice(existingIndex, 1);
+        localStorage.setItem('cart', JSON.stringify(cart));
+        showNotification('Товар удален из корзины');
+        buttonElement.textContent = 'В корзину';
+        buttonElement.classList.remove('in-cart');
+    }
+}
+
 function getFavorites() {
     const favorites = localStorage.getItem('favorites');
     return favorites ? JSON.parse(favorites) : [];
@@ -297,14 +318,15 @@ function openFavoritesModal() {
                 <div class="modal-body">
                     <div class="modal-items">
                         ${products.map((product, idx) => {
-                            const source = favorites[idx].source === 'mens' ? '(мужское)' : '(женское)';
+                            const isInCart = getCart().some(item => item.id === product.id);
+                            const source = favorites[idx].source === 'mens' ? '(мужское)' : (favorites[idx].source === 'womens' ? '(женское)' : '(товар)');
                             return `
                             <div class="modal-item">
                                 <img src="${product.image}" alt="${product.name}" class="modal-item-img">
                                 <div class="modal-item-info">
                                     <h3>${product.name} <small>${source}</small></h3>
                                     <div class="modal-item-actions">
-                                        <button class="btn-add-to-cart" onclick="addToCart(${product.id}); this.closest('.modal-item').querySelector('.btn-add-to-cart').textContent = 'В корзине'; this.closest('.modal-item').querySelector('.btn-add-to-cart').disabled = true;">В корзину</button>
+                                        <button class="btn-add-to-cart ${isInCart ? 'in-cart' : ''}" onclick="toggleCartFromModal(${product.id}, this)">${isInCart ? 'Удалить из корзины' : 'В корзину'}</button>
                                         <button class="btn-remove" onclick="removeFromFavorites(${product.id}); this.closest('.modal-item').remove(); if(document.querySelectorAll('.modal-item').length === 0) { document.querySelector('.modal-body').innerHTML = '<p class=\\'empty-message\\'>У вас пока нет товаров в избранном</p>'; }">Удалить</button>
                                     </div>
                                 </div>

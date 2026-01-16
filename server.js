@@ -8,6 +8,11 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.static('.'));
 
+// Redirect root to welcome
+app.get('/', (req, res) => {
+    res.redirect('/welcome');
+});
+
 // Serve HTML files without extension
 app.get('/:file', (req, res) => {
     res.sendFile(__dirname + '/' + req.params.file + '.html');
