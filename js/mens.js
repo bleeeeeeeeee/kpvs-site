@@ -99,17 +99,13 @@ function toggleCart(productId, buttonElement) {
     const existingIndex = cart.findIndex(item => item.id === productId);
     
     if (existingIndex === -1) {
-        // Добавляем в корзину
         cart.push({ id: productId, source: 'mens' });
         localStorage.setItem('cart', JSON.stringify(cart));
-        showNotification('Товар добавлен в корзину');
         buttonElement.textContent = 'Удалить из корзины';
         buttonElement.classList.add('in-cart');
     } else {
-        // Удаляем из корзины
         cart.splice(existingIndex, 1);
         localStorage.setItem('cart', JSON.stringify(cart));
-        showNotification('Товар удален из корзины');
         buttonElement.textContent = 'В корзину';
         buttonElement.classList.remove('in-cart');
     }
@@ -146,101 +142,6 @@ function getProductsByIds(ids) {
     ));
 }
 
-function showNotification(message) {
-    const notification = document.createElement('div');
-    notification.className = 'notification';
-    
-    const content = document.createElement('div');
-    content.className = 'notification-content';
-    content.textContent = message;
-    
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'notification-close';
-    closeBtn.innerHTML = '&times;';
-    closeBtn.onclick = () => {
-        notification.classList.remove('show');
-        setTimeout(() => notification.remove(), 300);
-    };
-    
-    const handle = document.createElement('div');
-    handle.className = 'notification-handle';
-    handle.title = 'Перетаскивайте отсюда';
-    
-    notification.appendChild(content);
-    notification.appendChild(closeBtn);
-    notification.appendChild(handle);
-    
-    const savedPos = localStorage.getItem('notificationPos');
-    if (savedPos) {
-        try {
-            const pos = JSON.parse(savedPos);
-            notification.style.top = pos.top + 'px';
-            notification.style.left = pos.left + 'px';
-            notification.style.right = 'auto';
-        } catch (e) {
-            console.error('Error parsing saved position:', e);
-        }
-    }
-    
-    let isDragging = false;
-    let offset = { x: 0, y: 0 };
-    let autoHideTimer = null;
-    
-    const clearAutoHide = () => {
-        if (autoHideTimer) {
-            clearTimeout(autoHideTimer);
-            autoHideTimer = null;
-        }
-    };
-    
-    const setAutoHide = () => {
-        clearAutoHide();
-        autoHideTimer = setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
-    };
-    
-    handle.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        clearAutoHide();
-        notification.classList.add('dragging');
-        offset.x = e.clientX - notification.getBoundingClientRect().left;
-        offset.y = e.clientY - notification.getBoundingClientRect().top;
-    });
-    
-    const handleMouseMove = (e) => {
-        if (!isDragging || !document.body.contains(notification)) return;
-        notification.style.top = (e.clientY - offset.y) + 'px';
-        notification.style.left = (e.clientX - offset.x) + 'px';
-        notification.style.right = 'auto';
-    };
-    
-    const handleMouseUp = () => {
-        if (isDragging) {
-            isDragging = false;
-            notification.classList.remove('dragging');
-            if (document.body.contains(notification)) {
-                const pos = notification.getBoundingClientRect();
-                localStorage.setItem('notificationPos', JSON.stringify({
-                    top: pos.top,
-                    left: pos.left
-                }));
-                setAutoHide();
-            }
-        }
-    };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    
-    document.body.appendChild(notification);
-    setTimeout(() => {
-        notification.classList.add('show');
-        setAutoHide();
-    }, 10);
-}
-
 function toggleFavorite(productId, buttonElement = null) {
     let favorites = getFavorites();
     const wasFavorite = favorites.some(item => item.id === productId);
@@ -261,8 +162,6 @@ function toggleFavorite(productId, buttonElement = null) {
             buttonElement.classList.add('in-favorites');
         }
     }
-    
-    showNotification(wasFavorite ? 'Товар удален из избранного' : 'Товар добавлен в избранное');
 }
 
 function toggleCartFromModal(productId, buttonElement) {
@@ -270,17 +169,13 @@ function toggleCartFromModal(productId, buttonElement) {
     const existingIndex = cart.findIndex(item => item.id === productId);
     
     if (existingIndex === -1) {
-        // Добавляем в корзину
         cart.push({ id: productId, source: 'mens' });
         localStorage.setItem('cart', JSON.stringify(cart));
-        showNotification('Товар добавлен в корзину');
         buttonElement.textContent = 'Удалить из корзины';
         buttonElement.classList.add('in-cart');
     } else {
-        // Удаляем из корзины
         cart.splice(existingIndex, 1);
         localStorage.setItem('cart', JSON.stringify(cart));
-        showNotification('Товар удален из корзины');
         buttonElement.textContent = 'В корзину';
         buttonElement.classList.remove('in-cart');
     }
@@ -503,5 +398,4 @@ function removeFromCart(productId) {
     let cart = getCart();
     cart = cart.filter(item => item.id !== productId);
     localStorage.setItem('cart', JSON.stringify(cart));
-    showNotification('Товар удален из корзины');
 }

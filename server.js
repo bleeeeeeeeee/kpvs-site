@@ -8,19 +8,16 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.static('.'));
 
-// Redirect root to welcome
 app.get('/', (req, res) => {
     res.redirect('/welcome');
 });
 
-// Serve HTML files without extension
 app.get('/:file', (req, res) => {
     res.sendFile(__dirname + '/' + req.params.file + '.html');
 });
 
 initDB();
 
-// Logging middleware
 app.use((req, res, next) => {
     console.log(`${req.method} ${req.path}`);
     next();
@@ -56,7 +53,7 @@ app.get('/api/product/:id', async (req, res) => {
 
 initDB().then(() => {
     app.listen(PORT, () => {
-        console.log(`✓ Server running on http://localhost:${PORT}`);
+        console.log(`  - Server running on http://localhost:${PORT}`);
     });
 }).catch(err => {
     console.error('Failed to initialize database:', err);

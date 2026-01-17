@@ -38,14 +38,14 @@ async function loadProduct() {
                     </div>
 
                     <div class="product-actions">
+                        <button class="favorite-btn ${isFavorite ? 'in-favorites' : ''}" onclick="toggleFavorite(${productId}, this)">
+                            ${isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
+                        </button>
                         <button class="price-btn cart-action-btn ${isInCart ? 'in-cart' : ''}" onclick="toggleCart(${productId}, this)">
                             ${isInCart ? 'Удалить из корзины' : 'В корзину'}
                         </button>
                         <button class="price-btn inquire-action-btn" onclick="inquirePrice('${product.name.replace(/'/g, "\\'")}', ${productId})">
                             Запросить цену
-                        </button>
-                        <button class="favorite-btn ${isFavorite ? 'in-favorites' : ''}" onclick="toggleFavorite(${productId}, this)">
-                            ${isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
                         </button>
                     </div>
                 </div>
@@ -73,17 +73,13 @@ function toggleCart(productId, buttonElement) {
     const existingIndex = cart.findIndex(item => item.id === productId);
     
     if (existingIndex === -1) {
-        // Добавляем в корзину
         cart.push({ id: productId, source: 'product' });
         localStorage.setItem('cart', JSON.stringify(cart));
-        showNotification('Товар добавлен в корзину');
         buttonElement.textContent = 'Удалить из корзины';
         buttonElement.classList.add('in-cart');
     } else {
-        // Удаляем из корзины
         cart.splice(existingIndex, 1);
         localStorage.setItem('cart', JSON.stringify(cart));
-        showNotification('Товар удален из корзины');
         buttonElement.textContent = 'В корзину';
         buttonElement.classList.remove('in-cart');
     }
@@ -113,101 +109,6 @@ function inquirePriceFromCart() {
     });
 }
 
-function showNotification(message) {
-    const notification = document.createElement('div');
-    notification.className = 'notification';
-    
-    const content = document.createElement('div');
-    content.className = 'notification-content';
-    content.textContent = message;
-    
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'notification-close';
-    closeBtn.innerHTML = '&times;';
-    closeBtn.onclick = () => {
-        notification.classList.remove('show');
-        setTimeout(() => notification.remove(), 300);
-    };
-    
-    const handle = document.createElement('div');
-    handle.className = 'notification-handle';
-    handle.title = 'Перетаскивайте отсюда';
-    
-    notification.appendChild(content);
-    notification.appendChild(closeBtn);
-    notification.appendChild(handle);
-    
-    const savedPos = localStorage.getItem('notificationPos');
-    if (savedPos) {
-        try {
-            const pos = JSON.parse(savedPos);
-            notification.style.top = pos.top + 'px';
-            notification.style.left = pos.left + 'px';
-            notification.style.right = 'auto';
-        } catch (e) {
-            console.error('Error parsing saved position:', e);
-        }
-    }
-    
-    let isDragging = false;
-    let offset = { x: 0, y: 0 };
-    let autoHideTimer = null;
-    
-    const clearAutoHide = () => {
-        if (autoHideTimer) {
-            clearTimeout(autoHideTimer);
-            autoHideTimer = null;
-        }
-    };
-    
-    const setAutoHide = () => {
-        clearAutoHide();
-        autoHideTimer = setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => notification.remove(), 300);
-        }, 3000);
-    };
-    
-    handle.addEventListener('mousedown', (e) => {
-        isDragging = true;
-        clearAutoHide();
-        notification.classList.add('dragging');
-        offset.x = e.clientX - notification.getBoundingClientRect().left;
-        offset.y = e.clientY - notification.getBoundingClientRect().top;
-    });
-    
-    const handleMouseMove = (e) => {
-        if (!isDragging || !document.body.contains(notification)) return;
-        notification.style.top = (e.clientY - offset.y) + 'px';
-        notification.style.left = (e.clientX - offset.x) + 'px';
-        notification.style.right = 'auto';
-    };
-    
-    const handleMouseUp = () => {
-        if (isDragging) {
-            isDragging = false;
-            notification.classList.remove('dragging');
-            if (document.body.contains(notification)) {
-                const pos = notification.getBoundingClientRect();
-                localStorage.setItem('notificationPos', JSON.stringify({
-                    top: pos.top,
-                    left: pos.left
-                }));
-                setAutoHide();
-            }
-        }
-    };
-    
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-    
-    document.body.appendChild(notification);
-    setTimeout(() => {
-        notification.classList.add('show');
-        setAutoHide();
-    }, 10);
-}
-
 function removeFromFavorites(productId) {
     let favorites = getFavorites();
     favorites = favorites.filter(item => item.id !== productId);
@@ -218,7 +119,6 @@ function removeFromCart(productId) {
     let cart = getCart();
     cart = cart.filter(item => item.id !== productId);
     localStorage.setItem('cart', JSON.stringify(cart));
-    showNotification('Товар удален из корзины');
 }
 
 function toggleCartFromModal(productId, buttonElement) {
@@ -226,17 +126,13 @@ function toggleCartFromModal(productId, buttonElement) {
     const existingIndex = cart.findIndex(item => item.id === productId);
     
     if (existingIndex === -1) {
-        // Добавляем в корзину
         cart.push({ id: productId, source: 'product' });
         localStorage.setItem('cart', JSON.stringify(cart));
-        showNotification('Товар добавлен в корзину');
         buttonElement.textContent = 'Удалить из корзины';
         buttonElement.classList.add('in-cart');
     } else {
-        // Удаляем из корзины
         cart.splice(existingIndex, 1);
         localStorage.setItem('cart', JSON.stringify(cart));
-        showNotification('Товар удален из корзины');
         buttonElement.textContent = 'В корзину';
         buttonElement.classList.remove('in-cart');
     }
@@ -281,7 +177,7 @@ function openFavoritesModal() {
                     <div class="modal-items">
                         ${products.map((product, idx) => {
                             const isInCart = getCart().some(item => item.id === product.id);
-                            const source = favorites[idx].source === 'mens' ? '(мужское)' : (favorites[idx].source === 'womens' ? '(женское)' : '(товар)');
+                            const source = favorites[idx].source === 'mens' ? '(мужское)' : (favorites[idx].source === 'womens' ? '(женское)' : '(карточка товара)');
                             return `
                             <div class="modal-item">
                                 <img src="${product.image}" alt="${product.name}" class="modal-item-img">
@@ -399,8 +295,6 @@ function toggleFavorite(productId, buttonElement = null) {
             button.classList.add('in-favorites');
         }
     }
-    
-    showNotification(wasFavorite ? 'Товар удален из избранного' : 'Товар добавлен в избранное');
 }
 
 function getFavorites() {

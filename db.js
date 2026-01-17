@@ -37,7 +37,7 @@ function initDB() {
                                     function(err) {
                                         inserted++;
                                         if (inserted === total) {
-                                            console.log('✓ DB initialized with ' + total + ' products');
+                                            console.log('  - DB initialized with ' + total + ' products');
                                             resolve();
                                         }
                                     });
@@ -51,7 +51,7 @@ function initDB() {
                                     function(err) {
                                         inserted++;
                                         if (inserted === total) {
-                                            console.log('✓ DB initialized with ' + total + ' products');
+                                            console.log('  - DB initialized with ' + total + ' products');
                                             resolve();
                                         }
                                     });
@@ -61,7 +61,7 @@ function initDB() {
                         reject(err);
                     }
                 } else {
-                    console.log('✓ DB already initialized');
+                    console.log('  - DB already initialized');
                     resolve();
                 }
             });
