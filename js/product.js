@@ -41,7 +41,7 @@ async function loadProduct() {
                         <button class="price-btn cart-action-btn ${isInCart ? 'in-cart' : ''}" onclick="toggleCart(${productId}, this)">
                             ${isInCart ? 'Удалить из корзины' : 'В корзину'}
                         </button>
-                        <button class="price-btn inquire-action-btn" onclick="inquirePrice('${product.name.replace(/'/g, "\\'")}')">
+                        <button class="price-btn inquire-action-btn" onclick="inquirePrice('${product.name.replace(/'/g, "\\'")}', ${productId})">
                             Запросить цену
                         </button>
                         <button class="favorite-btn ${isFavorite ? 'in-favorites' : ''}" onclick="toggleFavorite(${productId}, this)">
@@ -89,10 +89,10 @@ function toggleCart(productId, buttonElement) {
     }
 }
 
-function inquirePrice(productName) {
+function inquirePrice(productName, productId = null) {
     const subject = encodeURIComponent(`Запрос цены на ${productName}`);
-    const body = encodeURIComponent(`Здравствуйте! Прошу предоставить информацию о цене на ${productName}.`);
-    const email = 'info@kpvs.by';
+    const body = encodeURIComponent(`Здравствуйте! Прошу предоставить информацию о цене на:\n\nНазвание: ${productName}\nID товара: ${productId || 'н/д'}\n\nСпасибо!`);
+    const email = 'sbyt@kpvs.by';
     window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
 }
 
@@ -103,11 +103,12 @@ function inquirePriceFromCart() {
         return;
     }
     
-    getProductsByIds(cart).then(products => {
-        const productNames = products.map(p => p.name).join(', ');
+    const ids = cart.map(item => item.id);
+    getProductsByIds(ids).then(products => {
+        const productList = products.map(p => `- ${p.name} (ID: ${p.id})`).join('\n');
         const subject = encodeURIComponent('Запрос цены на товары из корзины');
-        const body = encodeURIComponent(`Здравствуйте! Прошу предоставить информацию о ценах на следующие товары:\n\n${productNames}\n\nСпасибо!`);
-        const email = 'info@kpvs.by';
+        const body = encodeURIComponent(`Здравствуйте! Прошу предоставить информацию о ценах на следующие товары:\n\n${productList}\n\nСпасибо!`);
+        const email = 'sbyt@kpvs.by';
         window.location.href = `mailto:${email}?subject=${subject}&body=${body}`;
     });
 }
@@ -115,15 +116,96 @@ function inquirePriceFromCart() {
 function showNotification(message) {
     const notification = document.createElement('div');
     notification.className = 'notification';
-    notification.textContent = message;
+    
+    const content = document.createElement('div');
+    content.className = 'notification-content';
+    content.textContent = message;
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'notification-close';
+    closeBtn.innerHTML = '&times;';
+    closeBtn.onclick = () => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    };
+    
+    const handle = document.createElement('div');
+    handle.className = 'notification-handle';
+    handle.title = 'Перетаскивайте отсюда';
+    
+    notification.appendChild(content);
+    notification.appendChild(closeBtn);
+    notification.appendChild(handle);
+    
+    const savedPos = localStorage.getItem('notificationPos');
+    if (savedPos) {
+        try {
+            const pos = JSON.parse(savedPos);
+            notification.style.top = pos.top + 'px';
+            notification.style.left = pos.left + 'px';
+            notification.style.right = 'auto';
+        } catch (e) {
+            console.error('Error parsing saved position:', e);
+        }
+    }
+    
+    let isDragging = false;
+    let offset = { x: 0, y: 0 };
+    let autoHideTimer = null;
+    
+    const clearAutoHide = () => {
+        if (autoHideTimer) {
+            clearTimeout(autoHideTimer);
+            autoHideTimer = null;
+        }
+    };
+    
+    const setAutoHide = () => {
+        clearAutoHide();
+        autoHideTimer = setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    };
+    
+    handle.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        clearAutoHide();
+        notification.classList.add('dragging');
+        offset.x = e.clientX - notification.getBoundingClientRect().left;
+        offset.y = e.clientY - notification.getBoundingClientRect().top;
+    });
+    
+    const handleMouseMove = (e) => {
+        if (!isDragging || !document.body.contains(notification)) return;
+        notification.style.top = (e.clientY - offset.y) + 'px';
+        notification.style.left = (e.clientX - offset.x) + 'px';
+        notification.style.right = 'auto';
+    };
+    
+    const handleMouseUp = () => {
+        if (isDragging) {
+            isDragging = false;
+            notification.classList.remove('dragging');
+            if (document.body.contains(notification)) {
+                const pos = notification.getBoundingClientRect();
+                localStorage.setItem('notificationPos', JSON.stringify({
+                    top: pos.top,
+                    left: pos.left
+                }));
+                setAutoHide();
+            }
+        }
+    };
+    
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    
     document.body.appendChild(notification);
     setTimeout(() => {
         notification.classList.add('show');
+        setAutoHide();
     }, 10);
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => notification.remove(), 300);
-    }, 2000);
 }
 
 function removeFromFavorites(productId) {
