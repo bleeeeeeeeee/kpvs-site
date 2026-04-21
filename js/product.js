@@ -1,56 +1,104 @@
 async function loadProduct() {
     const urlParams = new URLSearchParams(window.location.search);
-    const productId = parseInt(urlParams.get('id'));
+    const slug = urlParams.get('slug');
+    const productId = urlParams.get('id');
+    const identifier = slug || productId;
 
-    if (!productId) {
+    if (!identifier) {
         document.getElementById('product-details').innerHTML = '<p>Товар не найден.</p>';
         return;
     }
 
     try {
-        const res = await fetch(`/api/product/${productId}`);
-        const product = await res.json();
+        const res = await fetch(`/api/product/${encodeURIComponent(identifier)}`);
+        if (!res.ok) {
+            throw new Error(`Server returned ${res.status}`);
+        }
 
+        const product = await res.json();
         if (!product || !product.id) {
             document.getElementById('product-details').innerHTML = '<p>Товар не найден.</p>';
             return;
         }
 
-        const isFavorite = getFavorites().some(fav => fav.id === productId);
-        const isInCart = getCart().some(cartItem => cartItem.id === productId);
+        const isFavorite = getFavorites().some((fav) => fav.id === product.id);
+        const isInCart = getCart().some((cartItem) => cartItem.id === product.id);
+        const tagsHtml = (product.tags || [])
+            .map((tag) => `<span class="product-tag" style="background:${tag.color || '#eee'}">${tag.icon || ''} ${tag.name}</span>`)
+            .join('');
+
+        const materialsHtml = (product.materials || [])
+            .map((material) => `<li>${material.material} — ${material.percentage}%</li>`)
+            .join('');
+
+        const sizesHtml = (product.sizes || [])
+            .map((size) => `<li>${size.size}${size.quantity != null ? ` — ${size.quantity} шт.` : ''}</li>`)
+            .join('');
+
+        const images = Array.isArray(product.images) && product.images.length ? product.images : [{ path: product.image, is_main: true }];
+        const mainImage = images.find((img) => img.is_main) || images[0];
+        const galleryHtml = images.length > 1
+            ? `<div class="product-gallery">${images.map((img) => `<img src="${img.path}" alt="${product.name}" class="product-gallery-item" data-src="${img.path}">`).join('')}</div>`
+            : '';
 
         document.getElementById('product-details').innerHTML = `
             <div class="product-page">
-                <div class="product-image-wrapper">
-                    <img src="${product.image}" alt="${product.name}" class="product-image">
-                </div>
-                <div class="product-info">
-                    <h1 class="product-title">${product.name}</h1>
-
-                    <div class="product-section">
-                        <h3>Описание</h3>
-                        <p class="product-description">${product.description || 'Описание товара будет добавлено позже.'}</p>
+                <div class="product-image-block">
+                    <div class="product-image-wrapper">
+                        <img src="${mainImage.path}" alt="${product.name}" class="product-image">
                     </div>
-
-                    <div class="product-section">
-                        <h3>Материалы</h3>
-                        <p class="product-materials">${product.materials || 'Информация о материалах будет добавлена позже.'}</p>
-                    </div>
-
+                    ${galleryHtml}
                     <div class="product-actions">
-                        <button class="favorite-btn ${isFavorite ? 'in-favorites' : ''}" onclick="toggleFavorite(${productId}, this)">
+                        <button class="favorite-btn ${isFavorite ? 'in-favorites' : ''}" onclick="toggleFavorite(${product.id}, this)">
                             ${isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
                         </button>
-                        <button class="price-btn cart-action-btn ${isInCart ? 'in-cart' : ''}" onclick="toggleCart(${productId}, this)">
+                        <button class="price-btn cart-action-btn ${isInCart ? 'in-cart' : ''}" onclick="toggleCart(${product.id}, this)">
                             ${isInCart ? 'Удалить из корзины' : 'В корзину'}
                         </button>
-                        <button class="price-btn inquire-action-btn" onclick="inquirePrice('${product.name.replace(/'/g, "\\'")}', ${productId})">
+                        <button class="price-btn inquire-action-btn" onclick="inquirePrice('${product.name.replace(/'/g, "\\'")}', ${product.id})">
                             Запросить цену
                         </button>
                     </div>
                 </div>
+                <div class="product-info">
+                    <h1 class="product-title">${product.name}</h1>
+                    <p class="product-meta">${product.gender_name || 'Товар'}${product.category_name ? ` • ${product.category_name}` : ''}</p>
+                    <p class="product-sku">Артикул: ${product.id}</p>
+
+                    <div class="product-summary">
+                        <p class="product-description">${product.description || 'Описание товара будет добавлено позже.'}</p>
+                        <div class="product-tags">${tagsHtml || '<span>Нет тегов</span>'}</div>
+                    </div>
+
+                    <div class="product-specs">
+                        <p class="product-price">${product.price == null ? 'По запросу' : `${product.price.toFixed(2)} руб.`}</p>
+                        <div class="product-spec-group">
+                            <div>
+                                <p class="product-spec-heading">Состав</p>
+                                <ul class="product-material-list">${materialsHtml || '<li>Информация о материалах будет добавлена позже.</li>'}</ul>
+                            </div>
+                            <div>
+                                <p class="product-spec-heading">Размеры</p>
+                                <ul class="product-size-list">${sizesHtml || '<li>Размеры отсутствуют</li>'}</ul>
+                            </div>
+                        </div>
+                        <p class="product-meta">Дата добавления: ${product.created_at ? new Date(product.created_at).toLocaleDateString('ru-RU') : 'не указана'}</p>
+                    </div>
+                </div>
             </div>
         `;
+
+        if (images.length > 1) {
+            document.querySelectorAll('.product-gallery-item').forEach((thumb) => {
+                thumb.addEventListener('click', () => {
+                    const newSrc = thumb.dataset.src;
+                    const mainImg = document.querySelector('.product-image');
+                    if (mainImg && newSrc) {
+                        mainImg.src = newSrc;
+                    }
+                });
+            });
+        }
     } catch (error) {
         console.error('Error loading product:', error);
         document.getElementById('product-details').innerHTML = '<p>Ошибка загрузки товара.</p>';
@@ -59,9 +107,16 @@ async function loadProduct() {
 
 async function getProductsByIds(ids) {
     try {
-        return Promise.all(ids.map(id => 
-            fetch(`/api/product/${id}`).then(r => r.json())
-        ));
+        const requests = ids.map(async (id) => {
+            const res = await fetch(`/api/product/${id}`);
+            if (!res.ok) {
+                return null;
+            }
+            return res.json();
+        });
+
+        const products = await Promise.all(requests);
+        return products.filter(Boolean);
     } catch (error) {
         console.error('Error loading products:', error);
         return [];
@@ -141,6 +196,7 @@ function toggleCartFromModal(productId, buttonElement) {
 function openFavoritesModal() {
     const favorites = getFavorites();
     const ids = favorites.map(item => item.id);
+    const favoritesMap = new Map(favorites.map(item => [item.id, item]));
     
     if (ids.length === 0) {
         const modal = document.createElement('div');
@@ -175,17 +231,21 @@ function openFavoritesModal() {
                 </div>
                 <div class="modal-body">
                     <div class="modal-items">
-                        ${products.map((product, idx) => {
+                        ${products.filter(product => product && product.id).map((product) => {
                             const isInCart = getCart().some(item => item.id === product.id);
-                            const source = favorites[idx].source === 'mens' ? '(мужское)' : (favorites[idx].source === 'womens' ? '(женское)' : '(карточка товара)');
+                            const source = favoritesMap.get(product.id)?.source === 'mens'
+                                ? '(мужское)'
+                                : favoritesMap.get(product.id)?.source === 'womens'
+                                ? '(женское)'
+                                : '(карточка товара)';
                             return `
-                            <div class="modal-item">
+                            <div class="modal-item" data-product-id="${product.id}">
                                 <img src="${product.image}" alt="${product.name}" class="modal-item-img">
                                 <div class="modal-item-info">
                                     <h3>${product.name} <small>${source}</small></h3>
                                     <div class="modal-item-actions">
-                                        <button class="btn-add-to-cart ${isInCart ? 'in-cart' : ''}" onclick="toggleCartFromModal(${product.id}, this)">${isInCart ? 'Удалить из корзины' : 'В корзину'}</button>
-                                        <button class="btn-remove" onclick="removeFromFavorites(${product.id}); this.closest('.modal-item').remove(); if(document.querySelectorAll('.modal-item').length === 0) { document.querySelector('.modal-body').innerHTML = '<p class=\\'empty-message\\'>У вас пока нет товаров в избранном</p>'; }">Удалить</button>
+                                        <button class="btn-add-to-cart ${isInCart ? 'in-cart' : ''}" data-action="toggle-cart" data-product-id="${product.id}">${isInCart ? 'Удалить из корзины' : 'В корзину'}</button>
+                                        <button class="btn-remove" data-action="remove-favorite" data-product-id="${product.id}">Удалить</button>
                                     </div>
                                 </div>
                             </div>
@@ -200,12 +260,34 @@ function openFavoritesModal() {
         modal.addEventListener('click', (e) => {
             if (e.target === modal) modal.remove();
         });
+
+        modal.querySelectorAll('[data-action="toggle-cart"]').forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const productId = Number(button.dataset.productId);
+                toggleCartFromModal(productId, button);
+            });
+        });
+
+        modal.querySelectorAll('[data-action="remove-favorite"]').forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const productId = Number(button.dataset.productId);
+                removeFromFavorites(productId);
+                const itemElement = button.closest('.modal-item');
+                if (itemElement) itemElement.remove();
+                if (!modal.querySelector('.modal-item')) {
+                    modal.querySelector('.modal-body').innerHTML = '<p class="empty-message">У вас пока нет товаров в избранном</p>';
+                }
+            });
+        });
     });
 }
 
 function openCartModal() {
     const cart = getCart();
     const ids = cart.map(item => item.id);
+    const cartMap = new Map(cart.map(item => [item.id, item]));
     
     if (ids.length === 0) {
         const modal = document.createElement('div');
@@ -240,15 +322,19 @@ function openCartModal() {
                 </div>
                 <div class="modal-body">
                     <div class="modal-items">
-                        ${products.map((product, idx) => {
-                            const source = cart[idx].source === 'mens' ? '(мужское)' : cart[idx].source === 'womens' ? '(женское)' : '(товар)';
+                        ${products.filter(product => product && product.id).map((product) => {
+                            const source = cartMap.get(product.id)?.source === 'mens'
+                                ? '(мужское)'
+                                : cartMap.get(product.id)?.source === 'womens'
+                                ? '(женское)'
+                                : '(товар)';
                             return `
-                            <div class="modal-item">
+                            <div class="modal-item" data-product-id="${product.id}">
                                 <img src="${product.image}" alt="${product.name}" class="modal-item-img">
                                 <div class="modal-item-info">
                                     <h3>${product.name} <small>${source}</small></h3>
                                     <div class="modal-item-actions">
-                                        <button class="btn-remove" onclick="removeFromCart(${product.id}); this.closest('.modal-item').remove(); if(document.querySelectorAll('.modal-item').length === 0) { document.querySelector('.modal-body').innerHTML = '<p class=\\'empty-message\\'>Корзина пуста</p>'; }">Удалить</button>
+                                        <button class="btn-remove" data-action="remove-from-cart" data-product-id="${product.id}">Удалить</button>
                                     </div>
                                 </div>
                             </div>
@@ -266,45 +352,81 @@ function openCartModal() {
         modal.addEventListener('click', (e) => {
             if (e.target === modal) modal.remove();
         });
+
+        modal.querySelectorAll('[data-action="remove-from-cart"]').forEach((button) => {
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                const productId = Number(button.dataset.productId);
+                removeFromCart(productId);
+                const itemElement = button.closest('.modal-item');
+                if (itemElement) itemElement.remove();
+                if (!modal.querySelector('.modal-item')) {
+                    modal.querySelector('.modal-body').innerHTML = '<p class="empty-message">Корзина пуста</p>';
+                }
+            });
+        });
     });
 }
 
 function removeFromFavorites(productId) {
     let favorites = getFavorites();
-    favorites = favorites.filter(id => id !== productId);
+    favorites = favorites.filter((item) => item.id !== productId);
     localStorage.setItem('favorites', JSON.stringify(favorites));
 }
 
 function toggleFavorite(productId, buttonElement = null) {
     let favorites = getFavorites();
-    const wasFavorite = favorites.some(item => item.id === productId);
-    
+    const wasFavorite = favorites.some((item) => item.id === productId);
+
     if (wasFavorite) {
-        favorites = favorites.filter(item => item.id !== productId);
+        favorites = favorites.filter((item) => item.id !== productId);
     } else {
         favorites.push({ id: productId, source: 'product' });
     }
+
     localStorage.setItem('favorites', JSON.stringify(favorites));
 
     const button = buttonElement || document.querySelector('.favorite-btn');
     if (button) {
         button.textContent = wasFavorite ? 'Добавить в избранное' : 'Удалить из избранного';
-        if (wasFavorite) {
-            button.classList.remove('in-favorites');
-        } else {
-            button.classList.add('in-favorites');
-        }
+        button.classList.toggle('in-favorites', !wasFavorite);
     }
 }
 
 function getFavorites() {
     const favorites = localStorage.getItem('favorites');
-    return favorites ? JSON.parse(favorites) : [];
+    if (!favorites) return [];
+
+    try {
+        const parsed = JSON.parse(favorites);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.map((item) => {
+            if (typeof item === 'number' || typeof item === 'string') {
+                return { id: Number(item), source: 'product' };
+            }
+            return { id: Number(item.id), source: item.source || 'product' };
+        }).filter((item) => Number.isFinite(item.id));
+    } catch {
+        return [];
+    }
 }
 
 function getCart() {
     const cart = localStorage.getItem('cart');
-    return cart ? JSON.parse(cart) : [];
+    if (!cart) return [];
+
+    try {
+        const parsed = JSON.parse(cart);
+        if (!Array.isArray(parsed)) return [];
+        return parsed.map((item) => {
+            if (typeof item === 'number' || typeof item === 'string') {
+                return { id: Number(item), source: 'product' };
+            }
+            return { id: Number(item.id), source: item.source || 'product' };
+        }).filter((item) => Number.isFinite(item.id));
+    } catch {
+        return [];
+    }
 }
 
 document.querySelector('.section #logo').addEventListener('click', () => {

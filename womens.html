@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Женский раздел</title>
     <link rel="stylesheet" href="/css/style.css">
-    <script src="/js/womens.js" defer></script>
+    <script src="/js/catalog.js" defer></script>
 </head>
-<body>
+<body data-gender="womens">
     <div class="container">
         <header>
             <div class="section">
@@ -34,14 +34,7 @@
                 </select>
             </div>
             <div class="sort-section">
-                <label for="filter-select">Фильтры:</label>
-                <select id="filter-select">
-                    <option value="all">Все категории</option>
-                    <option value="popular">Популярные</option>
-                    <option value="outerwear">Верхняя одежда</option>
-                    <option value="underwear">Нижняя одежда</option>
-                    <option value="accessories">Аксессуары</option>
-                </select>
+                <button id="filter-button" class="filter-button" type="button">Фильтры</button>
             </div>
         </div>
 

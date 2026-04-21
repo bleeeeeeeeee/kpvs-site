@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Администрирование</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/admin.js" defer></script>
+</head>
+<body>
+    <div class="container admin-panel">
+        <header class="admin-header">
+            <div>
+                <h1>Административная панель</h1>
+                <p class="admin-subtitle">Управление товарами, фильтрами и категориями.</p>
+            </div>
+            <button id="add-product-btn" class="filter-button" type="button">Добавить товар</button>
+        </header>
+
+        <div class="admin-toolbar">
+            <input id="search-input" type="search" placeholder="Поиск по названию или описанию" />
+            <button id="open-filters-btn" class="filter-button outline" type="button">Фильтры</button>
+            <button id="refresh-btn" class="filter-button" type="button">Обновить</button>
+        </div>
+
+        <div class="admin-summary-row">
+            <div class="admin-count">Загружено товаров: <span id="product-count">0</span></div>
+            <div class="admin-sorting">
+                <label for="sort-by">Сортировка</label>
+                <select id="sort-by">
+                    <option value="created_at_desc">Сначала новые</option>
+                    <option value="created_at_asc">Сначала старые</option>
+                    <option value="name_asc">Название A–Я</option>
+                    <option value="name_desc">Название Я–A</option>
+                    <option value="price_asc">Цена по возрастанию</option>
+                    <option value="price_desc">Цена по убыванию</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="admin-summary-note">Используйте фильтры для точного поиска и сортировки товаров.</div>
+
+        <div class="admin-table-container">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Название</th>
+                        <th>Описание</th>
+                        <th>Категория</th>
+                        <th>Пол</th>
+                        <th>Цена</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody id="products-body"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="modal" id="filter-modal">
+        <div class="modal-content admin-modal-content">
+            <div class="modal-header">
+                <h2>Фильтры товаров</h2>
+                <button class="modal-close" type="button">&times;</button>
+            </div>
+            <div class="modal-body admin-filter-body">
+                <div class="filter-section">
+                    <label for="filter-gender-modal">Пол</label>
+                    <select id="filter-gender-modal">
+                        <option value="">Все разделы</option>
+                        <option value="mens">Мужской</option>
+                        <option value="womens">Женский</option>
+                    </select>
+                </div>
+                <div class="filter-section">
+                    <label for="filter-category-modal">Категория</label>
+                    <select id="filter-category-modal">
+                        <option value="">Все категории</option>
+                    </select>
+                </div>
+                <div class="filter-row">
+                    <div class="filter-section filter-price">
+                        <label for="min-price">Мин. цена</label>
+                        <input id="min-price" type="number" min="0" step="0.01" placeholder="0" />
+                    </div>
+                    <div class="filter-section filter-price">
+                        <label for="max-price">Макс. цена</label>
+                        <input id="max-price" type="number" min="0" step="0.01" placeholder="0" />
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="apply-filters-btn" class="filter-apply-btn" type="button">Применить</button>
+                <button id="clear-filters-btn" class="filter-clear-btn" type="button">Сбросить</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal" id="product-modal">
+        <div class="modal-content admin-modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Новый товар</h2>
+                <button class="modal-close" type="button">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="product-form" class="admin-form">
+                    <div class="form-row">
+                        <label for="product-name">Название</label>
+                        <input id="product-name" name="name" type="text" required />
+                    </div>
+                    <div class="form-row">
+                        <label for="product-slug">Slug</label>
+                        <input id="product-slug" name="slug" type="text" placeholder="Автоматически создаётся из названия" />
+                    </div>
+                    <div class="form-row">
+                        <label for="product-description">Описание</label>
+                        <textarea id="product-description" name="description" rows="4"></textarea>
+                    </div>
+                    <div class="form-row form-grid">
+                        <div>
+                            <label for="product-price">Цена</label>
+                            <input id="product-price" name="price" type="number" step="0.01" min="0" />
+                        </div>
+                        <div>
+                            <label for="product-image">URL изображения</label>
+                            <input id="product-image" name="image" type="url" />
+                        </div>
+                    </div>
+                    <div class="form-row form-grid">
+                        <div>
+                            <label for="product-gender">Пол</label>
+                            <select id="product-gender" name="gender" required>
+                                <option value="mens">Мужской</option>
+                                <option value="womens">Женский</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="product-category">Категория</label>
+                            <select id="product-category" name="category" required></select>
+                        </div>
+                    </div>
+                    <div class="admin-form-actions">
+                        <button class="filter-button" id="save-product-btn" type="submit">Сохранить</button>
+                        <button class="btn-remove" id="cancel-product-btn" type="button">Отмена</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
