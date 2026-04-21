@@ -42,6 +42,15 @@
 
         <div class="admin-table-container">
             <table class="admin-table">
+                <colgroup>
+                    <col data-col="id" style="width: 72px;">
+                    <col data-col="name" style="width: 280px;">
+                    <col data-col="description">
+                    <col data-col="category" style="width: 200px;">
+                    <col data-col="gender" style="width: 140px;">
+                    <col data-col="price" style="width: 140px;">
+                    <col data-col="actions" style="width: 220px;">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -75,9 +84,14 @@
                 </div>
                 <div class="filter-section">
                     <label for="filter-category-modal">Категория</label>
-                    <select id="filter-category-modal">
-                        <option value="">Все категории</option>
-                    </select>
+                    <div class="admin-multiselect" id="filter-category-multiselect">
+                        <button class="admin-multiselect-trigger" id="filter-category-trigger" type="button">
+                            <span id="filter-category-label">Все категории</span>
+                            <span class="admin-multiselect-caret" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="admin-multiselect-dropdown" id="filter-category-dropdown" role="listbox" aria-multiselectable="true"></div>
+                        <input type="hidden" id="filter-category-modal" value="" />
+                    </div>
                 </div>
                 <div class="filter-row">
                     <div class="filter-section filter-price">
@@ -126,6 +140,12 @@
                             <label for="product-image">URL изображения</label>
                             <input id="product-image" name="image" type="url" />
                         </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="product-images">Изображения (несколько файлов)</label>
+                        <input id="product-images" name="images" type="file" accept="image/*" multiple />
+                        <div class="admin-image-help">Можно выбрать несколько файлов. После выбора они загрузятся и появятся в списке ниже.</div>
+                        <div id="product-images-list" class="admin-image-list" aria-live="polite"></div>
                     </div>
                     <div class="form-row form-grid">
                         <div>

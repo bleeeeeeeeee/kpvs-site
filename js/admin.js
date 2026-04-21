@@ -2,12 +2,26 @@ const Admin = (() => {
     let categories = [];
     let products = [];
     let editingProductId = null;
+    let productImages = [];
     const state = {
         gender: '',
-        category: '',
+        categories: [],
         minPrice: '',
         maxPrice: '',
         sortOption: 'created_at_desc'
+    };
+
+    const ui = {
+        productsBody: null,
+        productCount: null,
+        filterCategoryHidden: null,
+        filterCategoryMultiselect: null,
+        filterCategoryDropdown: null,
+        filterCategoryLabel: null,
+        filterCategoryTrigger: null,
+        productCategorySelect: null,
+        productImagesInput: null,
+        productImagesList: null
     };
 
     function slugify(text) {
@@ -21,6 +35,50 @@ const Admin = (() => {
             .replace(/^-+|-+$/g, '');
     }
 
+    function notify(message, kind = 'info') {
+        const existing = document.querySelector('.notification');
+        if (existing) existing.remove();
+
+        const node = document.createElement('div');
+        node.className = 'notification show';
+        node.setAttribute('role', 'status');
+        node.innerHTML = `
+            <div class="notification-handle" aria-hidden="true"></div>
+            <div class="notification-content">
+                <strong>${escapeHtml(kind === 'error' ? 'Ошибка' : kind === 'success' ? 'Готово' : 'Сообщение')}</strong>
+                <span>${escapeHtml(message)}</span>
+            </div>
+            <button class="notification-close" type="button" aria-label="Закрыть">&times;</button>
+        `;
+        document.body.appendChild(node);
+
+        const close = node.querySelector('.notification-close');
+        if (close) close.onclick = () => node.remove();
+
+        window.setTimeout(() => {
+            if (node.isConnected) node.remove();
+        }, kind === 'error' ? 7000 : 4500);
+    }
+
+    function setTableStatusRow(message) {
+        if (!ui.productsBody || !ui.productCount) return;
+        ui.productsBody.innerHTML = `
+            <tr class="empty-row">
+                <td colspan="7">${escapeHtml(message)}</td>
+            </tr>
+        `;
+        ui.productCount.textContent = '0';
+    }
+
+    function normalizeSelectedCategories(value) {
+        if (!value) return [];
+        if (Array.isArray(value)) return value.map(String).map((v) => v.trim()).filter(Boolean);
+        return String(value)
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean);
+    }
+
     async function fetchCategories() {
         try {
             const response = await fetch('/api/categories');
@@ -32,12 +90,9 @@ const Admin = (() => {
             populateCategoryFilters();
         } catch (error) {
             console.error('Error fetching categories:', error);
-            categories = [
-                { code: 'outerwear', name: 'Верхняя одежда' },
-                { code: 'pants', name: 'Брюки' },
-                { code: 'accessories', name: 'Аксессуары' }
-            ];
+            categories = [];
             populateCategoryFilters();
+            notify('Не удалось загрузить категории. Проверьте сервер и попробуйте обновить.', 'error');
         }
     }
 
@@ -56,18 +111,69 @@ const Admin = (() => {
     }
 
     function populateCategoryFilters() {
-        const filterSelect = document.getElementById('filter-category-modal');
-        const formSelect = document.getElementById('product-category');
+        if (!ui.filterCategoryDropdown || !ui.filterCategoryHidden || !ui.productCategorySelect) return;
 
-        if (!filterSelect || !formSelect) return;
+        ui.filterCategoryDropdown.innerHTML = '';
+        categories.forEach((category) => {
+            const option = document.createElement('label');
+            option.className = 'admin-multiselect-option';
+            option.innerHTML = `
+                <input type="checkbox" value="${escapeHtml(category.code)}" />
+                <span>${escapeHtml(category.name)}</span>
+            `;
+            ui.filterCategoryDropdown.appendChild(option);
+        });
 
-        filterSelect.innerHTML = '<option value="">Все категории</option>' + categories
-            .map((category) => `<option value="${category.code}">${category.name}</option>`)
+        ui.productCategorySelect.innerHTML = categories
+            .map((category) => `<option value="${category.code}">${escapeHtml(category.name)}</option>`)
             .join('');
 
-        formSelect.innerHTML = categories
-            .map((category) => `<option value="${category.code}">${category.name}</option>`)
-            .join('');
+        const next = normalizeSelectedCategories(state.categories);
+        setSelectedCategories(next);
+    }
+
+    function getSelectedCategories() {
+        if (!ui.filterCategoryDropdown) return [];
+        return Array.from(ui.filterCategoryDropdown.querySelectorAll('input[type="checkbox"]:checked'))
+            .map((input) => input.value)
+            .filter(Boolean);
+    }
+
+    function setSelectedCategories(codes) {
+        const selected = normalizeSelectedCategories(codes);
+        state.categories = selected;
+
+        if (ui.filterCategoryHidden) {
+            ui.filterCategoryHidden.value = selected.join(',');
+        }
+
+        if (ui.filterCategoryDropdown) {
+            const set = new Set(selected);
+            ui.filterCategoryDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                input.checked = set.has(input.value);
+            });
+        }
+
+        if (ui.filterCategoryLabel) {
+            if (!selected.length) {
+                ui.filterCategoryLabel.textContent = 'Все категории';
+            } else if (selected.length === 1) {
+                const name = categories.find((c) => c.code === selected[0])?.name || selected[0];
+                ui.filterCategoryLabel.textContent = name;
+            } else {
+                ui.filterCategoryLabel.textContent = `Выбрано категорий: ${selected.length}`;
+            }
+        }
+    }
+
+    function openCategoryDropdown() {
+        if (!ui.filterCategoryMultiselect) return;
+        ui.filterCategoryMultiselect.classList.add('open');
+    }
+
+    function closeCategoryDropdown() {
+        if (!ui.filterCategoryMultiselect) return;
+        ui.filterCategoryMultiselect.classList.remove('open');
     }
 
     function getSortValues() {
@@ -79,11 +185,14 @@ const Admin = (() => {
 
     async function fetchProducts() {
         try {
+            setTableStatusRow('Загрузка товаров…');
             const searchInput = document.getElementById('search-input');
             const params = new URLSearchParams();
             if (searchInput && searchInput.value.trim()) params.set('q', searchInput.value.trim());
             if (state.gender) params.set('gender', state.gender);
-            if (state.category) params.set('category', state.category);
+            if (state.categories && state.categories.length) {
+                state.categories.forEach((code) => params.append('category', code));
+            }
             if (state.minPrice) params.set('price_min', state.minPrice);
             if (state.maxPrice) params.set('price_max', state.maxPrice);
             const { sortBy, sortDir } = getSortValues();
@@ -94,66 +203,32 @@ const Admin = (() => {
 
             const response = await fetch(`/api/admin/products?${params.toString()}`);
             if (!response.ok) {
-                throw new Error('Не удалось загрузить товары');
+                throw new Error(`Не удалось загрузить товары (код ${response.status})`);
             }
             products = await response.json();
             renderProducts();
         } catch (error) {
             console.error('Error fetching products:', error);
-            showDemoData();
+            products = [];
+            setTableStatusRow('Не удалось загрузить товары. Проверьте подключение к серверу и обновите страницу.');
+            notify(error.message || 'Не удалось загрузить товары.', 'error');
         }
     }
 
-    function showDemoData() {
-        products = [
-            {
-                id: 1,
-                name: 'Куртка утепленная',
-                description: 'Теплая зимняя куртка с водоотталкивающей пропиткой',
-                price: 299.99,
-                image: '/img/demo1.jpg',
-                gender: 'mens',
-                category: 'outerwear'
-            },
-            {
-                id: 2,
-                name: 'Брюки классические',
-                description: 'Классические брюки из костюмной ткани',
-                price: 149.99,
-                image: '/img/demo2.jpg',
-                gender: 'mens',
-                category: 'pants'
-            },
-            {
-                id: 3,
-                name: 'Платье офисное',
-                description: 'Элегантное платье для офиса',
-                price: 199.99,
-                image: '/img/demo3.jpg',
-                gender: 'womens',
-                category: 'outerwear'
-            }
-        ];
-        renderProducts();
-    }
-
     function renderProducts() {
-        const body = document.getElementById('products-body');
-        const count = document.getElementById('product-count');
-
-        if (!body || !count) return;
+        if (!ui.productsBody || !ui.productCount) return;
 
         if (!products || products.length === 0) {
-            body.innerHTML = `
+            ui.productsBody.innerHTML = `
                 <tr class="empty-row">
                     <td colspan="7">Товары не найдены по текущим условиям поиска и фильтрам.</td>
                 </tr>
             `;
-            count.textContent = '0';
+            ui.productCount.textContent = '0';
             return;
         }
 
-        body.innerHTML = products.map((product) => {
+        ui.productsBody.innerHTML = products.map((product) => {
             const category = categories.find((item) => item.code === product.category)?.name || product.category || '-';
             const genderLabel = product.gender === 'mens' ? 'Мужской' : product.gender === 'womens' ? 'Женский' : (product.gender || '-');
             const description = product.description || '-';
@@ -162,20 +237,28 @@ const Admin = (() => {
             return `
                 <tr data-product-id="${product.id}">
                     <td class="cell-id">${product.id}</td>
-                    <td class="cell-name"><strong>${escapeHtml(product.name)}</strong></td>
-                    <td class="cell-description" title="${escapeHtml(description)}">${escapeHtml(shortDescription)}</td>
+                    <td>
+                        <div class="cell-name">
+                            <strong>${escapeHtml(product.name)}</strong>
+                        </div>
+                    </td>
+                    <td title="${escapeHtml(description)}">
+                        <div class="cell-description">${escapeHtml(shortDescription)}</div>
+                    </td>
                     <td>${escapeHtml(category)}</td>
                     <td>${escapeHtml(genderLabel)}</td>
                     <td class="cell-price">${product.price !== null && product.price !== undefined ? product.price.toFixed(2) : 'По запросу'}</td>
-                    <td class="admin-actions-cell">
-                        <button type="button" class="btn-edit" data-action="edit" data-id="${product.id}">Редактировать</button>
-                        <button type="button" class="btn-delete" data-action="delete" data-id="${product.id}">Удалить</button>
+                    <td>
+                        <div class="admin-actions-cell">
+                            <button type="button" class="btn-edit" data-action="edit" data-id="${product.id}">Редактировать</button>
+                            <button type="button" class="btn-delete" data-action="delete" data-id="${product.id}">Удалить</button>
+                        </div>
                     </td>
                 </tr>
             `;
         }).join('');
 
-        count.textContent = products.length.toString();
+        ui.productCount.textContent = products.length.toString();
     }
 
     function escapeHtml(str) {
@@ -186,6 +269,127 @@ const Admin = (() => {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    function normalizeImagePath(path) {
+        if (!path || typeof path !== 'string') return null;
+        const trimmed = path.trim();
+        return trimmed ? trimmed : null;
+    }
+
+    function dedupeImages(images) {
+        const seen = new Set();
+        const out = [];
+        images.forEach((img) => {
+            const p = normalizeImagePath(img?.path);
+            if (!p) return;
+            if (seen.has(p)) return;
+            seen.add(p);
+            out.push({ path: p, is_main: Boolean(img?.is_main), sort_order: out.length });
+        });
+        if (!out.length) return [];
+        if (!out.some((i) => i.is_main)) out[0].is_main = true;
+        return out;
+    }
+
+    function setProductImages(nextImages) {
+        productImages = dedupeImages(Array.isArray(nextImages) ? nextImages : []);
+        renderProductImages();
+    }
+
+    function renderProductImages() {
+        if (!ui.productImagesList) return;
+        if (!productImages.length) {
+            ui.productImagesList.innerHTML = '';
+            return;
+        }
+
+        ui.productImagesList.innerHTML = productImages.map((img, idx) => {
+            const safePath = escapeHtml(img.path);
+            const checked = img.is_main ? 'checked' : '';
+            return `
+                <div class="admin-image-item" data-index="${idx}">
+                    <div class="admin-image-thumb">
+                        <img src="${safePath}" alt="image ${idx + 1}">
+                    </div>
+                    <div class="admin-image-meta">
+                        <strong>Картинка ${idx + 1}</strong>
+                        <code title="${safePath}">${safePath}</code>
+                    </div>
+                    <div class="admin-image-actions">
+                        <label>
+                            <input type="radio" name="main-image" value="${idx}" ${checked} />
+                            Главная
+                        </label>
+                        <button type="button" data-action="remove-image" data-index="${idx}">Удалить</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        ui.productImagesList.querySelectorAll('input[type="radio"][name="main-image"]').forEach((radio) => {
+            radio.addEventListener('change', () => {
+                const index = Number(radio.value);
+                if (!Number.isFinite(index)) return;
+                productImages = productImages.map((img, i) => ({ ...img, is_main: i === index }));
+                renderProductImages();
+            });
+        });
+
+        ui.productImagesList.querySelectorAll('[data-action="remove-image"]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const index = Number(btn.getAttribute('data-index'));
+                if (!Number.isFinite(index)) return;
+                productImages.splice(index, 1);
+                if (productImages.length && !productImages.some((i) => i.is_main)) {
+                    productImages[0].is_main = true;
+                }
+                productImages = dedupeImages(productImages);
+                renderProductImages();
+            });
+        });
+    }
+
+    async function uploadSelectedFiles(files) {
+        const list = Array.from(files || []).filter(Boolean);
+        if (!list.length) return [];
+        const form = new FormData();
+        list.forEach((file) => form.append('images', file, file.name));
+
+        const res = await fetch('/api/admin/uploads', { method: 'POST', body: form });
+        if (!res.ok) {
+            let details = '';
+            try {
+                const err = await res.json();
+                if (err && err.error) details = String(err.error);
+            } catch {}
+            throw new Error(details || `Не удалось загрузить изображения (код ${res.status})`);
+        }
+        const data = await res.json();
+        const uploaded = Array.isArray(data?.files) ? data.files : [];
+        return uploaded.map((p) => ({ path: p, is_main: false, sort_order: 0 }));
+    }
+
+    async function loadProductImagesForEdit(productId) {
+        try {
+            const res = await fetch(`/api/product/${encodeURIComponent(productId)}`);
+            if (!res.ok) return;
+            const full = await res.json();
+            const images = Array.isArray(full?.images) ? full.images : [];
+            if (images.length) {
+                setProductImages(images.map((img) => ({
+                    path: img.path || img.image_path || img.image || '',
+                    is_main: Boolean(img.is_main),
+                    sort_order: Number(img.sort_order) || 0
+                })));
+                return;
+            }
+            if (full?.image) {
+                setProductImages([{ path: full.image, is_main: true, sort_order: 0 }]);
+            }
+        } catch (error) {
+            console.error('Failed to load product images:', error);
+        }
     }
 
     function setupTableDelegation() {
@@ -225,17 +429,64 @@ const Admin = (() => {
         });
     }
 
+    function setupResizableColumns() {
+        const table = document.querySelector('.admin-table');
+        if (!table) return;
+        if (table._resizableSet) return;
+        table._resizableSet = true;
+
+        const headerRow = table.querySelector('thead tr');
+        const cols = Array.from(table.querySelectorAll('colgroup col'));
+        const ths = Array.from(table.querySelectorAll('thead th'));
+        if (!headerRow || !cols.length || ths.length !== cols.length) return;
+
+        ths.forEach((th, index) => {
+            if (index === ths.length - 1) return;
+            const handle = document.createElement('span');
+            handle.className = 'admin-col-resizer';
+            handle.setAttribute('role', 'separator');
+            handle.setAttribute('aria-orientation', 'vertical');
+            th.appendChild(handle);
+
+            const minWidths = [60, 180, 220, 140, 110, 110, 160];
+            const minWidth = minWidths[index] || 80;
+
+            const onPointerDown = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try { handle.setPointerCapture(e.pointerId); } catch {}
+                const startX = e.clientX;
+                const startWidth = th.getBoundingClientRect().width;
+
+                const onMove = (moveEvent) => {
+                    const dx = moveEvent.clientX - startX;
+                    const nextWidth = Math.max(minWidth, Math.round(startWidth + dx));
+                    cols[index].style.width = `${nextWidth}px`;
+                };
+
+                const onUp = () => {
+                    document.removeEventListener('pointermove', onMove);
+                    document.removeEventListener('pointerup', onUp);
+                };
+
+                document.addEventListener('pointermove', onMove);
+                document.addEventListener('pointerup', onUp);
+            };
+
+            handle.addEventListener('pointerdown', onPointerDown);
+        });
+    }
+
     function openFiltersModal() {
         const modal = document.getElementById('filter-modal');
         if (!modal) return;
         
         const genderSelect = document.getElementById('filter-gender-modal');
-        const categorySelect = document.getElementById('filter-category-modal');
         const minPriceInput = document.getElementById('min-price');
         const maxPriceInput = document.getElementById('max-price');
         
         if (genderSelect) genderSelect.value = state.gender;
-        if (categorySelect) categorySelect.value = state.category;
+        setSelectedCategories(state.categories);
         if (minPriceInput) minPriceInput.value = state.minPrice;
         if (maxPriceInput) maxPriceInput.value = state.maxPrice;
         
@@ -256,12 +507,11 @@ const Admin = (() => {
 
     function applyFilters() {
         const genderSelect = document.getElementById('filter-gender-modal');
-        const categorySelect = document.getElementById('filter-category-modal');
         const minPriceInput = document.getElementById('min-price');
         const maxPriceInput = document.getElementById('max-price');
         
         state.gender = genderSelect ? genderSelect.value : '';
-        state.category = categorySelect ? categorySelect.value : '';
+        state.categories = getSelectedCategories();
         state.minPrice = minPriceInput ? minPriceInput.value.trim() : '';
         state.maxPrice = maxPriceInput ? maxPriceInput.value.trim() : '';
         
@@ -271,17 +521,16 @@ const Admin = (() => {
 
     function clearFilters() {
         state.gender = '';
-        state.category = '';
+        state.categories = [];
         state.minPrice = '';
         state.maxPrice = '';
         
         const genderSelect = document.getElementById('filter-gender-modal');
-        const categorySelect = document.getElementById('filter-category-modal');
         const minPriceInput = document.getElementById('min-price');
         const maxPriceInput = document.getElementById('max-price');
         
         if (genderSelect) genderSelect.value = '';
-        if (categorySelect) categorySelect.value = '';
+        setSelectedCategories([]);
         if (minPriceInput) minPriceInput.value = '';
         if (maxPriceInput) maxPriceInput.value = '';
         
@@ -296,18 +545,13 @@ const Admin = (() => {
             });
 
             if (!response.ok) {
-                products = products.filter(p => p.id !== id);
-                renderProducts();
-                alert('Товар удален локально (API недоступен)');
-                return;
+                throw new Error(`Не удалось удалить товар (код ${response.status})`);
             }
             await fetchProducts();
-            alert('Товар успешно удален');
+            notify('Товар успешно удалён', 'success');
         } catch (error) {
             console.error('Error deleting product:', error);
-            products = products.filter(p => p.id !== id);
-            renderProducts();
-            alert('Товар удален локально (ошибка соединения)');
+            notify(error.message || 'Не удалось удалить товар.', 'error');
         }
     }
 
@@ -322,6 +566,8 @@ const Admin = (() => {
         title.textContent = product ? 'Редактировать товар' : 'Новый товар';
 
         form.reset();
+        setProductImages([]);
+        if (ui.productImagesInput) ui.productImagesInput.value = '';
         
         if (product) {
             const nameInput = document.getElementById('product-name');
@@ -339,6 +585,12 @@ const Admin = (() => {
             if (imageInput) imageInput.value = product.image || '';
             if (genderSelect) genderSelect.value = product.gender || 'mens';
             if (categorySelect) categorySelect.value = product.category || (categories[0]?.code || '');
+            loadProductImagesForEdit(product.id);
+        } else {
+            const categorySelect = document.getElementById('product-category');
+            if (categorySelect && categories.length) {
+                categorySelect.value = categories[0].code;
+            }
         }
         
         modal.style.display = 'flex';
@@ -370,14 +622,22 @@ const Admin = (() => {
         const genderSelect = document.getElementById('product-gender');
         const categorySelect = document.getElementById('product-category');
         
+        const urlImage = normalizeImagePath(imageInput ? imageInput.value : null);
+        const combinedImages = dedupeImages([
+            ...(productImages || []),
+            ...(urlImage ? [{ path: urlImage, is_main: false, sort_order: 9999 }] : [])
+        ]);
+        const main = combinedImages.find((i) => i.is_main) || combinedImages[0] || null;
+
         const productData = {
             name: nameInput ? nameInput.value.trim() : '',
             slug: (slugInput ? slugInput.value.trim() : '') || slugify(nameInput ? nameInput.value : ''),
             description: descInput ? descInput.value.trim() : '',
             price: priceInput && priceInput.value ? Number(priceInput.value) : null,
-            image_path: imageInput ? imageInput.value.trim() : null,
+            image_path: main ? main.path : null,
             gender_code: genderSelect ? genderSelect.value : 'mens',
-            category_code: categorySelect ? categorySelect.value : ''
+            category_code: categorySelect ? categorySelect.value : '',
+            images: combinedImages
         };
 
         if (!productData.name || !productData.category_code) {
@@ -395,35 +655,20 @@ const Admin = (() => {
             });
 
             if (!response.ok) {
-                const newProduct = {
-                    id: editingProductId || Date.now(),
-                    name: productData.name,
-                    description: productData.description,
-                    price: productData.price,
-                    image: productData.image_path,
-                    gender: productData.gender_code,
-                    category: productData.category_code,
-                    slug: productData.slug
-                };
-                
-                if (editingProductId) {
-                    const index = products.findIndex(p => p.id === editingProductId);
-                    if (index !== -1) products[index] = newProduct;
-                } else {
-                    products.unshift(newProduct);
-                }
-                renderProducts();
-                closeProductModal();
-                alert(editingProductId ? 'Товар обновлен локально' : 'Товар добавлен локально');
-                return;
+                let details = '';
+                try {
+                    const err = await response.json();
+                    if (err && err.error) details = String(err.error);
+                } catch {}
+                throw new Error(details || `Не удалось сохранить товар (код ${response.status})`);
             }
 
             await fetchProducts();
             closeProductModal();
-            alert(editingProductId ? 'Товар успешно обновлен' : 'Товар успешно добавлен');
+            notify(editingProductId ? 'Товар успешно обновлён' : 'Товар успешно добавлен', 'success');
         } catch (error) {
             console.error('Error saving product:', error);
-            alert(`Ошибка: ${error.message}`);
+            notify(error.message || 'Не удалось сохранить товар.', 'error');
         }
     }
 
@@ -465,11 +710,67 @@ const Admin = (() => {
         
         const productForm = document.getElementById('product-form');
         if (productForm) productForm.onsubmit = saveProduct;
+
+        if (ui.productImagesInput) {
+            ui.productImagesInput.addEventListener('change', async () => {
+                const files = ui.productImagesInput.files;
+                if (!files || !files.length) return;
+                try {
+                    notify('Загружаю изображения…', 'info');
+                    const uploaded = await uploadSelectedFiles(files);
+                    const next = dedupeImages([...(productImages || []), ...uploaded]);
+                    if (next.length && !next.some((i) => i.is_main)) next[0].is_main = true;
+                    setProductImages(next);
+                    notify('Изображения загружены', 'success');
+                } catch (error) {
+                    console.error('Upload failed:', error);
+                    notify(error.message || 'Не удалось загрузить изображения.', 'error');
+                } finally {
+                    ui.productImagesInput.value = '';
+                }
+            });
+        }
         
         setupTableDelegation();
+        setupResizableColumns();
     }
 
     function initAdminPage() {
+        ui.productsBody = document.getElementById('products-body');
+        ui.productCount = document.getElementById('product-count');
+        ui.filterCategoryHidden = document.getElementById('filter-category-modal');
+        ui.filterCategoryMultiselect = document.getElementById('filter-category-multiselect');
+        ui.filterCategoryDropdown = document.getElementById('filter-category-dropdown');
+        ui.filterCategoryLabel = document.getElementById('filter-category-label');
+        ui.filterCategoryTrigger = document.getElementById('filter-category-trigger');
+        ui.productCategorySelect = document.getElementById('product-category');
+        ui.productImagesInput = document.getElementById('product-images');
+        ui.productImagesList = document.getElementById('product-images-list');
+
+        if (ui.filterCategoryTrigger) {
+            ui.filterCategoryTrigger.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!ui.filterCategoryMultiselect) return;
+                const isOpen = ui.filterCategoryMultiselect.classList.contains('open');
+                if (isOpen) closeCategoryDropdown();
+                else openCategoryDropdown();
+            });
+        }
+
+        if (ui.filterCategoryDropdown) {
+            ui.filterCategoryDropdown.addEventListener('change', () => {
+                setSelectedCategories(getSelectedCategories());
+            });
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!ui.filterCategoryMultiselect) return;
+            if (!ui.filterCategoryMultiselect.contains(e.target)) {
+                closeCategoryDropdown();
+            }
+        });
+
         attachEvents();
         fetchCategories();
         fetchProducts();

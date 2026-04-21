@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 
-// Настройки
 const OUTPUT_FILE = 'project-export.txt';
 const IGNORE_PATTERNS = [
     'node_modules',
@@ -54,18 +53,17 @@ function getAllFiles(dirPath, arrayOfFiles = []) {
 }
 
 function generateExport() {
-    console.log('🚀 Начинаем экспорт проекта...');
+    console.log('Начинаем экспорт проекта...');
     
     const allFiles = getAllFiles(__dirname);
     
     if (allFiles.length === 0) {
-        console.log('❌ Не найдено файлов для экспорта');
+        console.log('Не найдено файлов для экспорта');
         return;
     }
     
     let output = [];
     
-    // Заголовок экспорта
     output.push('='.repeat(80));
     output.push('ЭКСПОРТ ПРОЕКТА');
     output.push(`Создано: ${new Date().toLocaleString()}`);
@@ -73,7 +71,6 @@ function generateExport() {
     output.push('='.repeat(80));
     output.push('');
     
-    // Обрабатываем каждый файл
     allFiles.forEach(filePath => {
         const relativePath = path.relative(__dirname, filePath);
         const fileContent = fs.readFileSync(filePath, 'utf8');
@@ -91,17 +88,15 @@ function generateExport() {
         output.push('');
     });
     
-    // Записываем результат
     fs.writeFileSync(OUTPUT_FILE, output.join('\n'), 'utf8');
     
-    console.log(`✅ Готово! Файл экспорта создан: ${OUTPUT_FILE}`);
-    console.log(`📊 Экспортировано файлов: ${allFiles.length}`);
-    console.log(`💾 Размер экспорта: ${(fs.statSync(OUTPUT_FILE).size / 1024).toFixed(2)} KB`);
+    console.log(`Готово. Файл экспорта создан: ${OUTPUT_FILE}`);
+    console.log(`Экспортировано файлов: ${allFiles.length}`);
+    console.log(`Размер экспорта: ${(fs.statSync(OUTPUT_FILE).size / 1024).toFixed(2)} KB`);
 }
 
-// Запускаем экспорт
 try {
     generateExport();
 } catch (error) {
-    console.error('❌ Ошибка:', error.message);
+    console.error('Ошибка:', error.message);
 }

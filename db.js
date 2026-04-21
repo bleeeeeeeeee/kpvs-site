@@ -49,6 +49,50 @@ function buildCategoryCondition(category, values, startIndex) {
     };
 }
 
+function normalizeCategoryInput(category) {
+    if (!category) return [];
+    if (Array.isArray(category)) {
+        return category
+            .flatMap((value) => typeof value === 'string' ? value.split(',') : [])
+            .map((value) => value.trim())
+            .filter(Boolean);
+    }
+    if (typeof category === 'string') {
+        return category
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
+    }
+    return [];
+}
+
+function buildCategoriesCondition(categories, values, startIndex) {
+    const items = normalizeCategoryInput(categories);
+    if (!items.length) {
+        return { condition: null, nextIndex: startIndex };
+    }
+
+    const conditions = [];
+    let nextIndex = startIndex;
+
+    items.forEach((category) => {
+        const built = buildCategoryCondition(category, values, nextIndex);
+        if (built.condition) {
+            conditions.push(built.condition);
+            nextIndex = built.nextIndex;
+        }
+    });
+
+    if (!conditions.length) {
+        return { condition: null, nextIndex: startIndex };
+    }
+
+    return {
+        condition: conditions.length === 1 ? conditions[0] : `(${conditions.join(' OR ')})`,
+        nextIndex
+    };
+}
+
 async function getProducts(gender, options = {}) {
     const {
         category,
@@ -79,7 +123,7 @@ async function getProducts(gender, options = {}) {
         if (category === 'popular') {
             internalTag = 'popular';
         } else {
-            const categoryCondition = buildCategoryCondition(category, values, nextIndex);
+            const categoryCondition = buildCategoriesCondition(category, values, nextIndex);
             if (categoryCondition.condition) {
                 conditions.push(categoryCondition.condition);
                 nextIndex = categoryCondition.nextIndex;
@@ -119,12 +163,28 @@ async function getProducts(gender, options = {}) {
     }
 
     if (q) {
-        values.push(`%${q}%`);
-        conditions.push(`(
-            p.name ILIKE $${nextIndex}
-            OR p.description ILIKE $${nextIndex}
-        )`);
-        nextIndex += 1;
+        const queryText = String(q).trim();
+        const isIdSearch = /^\d+$/.test(queryText);
+        if (isIdSearch) {
+            values.push(Number(queryText));
+            const idIndex = nextIndex;
+            nextIndex += 1;
+            values.push(`%${queryText}%`);
+            const textIndex = nextIndex;
+            nextIndex += 1;
+            conditions.push(`(
+                p.id = $${idIndex}
+                OR p.name ILIKE $${textIndex}
+                OR p.description ILIKE $${textIndex}
+            )`);
+        } else {
+            values.push(`%${queryText}%`);
+            conditions.push(`(
+                p.name ILIKE $${nextIndex}
+                OR p.description ILIKE $${nextIndex}
+            )`);
+            nextIndex += 1;
+        }
     }
 
     if (price_min != null && price_min !== '') {
@@ -308,51 +368,118 @@ async function getCategories() {
 }
 
 async function createProduct(product) {
-    const query = `
-        INSERT INTO products (name, slug, description, price, image_path, gender_code, category_code, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-        RETURNING id, name, slug, description, price, image_path AS image, gender_code AS gender, category_code AS category, created_at;
-    `;
-    const values = [
-        product.name,
-        product.slug,
-        product.description || null,
-        product.price,
-        product.image_path || null,
-        product.gender_code,
-        product.category_code
-    ];
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const query = `
+            INSERT INTO products (name, slug, description, price, image_path, gender_code, category_code, created_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+            RETURNING id, name, slug, description, price, image_path AS image, gender_code AS gender, category_code AS category, created_at;
+        `;
+        const values = [
+            product.name,
+            product.slug,
+            product.description || null,
+            product.price,
+            product.image_path || null,
+            product.gender_code,
+            product.category_code
+        ];
 
-    const result = await pool.query(query, values);
-    return result.rows[0];
+        const result = await client.query(query, values);
+        const created = result.rows[0];
+
+        if (created?.id && Array.isArray(product.images) && product.images.length) {
+            await replaceProductImages(client, created.id, product.images);
+        }
+
+        await client.query('COMMIT');
+        return created;
+    } catch (error) {
+        try { await client.query('ROLLBACK'); } catch {}
+        throw error;
+    } finally {
+        client.release();
+    }
 }
 
 async function updateProduct(id, product) {
-    const query = `
-        UPDATE products
-        SET name = $1,
-            slug = $2,
-            description = $3,
-            price = $4,
-            image_path = $5,
-            gender_code = $6,
-            category_code = $7
-        WHERE id = $8
-        RETURNING id, name, slug, description, price, image_path AS image, gender_code AS gender, category_code AS category, created_at;
-    `;
-    const values = [
-        product.name,
-        product.slug,
-        product.description || null,
-        product.price,
-        product.image_path || null,
-        product.gender_code,
-        product.category_code,
-        id
-    ];
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const query = `
+            UPDATE products
+            SET name = $1,
+                slug = $2,
+                description = $3,
+                price = $4,
+                image_path = $5,
+                gender_code = $6,
+                category_code = $7
+            WHERE id = $8
+            RETURNING id, name, slug, description, price, image_path AS image, gender_code AS gender, category_code AS category, created_at;
+        `;
+        const values = [
+            product.name,
+            product.slug,
+            product.description || null,
+            product.price,
+            product.image_path || null,
+            product.gender_code,
+            product.category_code,
+            id
+        ];
 
-    const result = await pool.query(query, values);
-    return result.rows[0] || null;
+        const result = await client.query(query, values);
+        const updated = result.rows[0] || null;
+
+        if (updated && Array.isArray(product.images)) {
+            await replaceProductImages(client, id, product.images);
+        }
+
+        await client.query('COMMIT');
+        return updated;
+    } catch (error) {
+        try { await client.query('ROLLBACK'); } catch {}
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+function normalizeImagesInput(images) {
+    if (!Array.isArray(images)) return [];
+    return images
+        .map((img, idx) => {
+            if (!img || typeof img !== 'object') return null;
+            const path = typeof img.path === 'string' ? img.path.trim() : '';
+            if (!path) return null;
+            return {
+                path,
+                is_main: Boolean(img.is_main),
+                sort_order: Number.isFinite(Number(img.sort_order)) ? Number(img.sort_order) : idx
+            };
+        })
+        .filter(Boolean);
+}
+
+async function replaceProductImages(client, productId, images) {
+    const normalized = normalizeImagesInput(images);
+    await client.query('DELETE FROM product_images WHERE product_id = $1', [productId]);
+    if (!normalized.length) return;
+
+    const hasMain = normalized.some((i) => i.is_main);
+    const rows = hasMain
+        ? normalized
+        : normalized.map((item, idx) => ({ ...item, is_main: idx === 0 }));
+
+    for (let i = 0; i < rows.length; i += 1) {
+        const item = rows[i];
+        await client.query(
+            'INSERT INTO product_images (product_id, image_path, is_main, sort_order) VALUES ($1, $2, $3, $4)',
+            [productId, item.path, item.is_main, item.sort_order]
+        );
+    }
 }
 
 async function deleteProduct(id) {

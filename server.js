@@ -1,6 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const {
     connectDB,
     getProducts,
@@ -70,6 +72,43 @@ app.get('/api/categories', async (req, res) => {
     }
 });
 
+const uploadsDir = path.join(__dirname, 'img', 'uploads');
+try {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+} catch (e) {
+    console.error('Failed to create uploads directory:', e);
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname || '').toLowerCase() || '.bin';
+        const safeExt = ext.replace(/[^a-z0-9.]/g, '') || '.bin';
+        const unique = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        cb(null, `${unique}${safeExt}`);
+    }
+});
+
+const upload = multer({
+    storage,
+    limits: { fileSize: 12 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype && file.mimetype.startsWith('image/')) return cb(null, true);
+        cb(new Error('Only image files are allowed'));
+    }
+});
+
+app.post('/api/admin/uploads', upload.array('images', 12), (req, res) => {
+    try {
+        const files = Array.isArray(req.files) ? req.files : [];
+        const paths = files.map((f) => `/img/uploads/${f.filename}`);
+        res.status(201).json({ files: paths });
+    } catch (error) {
+        console.error('Upload error:', error);
+        res.status(500).json({ error: 'Failed to upload images' });
+    }
+});
+
 app.get('/api/admin/products', async (req, res) => {
     try {
         const {
@@ -101,8 +140,57 @@ app.get('/api/admin/products', async (req, res) => {
     }
 });
 
+function validateProductPayload(payload) {
+    const errors = [];
+    if (!payload || typeof payload !== 'object') {
+        return ['Некорректное тело запроса'];
+    }
+
+    const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+    const slug = typeof payload.slug === 'string' ? payload.slug.trim() : '';
+    const gender = typeof payload.gender_code === 'string' ? payload.gender_code.trim() : '';
+    const category = typeof payload.category_code === 'string' ? payload.category_code.trim() : '';
+    const price = payload.price;
+    const images = payload.images;
+
+    if (!name) errors.push('Поле name обязательно');
+    if (!slug) errors.push('Поле slug обязательно');
+    if (!gender) errors.push('Поле gender_code обязательно');
+    if (!category) errors.push('Поле category_code обязательно');
+
+    if (price !== null && price !== undefined && price !== '') {
+        const numberPrice = Number(price);
+        if (!Number.isFinite(numberPrice)) errors.push('Поле price должно быть числом');
+        if (Number.isFinite(numberPrice) && numberPrice < 0) errors.push('Поле price не может быть отрицательным');
+    }
+
+    if (images !== undefined) {
+        if (!Array.isArray(images)) {
+            errors.push('Поле images должно быть массивом');
+        } else if (images.length > 30) {
+            errors.push('Слишком много изображений');
+        } else {
+            images.forEach((img) => {
+                if (!img || typeof img !== 'object') {
+                    errors.push('Некорректный элемент images');
+                    return;
+                }
+                if (!img.path || typeof img.path !== 'string') {
+                    errors.push('В images.path должна быть строка');
+                }
+            });
+        }
+    }
+
+    return errors;
+}
+
 app.post('/api/admin/products', async (req, res) => {
     try {
+        const errors = validateProductPayload(req.body);
+        if (errors.length) {
+            return res.status(400).json({ error: errors.join('. ') });
+        }
         const product = await createProduct(req.body);
         res.status(201).json(product);
     } catch (error) {
@@ -113,6 +201,10 @@ app.post('/api/admin/products', async (req, res) => {
 
 app.put('/api/admin/products/:id', async (req, res) => {
     try {
+        const errors = validateProductPayload(req.body);
+        if (errors.length) {
+            return res.status(400).json({ error: errors.join('. ') });
+        }
         const updatedProduct = await updateProduct(Number(req.params.id), req.body);
         if (!updatedProduct) {
             return res.status(404).json({ error: 'Product not found' });
