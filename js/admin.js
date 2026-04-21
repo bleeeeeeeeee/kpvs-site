@@ -2,7 +2,6 @@ const Admin = (() => {
     let categories = [];
     let products = [];
     let editingProductId = null;
-    let rowActionsSetup = false;
     const state = {
         gender: '',
         category: '',
@@ -59,38 +58,30 @@ const Admin = (() => {
     }
 
     function getSortValues() {
-        // Parse sortOption like 'created_at_desc' or 'name_asc'
-        const parts = state.sortOption.split('_');
-        const sortDir = parts.pop(); // Get last part (asc or desc)
-        const sortBy = parts.join('_'); // Join remaining parts (e.g., 'created_at' or 'name')
+        const [sortBy, sortDir] = state.sortOption.split('_');
         return { sortBy, sortDir };
     }
 
     async function fetchProducts() {
-        try {
-            const searchInput = document.getElementById('search-input');
-            const params = new URLSearchParams();
-            if (searchInput.value.trim()) params.set('q', searchInput.value.trim());
-            if (state.gender) params.set('gender', state.gender);
-            if (state.category) params.set('category', state.category);
-            if (state.minPrice) params.set('price_min', state.minPrice);
-            if (state.maxPrice) params.set('price_max', state.maxPrice);
-            const { sortBy, sortDir } = getSortValues();
-            params.set('sort_by', sortBy);
-            params.set('sort_direction', sortDir);
-            params.set('limit', '100');
-            params.set('offset', '0');
+        const searchInput = document.getElementById('search-input');
+        const params = new URLSearchParams();
+        if (searchInput.value.trim()) params.set('q', searchInput.value.trim());
+        if (state.gender) params.set('gender', state.gender);
+        if (state.category) params.set('category', state.category);
+        if (state.minPrice) params.set('price_min', state.minPrice);
+        if (state.maxPrice) params.set('price_max', state.maxPrice);
+        const { sortBy, sortDir } = getSortValues();
+        params.set('sort_by', sortBy);
+        params.set('sort_direction', sortDir);
+        params.set('limit', '100');
+        params.set('offset', '0');
 
-            const response = await fetch(`/api/admin/products?${params.toString()}`);
-            if (!response.ok) {
-                throw new Error('Не удалось загрузить товары');
-            }
-            products = await response.json();
-            renderProducts();
-        } catch (error) {
-            console.error(error);
-            alert('Ошибка загрузки товаров');
+        const response = await fetch(`/api/admin/products?${params.toString()}`);
+        if (!response.ok) {
+            throw new Error('Не удалось загрузить товары');
         }
+        products = await response.json();
+        renderProducts();
     }
 
     function renderProducts() {
@@ -99,16 +90,10 @@ const Admin = (() => {
 
         if (!body || !count) return;
 
-        // Clear any previous event listeners first
-        if (rowActionsSetup) {
-            const newBody = body.cloneNode(true);
-            body.parentNode.replaceChild(newBody, body);
-        }
-
         if (!products.length) {
             body.innerHTML = `
                 <tr class="empty-row">
-                    <td colspan="7">Товары не найдены по текущим условиям поиска и фильтрам.</td>
+                    <td colspan="6">Товары не найдены по текущим условиям поиска и фильтрам.</td>
                 </tr>
             `;
             count.textContent = '0';
@@ -121,51 +106,39 @@ const Admin = (() => {
             return `
                 <tr>
                     <td class="cell-id">${product.id}</td>
-                    <td class="cell-name"><strong>${product.name}</strong></td>
-                    <td class="cell-description">${product.description || '-'}</td>
+                    <td class="cell-name"><strong>${product.name}</strong><span>${product.description || ''}</span></td>
                     <td>${category || '-'}</td>
                     <td>${genderLabel}</td>
                     <td class="cell-price">${product.price !== null && product.price !== undefined ? product.price.toFixed(2) : '-'}</td>
                     <td class="admin-actions-cell">
-                        <button class="btn-add-to-cart btn-edit" data-action="edit" data-id="${product.id}">Редактировать</button>
-                        <button class="btn-remove btn-delete" data-action="delete" data-id="${product.id}">Удалить</button>
+                        <button class="btn-add-to-cart" data-action="edit" data-id="${product.id}">Редактировать</button>
+                        <button class="btn-remove" data-action="delete" data-id="${product.id}">Удалить</button>
                     </td>
                 </tr>
             `;
         }).join('');
 
         count.textContent = products.length.toString();
-        // Re-setup event listeners after rendering
-        setupRowActions();
+        bindRowActions();
     }
 
-    function setupRowActions() {
-        const productsBody = document.getElementById('products-body');
-        if (!productsBody) return;
+    function bindRowActions() {
+        document.querySelectorAll('[data-action="edit"]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const id = Number(button.dataset.id);
+                const product = products.find((item) => item.id === id);
+                if (product) openProductModal(product);
+            });
+        });
 
-        // Use event delegation - listener will work for dynamically added elements
-        // Only add listener once, since we're using event delegation
-        if (!rowActionsSetup) {
-            productsBody.addEventListener('click', handleRowAction);
-            rowActionsSetup = true;
-        }
-    }
-
-    function handleRowAction(event) {
-        const button = event.target.closest('button[data-action]');
-        if (!button) return;
-
-        const action = button.dataset.action;
-        const id = Number(button.dataset.id);
-
-        if (action === 'edit') {
-            const product = products.find((item) => item.id === id);
-            if (product) openProductModal(product);
-        } else if (action === 'delete') {
-            if (confirm('Удалить товар?')) {
-                deleteProduct(id);
-            }
-        }
+        document.querySelectorAll('[data-action="delete"]').forEach((button) => {
+            button.addEventListener('click', () => {
+                const id = Number(button.dataset.id);
+                if (confirm('Удалить товар?')) {
+                    deleteProduct(id);
+                }
+            });
+        });
     }
 
     function openFiltersModal() {
@@ -213,20 +186,15 @@ const Admin = (() => {
     }
 
     async function deleteProduct(id) {
-        try {
-            const response = await fetch(`/api/admin/products/${id}`, {
-                method: 'DELETE'
-            });
+        const response = await fetch(`/api/admin/products/${id}`, {
+            method: 'DELETE'
+        });
 
-            if (!response.ok) {
-                alert('Не удалось удалить товар');
-                return;
-            }
-            await fetchProducts();
-        } catch (error) {
-            console.error(error);
-            alert('Ошибка при удалении товара');
+        if (!response.ok) {
+            alert('Не удалось удалить товар');
+            return;
         }
+        await fetchProducts();
     }
 
     function openProductModal(product = null) {
@@ -300,49 +268,36 @@ const Admin = (() => {
     }
 
     function attachEvents() {
-        const addBtn = document.getElementById('add-product-btn');
-        const refreshBtn = document.getElementById('refresh-btn');
-        const searchInput = document.getElementById('search-input');
-        const openFiltersBtn = document.getElementById('open-filters-btn');
-        const applyFiltersBtn = document.getElementById('apply-filters-btn');
-        const clearFiltersBtn = document.getElementById('clear-filters-btn');
-        const sortBy = document.getElementById('sort-by');
-        const cancelBtn = document.getElementById('cancel-product-btn');
-        const filterModal = document.getElementById('filter-modal');
-        const productModal = document.getElementById('product-modal');
-        const filterModalClose = filterModal?.querySelector('.modal-close');
-        const productModalClose = productModal?.querySelector('.modal-close');
-        const productForm = document.getElementById('product-form');
-
-        if (addBtn) addBtn.addEventListener('click', () => openProductModal());
-        if (refreshBtn) refreshBtn.addEventListener('click', () => {
-            fetchProducts().catch(err => console.error(err));
-        });
-        if (searchInput) searchInput.addEventListener('input', () => {
-            fetchProducts().catch(err => console.error(err));
-        });
-        if (openFiltersBtn) openFiltersBtn.addEventListener('click', openFiltersModal);
-        if (applyFiltersBtn) applyFiltersBtn.addEventListener('click', applyFilters);
-        if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', clearFilters);
-        if (sortBy) sortBy.addEventListener('change', (event) => {
+        document.getElementById('add-product-btn')?.addEventListener('click', () => openProductModal());
+        document.getElementById('refresh-btn')?.addEventListener('click', fetchProducts);
+        document.getElementById('search-input')?.addEventListener('input', fetchProducts);
+        document.getElementById('open-filters-btn')?.addEventListener('click', openFiltersModal);
+        document.getElementById('apply-filters-btn')?.addEventListener('click', applyFilters);
+        document.getElementById('clear-filters-btn')?.addEventListener('click', clearFilters);
+        document.getElementById('sort-by')?.addEventListener('change', (event) => {
             state.sortOption = event.target.value;
-            fetchProducts().catch(err => console.error(err));
+            fetchProducts().catch((error) => {
+                console.error(error);
+                alert('Не удалось применить сортировку');
+            });
         });
-        if (cancelBtn) cancelBtn.addEventListener('click', closeProductModal);
-        if (filterModalClose) filterModalClose.addEventListener('click', closeFiltersModal);
-        if (filterModal) filterModal.addEventListener('click', (event) => {
-            if (event.target === filterModal) closeFiltersModal();
+        document.getElementById('cancel-product-btn')?.addEventListener('click', closeProductModal);
+        document.querySelectorAll('#filter-modal .modal-close, #filter-modal')?.forEach((element) => {
+            if (!element) return;
+            element.addEventListener('click', (event) => {
+                if (event.target === element || event.target.classList.contains('modal-close')) {
+                    closeFiltersModal();
+                }
+            });
         });
-        if (productModalClose) productModalClose.addEventListener('click', closeProductModal);
-        if (productModal) productModal.addEventListener('click', (event) => {
-            if (event.target === productModal) closeProductModal();
+        document.querySelector('#product-modal .modal-close')?.addEventListener('click', closeProductModal);
+        document.getElementById('product-modal')?.addEventListener('click', (event) => {
+            if (event.target === event.currentTarget) closeProductModal();
         });
-        if (productForm) productForm.addEventListener('submit', saveProduct);
     }
 
     function initAdminPage() {
         attachEvents();
-        setupRowActions(); // Setup listeners once on init
         fetchCategories()
             .then(fetchProducts)
             .catch((error) => {

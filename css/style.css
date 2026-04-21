@@ -198,26 +198,25 @@ body {
 .admin-sorting select { min-width: 220px; }
 .admin-summary-note { color: var(--text-secondary); font-size: 0.95rem; padding: 0 1rem 1rem; }
 .admin-count { color: var(--text-secondary); font-size: 0.98rem; }
-.admin-table-container { overflow-x: auto; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 1rem; box-shadow: 0 1rem 2rem rgba(36, 53, 42, 0.06); padding: 1rem; }
-.admin-table { width: 100%; border-collapse: collapse; }
-.admin-table th { background: rgba(182, 197, 63, 0.08); color: var(--primary-color); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 1rem 0.75rem; border-bottom: 2px solid var(--border-color); font-weight: 700; text-align: left; }
-.admin-table td { color: var(--text-primary); font-size: 0.9rem; padding: 0.85rem 0.75rem; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
-.admin-table tbody tr { height: auto; }
-.admin-table tbody tr:nth-child(odd) { background: rgba(182, 197, 63, 0.03); }
-.admin-table tbody tr:hover { background: rgba(182, 197, 63, 0.1); transition: background 0.15s ease; }
-.admin-table td.cell-id { width: 6%; text-align: center; font-weight: 600; }
-.admin-table td.cell-name { width: 18%; }
-.admin-table td.cell-name strong { display: block; margin-bottom: 0.15rem; color: var(--text-primary); font-weight: 600; }
-.admin-table td.cell-description { width: 22%; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; max-height: 2.8rem; }
-.admin-table td:nth-child(4) { width: 15%; }
-.admin-table td:nth-child(5) { width: 12%; text-align: center; }
-.admin-table td.cell-price { width: 12%; text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
-.admin-table td.admin-actions-cell { width: 15%; display: flex; gap: 0.4rem; flex-wrap: nowrap; justify-content: flex-end; align-items: center; }
-.admin-table td.admin-actions-cell button { padding: 0.55rem 0.75rem; font-size: 0.85rem; border: none; border-radius: 0.4rem; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
-.admin-table td.admin-actions-cell .btn-edit { background: var(--primary-color); color: white; }
-.admin-table td.admin-actions-cell .btn-edit:hover { background: var(--accent-color); }
-.admin-table td.admin-actions-cell .btn-delete { background: #c53d3d; color: white; }
-.admin-table td.admin-actions-cell .btn-delete:hover { background: #a53030; }
+.admin-table-container { overflow-x: auto; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 1rem; box-shadow: 0 1rem 2rem rgba(36, 53, 42, 0.06); }
+.admin-table { width: 100%; border-collapse: collapse; min-width: 720px; }
+.admin-table th,
+.admin-table td { text-align: left; padding: 1rem 0.75rem; border-bottom: 1px solid var(--border-color); }
+.admin-table th { background: rgba(182, 197, 63, 0.08); color: var(--primary-color); font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.08em; }
+.admin-table td { color: var(--text-primary); font-size: 0.95rem; vertical-align: middle; }
+.admin-table tbody tr:nth-child(odd) { background: rgba(182, 197, 63, 0.04); }
+.admin-table tbody tr:hover { background: rgba(182, 197, 63, 0.08); }
+.admin-table td.cell-id { width: 5%; text-align: center; font-weight: 700; }
+.admin-table td.cell-price { width: 10%; text-align: right; font-variant-numeric: tabular-nums; }
+.admin-table td.cell-name { width: 35%; display: flex; flex-direction: column; gap: 0.35rem; }
+.admin-table td.cell-name strong { display: block; }
+.admin-table td.cell-name span { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.3; }
+.admin-table td.admin-actions-cell { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
+.admin-table td.admin-actions-cell .btn-add-to-cart,
+.admin-table td.admin-actions-cell .btn-remove { padding: 0.65rem 0.95rem; font-size: 0.9rem; }
+.admin-table td.admin-actions-cell .btn-remove { background: #c53d3d; }
+.admin-table td.admin-actions-cell .btn-add-to-cart { background: var(--primary-color); }
+.admin-table td.admin-actions-cell button:hover { opacity: 0.95; }
 .admin-filter-body { display: grid; gap: 1rem; }
 .filter-section { display: flex; flex-direction: column; gap: 0.4rem; }
 .filter-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
