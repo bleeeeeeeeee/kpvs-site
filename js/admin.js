@@ -21,8 +21,7 @@ const Admin = (() => {
         filterCategoryTrigger: null,
         productCategorySelect: null,
         productImagesInput: null,
-        productImagesList: null,
-        productImagesListHandler: null
+        productImagesList: null
     };
 
     function slugify(text) {
@@ -61,57 +60,14 @@ const Admin = (() => {
         }, kind === 'error' ? 7000 : 4500);
     }
 
-    function saveFiltersToStorage() {
-        try {
-            const filters = {
-                gender: state.gender,
-                categories: state.categories,
-                minPrice: state.minPrice,
-                maxPrice: state.maxPrice,
-                sortOption: state.sortOption
-            };
-            localStorage.setItem('adminFilters', JSON.stringify(filters));
-        } catch (error) {
-            console.warn('Failed to save filters to localStorage:', error);
-        }
-    }
-
-    function loadFiltersFromStorage() {
-        try {
-            const saved = localStorage.getItem('adminFilters');
-            if (saved) {
-                const filters = JSON.parse(saved);
-                Object.assign(state, filters);
-                return true;
-            }
-        } catch (error) {
-            console.warn('Failed to load filters from localStorage:', error);
-        }
-        return false;
-    }
-
-    function applySavedFilters() {
-        // Применяем сохраненные фильтры к UI элементам
-        const genderSelect = document.getElementById('filter-gender');
-        const minPriceInput = document.getElementById('filter-min-price');
-        const maxPriceInput = document.getElementById('filter-max-price');
-        const sortSelect = document.getElementById('sort-by');
-
-        if (genderSelect) genderSelect.value = state.gender || '';
-        if (minPriceInput) minPriceInput.value = state.minPrice || '';
-        if (maxPriceInput) maxPriceInput.value = state.maxPrice || '';
-        if (sortSelect) sortSelect.value = state.sortOption || 'id_asc';
-
-        // Применяем категории (без повторного сохранения)
-        if (state.categories && state.categories.length > 0 && ui.filterCategoryDropdown) {
-            const set = new Set(state.categories);
-            ui.filterCategoryDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
-                input.checked = set.has(input.value);
-            });
-            if (ui.filterCategoryHidden) {
-                ui.filterCategoryHidden.value = state.categories.join(',');
-            }
-        }
+    function setTableStatusRow(message) {
+        if (!ui.productsBody || !ui.productCount) return;
+        ui.productsBody.innerHTML = `
+            <tr class="empty-row">
+                <td colspan="7">${escapeHtml(message)}</td>
+            </tr>
+        `;
+        ui.productCount.textContent = '0';
     }
 
     function normalizeSelectedCategories(value) {
@@ -186,7 +142,6 @@ const Admin = (() => {
     function setSelectedCategories(codes) {
         const selected = normalizeSelectedCategories(codes);
         state.categories = selected;
-        saveFiltersToStorage();
 
         if (ui.filterCategoryHidden) {
             ui.filterCategoryHidden.value = selected.join(',');
@@ -372,25 +327,14 @@ const Admin = (() => {
             `;
         }).join('');
 
-        // Используем делегирование событий для избежания множественных обработчиков
-        // Обработчик добавляется один раз при инициализации
-        const handleMainImageChange = (event) => {
-            if (event.target.name === 'main-image' && event.target.type === 'radio') {
-                const index = Number(event.target.value);
-                if (!Number.isFinite(index) || index >= productImages.length) return;
-                
-                // Снимаем флаг is_main со всех изображений
-                productImages.forEach(img => img.is_main = false);
-                // Устанавливаем флаг is_main для выбранного изображения
-                productImages[index].is_main = true;
-            }
-        };
-        
-        // Удаляем старый обработчик, если есть
-        ui.productImagesList.removeEventListener('change', ui.productImagesListHandler);
-        // Добавляем новый обработчик и сохраняем ссылку
-        ui.productImagesListHandler = handleMainImageChange;
-        ui.productImagesList.addEventListener('change', handleMainImageChange);
+        ui.productImagesList.querySelectorAll('input[type="radio"][name="main-image"]').forEach((radio) => {
+            radio.addEventListener('change', () => {
+                const index = Number(radio.value);
+                if (!Number.isFinite(index)) return;
+                productImages = productImages.map((img, i) => ({ ...img, is_main: i === index }));
+                renderProductImages();
+            });
+        });
 
         ui.productImagesList.querySelectorAll('[data-action="remove-image"]').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -572,7 +516,6 @@ const Admin = (() => {
         state.categories = getSelectedCategories();
         state.minPrice = minPriceInput ? minPriceInput.value.trim() : '';
         state.maxPrice = maxPriceInput ? maxPriceInput.value.trim() : '';
-        saveFiltersToStorage();
         
         closeFiltersModal();
         fetchProducts();
@@ -583,7 +526,6 @@ const Admin = (() => {
         state.categories = [];
         state.minPrice = '';
         state.maxPrice = '';
-        saveFiltersToStorage();
         
         const genderSelect = document.getElementById('filter-gender-modal');
         const minPriceInput = document.getElementById('min-price');
@@ -752,7 +694,6 @@ const Admin = (() => {
         if (clearFiltersBtn) clearFiltersBtn.onclick = clearFilters;
         if (sortBy) sortBy.onchange = (e) => {
             state.sortOption = e.target.value;
-            saveFiltersToStorage();
             fetchProducts();
         };
         if (cancelBtn) cancelBtn.onclick = closeProductModal;
@@ -820,9 +761,6 @@ const Admin = (() => {
         ui.productImagesInput = document.getElementById('product-images');
         ui.productImagesList = document.getElementById('product-images-list');
 
-        // Загружаем сохраненные фильтры
-        loadFiltersFromStorage();
-
         const sortBy = document.getElementById('sort-by');
         if (sortBy && !sortBy.value) {
             sortBy.value = 'id_asc';
@@ -855,12 +793,8 @@ const Admin = (() => {
         });
 
         attachEvents();
-        fetchCategories().then(() => {
-            // Применяем сохраненные фильтры после загрузки категорий
-            applySavedFilters();
-            // Загружаем товары с применённными фильтрами
-            fetchProducts();
-        });
+        fetchCategories();
+        fetchProducts();
     }
 
     if (document.readyState === 'loading') {
