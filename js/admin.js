@@ -3,6 +3,12 @@ const Admin = (() => {
     let products = [];
     let editingProductId = null;
     let productImages = [];
+    let availableSizes = [];
+    let availableTags = [];
+    let availableMaterials = [];
+    let productSizes = [];
+    let productTags = [];
+    let productMaterials = [];
     const state = {
         gender: '',
         categories: [],
@@ -21,14 +27,44 @@ const Admin = (() => {
         filterCategoryTrigger: null,
         productCategorySelect: null,
         productImagesInput: null,
-        productImagesList: null
+        productImagesList: null,
+        productImagesListHandler: null,
+        productSizesContainer: null,
+        productSizesTrigger: null,
+        productSizesDropdown: null,
+        productSizesHidden: null,
+        productTagsContainer: null,
+        productTagsTrigger: null,
+        productTagsDropdown: null,
+        productTagsHidden: null,
+        productMaterialsContainer: null,
+        productMaterialsTrigger: null,
+        productMaterialsDropdown: null,
+        productMaterialsHidden: null
     };
 
     function slugify(text) {
+        // Транслитерация русских символов
+        const translitMap = {
+            'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+            'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+            'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+            'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+            'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+            'А': 'a', 'Б': 'b', 'В': 'v', 'Г': 'g', 'Д': 'd', 'Е': 'e', 'Ё': 'e',
+            'Ж': 'zh', 'З': 'z', 'И': 'i', 'Й': 'y', 'К': 'k', 'Л': 'l', 'М': 'm',
+            'Н': 'n', 'О': 'o', 'П': 'p', 'Р': 'r', 'С': 's', 'Т': 't', 'У': 'u',
+            'Ф': 'f', 'Х': 'kh', 'Ц': 'ts', 'Ч': 'ch', 'Ш': 'sh', 'Щ': 'shch',
+            'Ъ': '', 'Ы': 'y', 'Ь': '', 'Э': 'e', 'Ю': 'yu', 'Я': 'ya'
+        };
+
         return text
             .toString()
             .trim()
             .toLowerCase()
+            .split('')
+            .map(char => translitMap[char] || char)
+            .join('')
             .replace(/\s+/g, '-')
             .replace(/[^a-z0-9\-]+/g, '')
             .replace(/\-\-+/g, '-')
@@ -96,6 +132,51 @@ const Admin = (() => {
         }
     }
 
+    async function fetchSizes() {
+        try {
+            const response = await fetch('/api/sizes');
+            if (!response.ok) {
+                throw new Error('Не удалось загрузить размеры');
+            }
+            availableSizes = await response.json();
+            populateSizesDropdown();
+        } catch (error) {
+            console.error('Error fetching sizes:', error);
+            availableSizes = [];
+            notify('Не удалось загрузить размеры.', 'error');
+        }
+    }
+
+    async function fetchTags() {
+        try {
+            const response = await fetch('/api/tags');
+            if (!response.ok) {
+                throw new Error('Не удалось загрузить теги');
+            }
+            availableTags = await response.json();
+            populateTagsDropdown();
+        } catch (error) {
+            console.error('Error fetching tags:', error);
+            availableTags = [];
+            notify('Не удалось загрузить теги.', 'error');
+        }
+    }
+
+    async function fetchMaterials() {
+        try {
+            const response = await fetch('/api/materials');
+            if (!response.ok) {
+                throw new Error('Не удалось загрузить материалы');
+            }
+            availableMaterials = await response.json();
+            populateMaterialsList();
+        } catch (error) {
+            console.error('Error fetching materials:', error);
+            availableMaterials = [];
+            notify('Не удалось загрузить материалы.', 'error');
+        }
+    }
+
     function flattenCategories(list) {
         const result = [];
         if (!Array.isArray(list)) return result;
@@ -132,11 +213,264 @@ const Admin = (() => {
         setSelectedCategories(next);
     }
 
-    function getSelectedCategories() {
-        if (!ui.filterCategoryDropdown) return [];
-        return Array.from(ui.filterCategoryDropdown.querySelectorAll('input[type="checkbox"]:checked'))
+    function populateSizesDropdown() {
+        if (!ui.productSizesDropdown || !availableSizes.length) return;
+
+        ui.productSizesDropdown.innerHTML = '';
+        availableSizes.forEach((size) => {
+            const option = document.createElement('div');
+            option.className = 'admin-multiselect-option';
+            option.innerHTML = `
+                <input type="checkbox" value="${size.name}" id="size-${size.name}" />
+                <label for="size-${size.name}">${escapeHtml(size.name)}</label>
+            `;
+            ui.productSizesDropdown.appendChild(option);
+        });
+
+        // Добавляем обработчики
+        if (ui.productSizesTrigger) {
+            ui.productSizesTrigger.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!ui.productSizesContainer) return;
+                const isOpen = ui.productSizesContainer.classList.contains('open');
+                if (isOpen) closeSizesDropdown();
+                else openSizesDropdown();
+            });
+        }
+
+        if (ui.productSizesDropdown) {
+            ui.productSizesDropdown.addEventListener('change', () => {
+                updateSelectedSizes();
+            });
+            
+            // Добавляем обработчик клика по строкам
+            ui.productSizesDropdown.addEventListener('click', (e) => {
+                const option = e.target.closest('.admin-multiselect-option');
+                if (option) {
+                    const checkbox = option.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        updateSelectedSizes();
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!ui.productSizesContainer) return;
+            if (!ui.productSizesContainer.contains(e.target)) {
+                closeSizesDropdown();
+            }
+        });
+    }
+
+    function populateTagsDropdown() {
+        if (!ui.productTagsDropdown || !availableTags.length) return;
+
+        ui.productTagsDropdown.innerHTML = '';
+        availableTags.forEach((tag) => {
+            const option = document.createElement('div');
+            option.className = 'admin-multiselect-option';
+            option.innerHTML = `
+                <input type="checkbox" value="${tag.code}" id="tag-${tag.code}" />
+                <label for="tag-${tag.code}">${escapeHtml(tag.name)}</label>
+            `;
+            ui.productTagsDropdown.appendChild(option);
+        });
+
+        // Добавляем обработчики
+        if (ui.productTagsTrigger) {
+            ui.productTagsTrigger.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!ui.productTagsContainer) return;
+                const isOpen = ui.productTagsContainer.classList.contains('open');
+                if (isOpen) closeTagsDropdown();
+                else openTagsDropdown();
+            });
+        }
+
+        if (ui.productTagsDropdown) {
+            ui.productTagsDropdown.addEventListener('change', () => {
+                updateSelectedTags();
+            });
+            
+            // Добавляем обработчик клика по строкам
+            ui.productTagsDropdown.addEventListener('click', (e) => {
+                const option = e.target.closest('.admin-multiselect-option');
+                if (option) {
+                    const checkbox = option.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        updateSelectedTags();
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!ui.productTagsContainer) return;
+            if (!ui.productTagsContainer.contains(e.target)) {
+                closeTagsDropdown();
+            }
+        });
+    }
+
+    function openSizesDropdown() {
+        if (!ui.productSizesContainer) return;
+        ui.productSizesContainer.classList.add('open');
+    }
+
+    function closeSizesDropdown() {
+        if (!ui.productSizesContainer) return;
+        ui.productSizesContainer.classList.remove('open');
+    }
+
+    function openTagsDropdown() {
+        if (!ui.productTagsContainer) return;
+        ui.productTagsContainer.classList.add('open');
+    }
+
+    function closeTagsDropdown() {
+        if (!ui.productTagsContainer) return;
+        ui.productTagsContainer.classList.remove('open');
+    }
+
+    function updateSelectedSizes() {
+        if (!ui.productSizesTrigger || !ui.productSizesHidden) return;
+        
+        const selected = Array.from(ui.productSizesDropdown.querySelectorAll('input[type="checkbox"]:checked'))
             .map((input) => input.value)
             .filter(Boolean);
+        
+        ui.productSizesHidden.value = selected.join(',');
+        
+        if (selected.length === 0) {
+            ui.productSizesTrigger.textContent = 'Выберите размеры';
+        } else if (selected.length === 1) {
+            ui.productSizesTrigger.textContent = selected[0];
+        } else {
+            ui.productSizesTrigger.textContent = `Выбрано размеров: ${selected.length}`;
+        }
+    }
+
+    function updateSelectedTags() {
+        if (!ui.productTagsTrigger || !ui.productTagsHidden) return;
+        
+        const selected = Array.from(ui.productTagsDropdown.querySelectorAll('input[type="checkbox"]:checked'))
+            .map((input) => input.value)
+            .filter(Boolean);
+        
+        ui.productTagsHidden.value = selected.join(',');
+        
+        if (selected.length === 0) {
+            ui.productTagsTrigger.textContent = 'Выберите теги';
+        } else if (selected.length === 1) {
+            const tag = availableTags.find((t) => t.code === selected[0]);
+            ui.productTagsTrigger.textContent = tag ? tag.name : selected[0];
+        } else {
+            ui.productTagsTrigger.textContent = `Выбрано тегов: ${selected.length}`;
+        }
+    }
+
+    function populateMaterialsList() {
+        if (!ui.productMaterialsContainer || !availableMaterials.length) return;
+
+        ui.productMaterialsContainer.innerHTML = '';
+        productMaterials.forEach((material, index) => {
+            const materialDiv = document.createElement('div');
+            materialDiv.className = 'admin-material-item';
+            materialDiv.innerHTML = `
+                <select class="admin-material-select">
+                    <option value="">Выберите материал</option>
+                    ${availableMaterials.map((m) => `<option value="${m.code}" ${m.code === material.code ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+                </select>
+                <input type="number" class="admin-material-percentage" value="${material.percentage || 0}" min="0" max="100" step="1" placeholder="%" />
+                <button type="button" class="admin-material-remove" data-index="${index}">×</button>
+            `;
+            ui.productMaterialsContainer.appendChild(materialDiv);
+        });
+
+        // Добавляем обработчики для новых элементов
+        ui.productMaterialsContainer.querySelectorAll('.admin-material-remove').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                removeMaterial(index);
+            });
+        });
+
+        ui.productMaterialsContainer.querySelectorAll('.admin-material-select, .admin-material-percentage').forEach((el) => {
+            el.addEventListener('change', updateMaterialsData);
+        });
+    }
+
+    function addMaterial() {
+        productMaterials.push({ code: '', percentage: 0 });
+        populateMaterialsList();
+    }
+
+    function removeMaterial(index) {
+        if (index >= 0 && index < productMaterials.length) {
+            productMaterials.splice(index, 1);
+            populateMaterialsList();
+        }
+    }
+
+    function updateMaterialsData() {
+        const materialItems = ui.productMaterialsContainer.querySelectorAll('.admin-material-item');
+        productMaterials = Array.from(materialItems).map((item) => {
+            const select = item.querySelector('.admin-material-select');
+            const percentage = item.querySelector('.admin-material-percentage');
+            return {
+                code: select ? select.value : '',
+                percentage: percentage ? parseInt(percentage.value) || 0 : 0
+            };
+        }).filter((m) => m.code && m.percentage > 0);
+    }
+
+    function saveStateToStorage() {
+        const stateToSave = {
+            gender: state.gender,
+            categories: state.categories,
+            minPrice: state.minPrice,
+            maxPrice: state.maxPrice,
+            sortOption: state.sortOption
+        };
+        sessionStorage.setItem('adminFilters', JSON.stringify(stateToSave));
+    }
+
+    function loadStateFromStorage() {
+        try {
+            const saved = sessionStorage.getItem('adminFilters');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                state.gender = parsed.gender || '';
+                state.categories = parsed.categories || [];
+                state.minPrice = parsed.minPrice || '';
+                state.maxPrice = parsed.maxPrice || '';
+                state.sortOption = parsed.sortOption || 'id_asc';
+            }
+        } catch (error) {
+            console.error('Error loading state from storage:', error);
+        }
+    }
+
+    function applySavedFilters() {
+        // Применяем сохраненные фильтры к UI
+        const genderSelect = document.getElementById('filter-gender-modal');
+        if (genderSelect) genderSelect.value = state.gender;
+
+        const minPriceInput = document.getElementById('min-price');
+        if (minPriceInput) minPriceInput.value = state.minPrice;
+
+        const maxPriceInput = document.getElementById('max-price');
+        if (maxPriceInput) maxPriceInput.value = state.maxPrice;
+
+        const sortBy = document.getElementById('sort-by');
+        if (sortBy) sortBy.value = state.sortOption;
+
+        setSelectedCategories(state.categories);
     }
 
     function setSelectedCategories(codes) {
@@ -164,6 +498,8 @@ const Admin = (() => {
                 ui.filterCategoryLabel.textContent = `Выбрано категорий: ${selected.length}`;
             }
         }
+
+        saveStateToStorage();
     }
 
     function openCategoryDropdown() {
@@ -195,6 +531,8 @@ const Admin = (() => {
             }
             if (state.minPrice) params.set('price_min', state.minPrice);
             if (state.maxPrice) params.set('price_max', state.maxPrice);
+            
+            // Всегда передаем параметры сортировки
             const { sortBy, sortDir } = getSortValues();
             params.set('sort_by', sortBy);
             params.set('sort_direction', sortDir);
@@ -517,6 +855,7 @@ const Admin = (() => {
         state.minPrice = minPriceInput ? minPriceInput.value.trim() : '';
         state.maxPrice = maxPriceInput ? maxPriceInput.value.trim() : '';
         
+        saveStateToStorage();
         closeFiltersModal();
         fetchProducts();
     }
@@ -536,6 +875,7 @@ const Admin = (() => {
         if (minPriceInput) minPriceInput.value = '';
         if (maxPriceInput) maxPriceInput.value = '';
         
+        saveStateToStorage();
         closeFiltersModal();
         fetchProducts();
     }
@@ -571,6 +911,11 @@ const Admin = (() => {
         setProductImages([]);
         if (ui.productImagesInput) ui.productImagesInput.value = '';
         
+        // Инициализируем размеры, теги и материалы
+        productSizes = [];
+        productTags = [];
+        productMaterials = [];
+        // populate функции будут вызваны после загрузки данных в fetch функциях
         if (product) {
             const nameInput = document.getElementById('product-name');
             const slugInput = document.getElementById('product-slug');
@@ -588,8 +933,36 @@ const Admin = (() => {
             if (genderSelect) genderSelect.value = product.gender || 'mens';
             if (categorySelect) categorySelect.value = product.category || (categories[0]?.code || '');
             loadProductImagesForEdit(product.id);
+            
+            // Заполняем размеры, теги и материалы
+            productSizes = product.sizes || [];
+            productTags = product.tags || [];
+            productMaterials = product.materials || [];
+            
+            // populate функции будут вызваны после загрузки данных
+            // Устанавливаем выбранные размеры после загрузки
+            setTimeout(() => {
+                if (productSizes.length && ui.productSizesDropdown) {
+                    const sizeSet = new Set(productSizes.map(s => s.name));
+                    ui.productSizesDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                        input.checked = sizeSet.has(input.value);
+                    });
+                    updateSelectedSizes();
+                }
+                
+                // Устанавливаем выбранные теги после загрузки
+                if (productTags.length && ui.productTagsDropdown) {
+                    const tagSet = new Set(productTags.map(t => t.code));
+                    ui.productTagsDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                        input.checked = tagSet.has(input.value);
+                    });
+                    updateSelectedTags();
+                }
+            }, 100);
         } else {
+            const genderSelect = document.getElementById('product-gender');
             const categorySelect = document.getElementById('product-category');
+            if (genderSelect) genderSelect.value = 'mens';
             if (categorySelect && categories.length) {
                 categorySelect.value = categories[0].code;
             }
@@ -641,7 +1014,10 @@ const Admin = (() => {
             image_path: main ? main.path : null,
             gender_code: genderSelect ? genderSelect.value : 'mens',
             category_code: categorySelect ? categorySelect.value : '',
-            images: combinedImages
+            images: combinedImages,
+            sizes: productSizes,
+            tags: productTags,
+            materials: productMaterials
         };
 
         if (!productData.name || !productData.category_code) {
@@ -694,9 +1070,13 @@ const Admin = (() => {
         if (clearFiltersBtn) clearFiltersBtn.onclick = clearFilters;
         if (sortBy) sortBy.onchange = (e) => {
             state.sortOption = e.target.value;
+            saveStateToStorage();
             fetchProducts();
         };
         if (cancelBtn) cancelBtn.onclick = closeProductModal;
+        
+        const addMaterialBtn = document.getElementById('add-material-btn');
+        if (addMaterialBtn) addMaterialBtn.onclick = addMaterial;
         
         const filterModal = document.getElementById('filter-modal');
         const productModal = document.getElementById('product-modal');
@@ -750,6 +1130,9 @@ const Admin = (() => {
     }
 
     function initAdminPage() {
+        // Загружаем сохраненное состояние
+        loadStateFromStorage();
+        
         ui.productsBody = document.getElementById('products-body');
         ui.productCount = document.getElementById('product-count');
         ui.filterCategoryHidden = document.getElementById('filter-category-modal');
@@ -760,6 +1143,15 @@ const Admin = (() => {
         ui.productCategorySelect = document.getElementById('product-category');
         ui.productImagesInput = document.getElementById('product-images');
         ui.productImagesList = document.getElementById('product-images-list');
+        ui.productSizesContainer = document.getElementById('product-sizes-container');
+        ui.productSizesTrigger = document.getElementById('product-sizes-trigger');
+        ui.productSizesDropdown = document.getElementById('product-sizes-dropdown');
+        ui.productSizesHidden = document.getElementById('product-sizes-hidden');
+        ui.productTagsContainer = document.getElementById('product-tags-container');
+        ui.productTagsTrigger = document.getElementById('product-tags-trigger');
+        ui.productTagsDropdown = document.getElementById('product-tags-dropdown');
+        ui.productTagsHidden = document.getElementById('product-tags-hidden');
+        ui.productMaterialsContainer = document.getElementById('product-materials-container');
 
         const sortBy = document.getElementById('sort-by');
         if (sortBy && !sortBy.value) {
@@ -793,8 +1185,15 @@ const Admin = (() => {
         });
 
         attachEvents();
-        fetchCategories();
-        fetchProducts();
+        fetchCategories().then(() => {
+            // Применяем сохраненные фильтры после загрузки категорий
+            applySavedFilters();
+            // Загружаем товары с применённными фильтрами
+            fetchProducts();
+        });
+        fetchSizes();
+        fetchTags();
+        fetchMaterials();
     }
 
     if (document.readyState === 'loading') {

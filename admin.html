@@ -18,7 +18,7 @@
         </header>
 
         <div class="admin-toolbar">
-            <input id="search-input" type="search" placeholder="Поиск по названию или описанию" />
+            <input id="search-input" type="search" placeholder="Поиск по ID, названию или описанию" />
             <button id="open-filters-btn" class="filter-button outline" type="button">Фильтры</button>
             <button id="refresh-btn" class="filter-button" type="button">Обновить</button>
         </div>
@@ -149,16 +149,47 @@
                     </div>
                     <div class="form-grid">
                         <div>
-                            <label for="product-gender">Пол</label>
-                            <select id="product-gender" name="gender" required>
+                            <label for="product-gender">Раздел</label>
+                            <select id="product-gender" name="gender">
                                 <option value="mens">Мужской</option>
                                 <option value="womens">Женский</option>
                             </select>
                         </div>
                         <div>
                             <label for="product-category">Категория</label>
-                            <select id="product-category" name="category" required></select>
+                            <select id="product-category" name="category">
+                                <!-- Категории будут загружены динамически -->
+                            </select>
                         </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="product-sizes">Размеры (несколько)</label>
+                        <div id="product-sizes-container" class="admin-multiselect">
+                            <button type="button" id="product-sizes-trigger" class="admin-multiselect-trigger">Выберите размеры</button>
+                            <div id="product-sizes-dropdown" class="admin-multiselect-dropdown">
+                                <!-- Размеры будут загружены динамически -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="product-sizes-hidden" name="sizes" />
+                    </div>
+
+                    <div class="form-row">
+                        <label for="product-tags">Теги (несколько)</label>
+                        <div id="product-tags-container" class="admin-multiselect">
+                            <button type="button" id="product-tags-trigger" class="admin-multiselect-trigger">Выберите теги</button>
+                            <div id="product-tags-dropdown" class="admin-multiselect-dropdown">
+                                <!-- Теги будут загружены динамически -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="product-tags-hidden" name="tags" />
+                    </div>
+
+                    <div class="form-row">
+                        <label for="product-materials">Состав (материалы)</label>
+                        <div id="product-materials-container" class="admin-materials">
+                            <!-- Материалы будут загружены динамически -->
+                        </div>
+                        <button type="button" id="add-material-btn" class="admin-add-btn">Добавить материал</button>
                     </div>
                     <div class="admin-form-actions">
                         <button class="admin-action-btn" id="save-product-btn" type="submit">Сохранить</button>

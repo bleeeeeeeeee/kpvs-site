@@ -14,6 +14,18 @@ const {
     deleteProduct
 } = require('./db');
 
+const { Pool } = require('pg');
+const dbPool = new Pool({
+    host: process.env.PGHOST || 'localhost',
+    port: Number(process.env.PGPORT || 5433),
+    database: process.env.PGDATABASE || 'kpvs_db',
+    user: process.env.PGUSER || 'postgres',
+    password: process.env.PGPASSWORD || '12345678',
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000
+});
+
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
 
@@ -239,6 +251,48 @@ app.get('/api/search', async (req, res) => {
     } catch (error) {
         console.error('Error searching products:', error);
         res.status(500).json({ error: 'Search failed' });
+    }
+});
+
+app.get('/api/sizes', async (req, res) => {
+    try {
+        const result = await dbPool.query(`
+            SELECT name FROM sizes 
+            ORDER BY 
+                CASE name 
+                    WHEN 'XS' THEN 1
+                    WHEN 'S' THEN 2
+                    WHEN 'M' THEN 3
+                    WHEN 'L' THEN 4
+                    WHEN 'XL' THEN 5
+                    WHEN 'XXL' THEN 6
+                    ELSE 7
+                END, name
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching sizes:', error);
+        res.status(500).json({ error: 'Failed to load sizes' });
+    }
+});
+
+app.get('/api/tags', async (req, res) => {
+    try {
+        const result = await dbPool.query('SELECT code, name FROM tags ORDER BY sort_order');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching tags:', error);
+        res.status(500).json({ error: 'Failed to load tags' });
+    }
+});
+
+app.get('/api/materials', async (req, res) => {
+    try {
+        const result = await dbPool.query('SELECT name, name as code FROM materials ORDER BY name');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching materials:', error);
+        res.status(500).json({ error: 'Failed to load materials' });
     }
 });
 

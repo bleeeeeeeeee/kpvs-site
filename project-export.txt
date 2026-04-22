@@ -1,6 +1,6 @@
 ================================================================================
 ЭКСПОРТ ПРОЕКТА
-Создано: 4/21/2026, 1:18:11 PM
+Создано: 4/22/2026, 10:31:52 AM
 Всего файлов: 17
 ================================================================================
 
@@ -84,7 +84,7 @@ npm start
 
 ================================================================================
 ФАЙЛ: admin.html
-РАЗМЕР: 7073 символов
+РАЗМЕР: 8590 символов
 РАСШИРЕНИЕ: .html
 ================================================================================
 
@@ -118,8 +118,8 @@ npm start
             <div class="admin-sorting">
                 <label for="sort-by">Сортировка</label>
                 <select id="sort-by">
-                    <option value="created_at_desc">Сначала новые</option>
-                    <option value="created_at_asc">Сначала старые</option>
+                    <option value="id_asc">ID по возрастанию (по умолчанию)</option>
+                    <option value="id_desc">ID по убыванию</option>
                     <option value="name_asc">Название A–Я</option>
                     <option value="name_desc">Название Я–A</option>
                     <option value="price_asc">Цена по возрастанию</option>
@@ -132,6 +132,15 @@ npm start
 
         <div class="admin-table-container">
             <table class="admin-table">
+                <colgroup>
+                    <col data-col="id" style="width: 72px;">
+                    <col data-col="name" style="width: 280px;">
+                    <col data-col="description">
+                    <col data-col="category" style="width: 200px;">
+                    <col data-col="gender" style="width: 140px;">
+                    <col data-col="price" style="width: 140px;">
+                    <col data-col="actions" style="width: 220px;">
+                </colgroup>
                 <thead>
                     <tr>
                         <th>ID</th>
@@ -165,9 +174,14 @@ npm start
                 </div>
                 <div class="filter-section">
                     <label for="filter-category-modal">Категория</label>
-                    <select id="filter-category-modal">
-                        <option value="">Все категории</option>
-                    </select>
+                    <div class="admin-multiselect" id="filter-category-multiselect">
+                        <button class="admin-multiselect-trigger" id="filter-category-trigger" type="button">
+                            <span id="filter-category-label">Все категории</span>
+                            <span class="admin-multiselect-caret" aria-hidden="true">▾</span>
+                        </button>
+                        <div class="admin-multiselect-dropdown" id="filter-category-dropdown" role="listbox" aria-multiselectable="true"></div>
+                        <input type="hidden" id="filter-category-modal" value="" />
+                    </div>
                 </div>
                 <div class="filter-row">
                     <div class="filter-section filter-price">
@@ -207,7 +221,7 @@ npm start
                         <label for="product-description">Описание</label>
                         <textarea id="product-description" name="description" rows="4"></textarea>
                     </div>
-                    <div class="form-row form-grid">
+                    <div class="form-grid">
                         <div>
                             <label for="product-price">Цена</label>
                             <input id="product-price" name="price" type="number" step="0.01" min="0" />
@@ -217,7 +231,13 @@ npm start
                             <input id="product-image" name="image" type="url" />
                         </div>
                     </div>
-                    <div class="form-row form-grid">
+                    <div class="form-row">
+                        <label for="product-images">Изображения (несколько файлов)</label>
+                        <input id="product-images" name="images" type="file" accept="image/*" multiple />
+                        <div class="admin-image-help">Можно выбрать несколько файлов. После выбора они загрузятся и появятся в списке ниже.</div>
+                        <div id="product-images-list" class="admin-image-list" aria-live="polite"></div>
+                    </div>
+                    <div class="form-grid">
                         <div>
                             <label for="product-gender">Пол</label>
                             <select id="product-gender" name="gender" required>
@@ -231,8 +251,8 @@ npm start
                         </div>
                     </div>
                     <div class="admin-form-actions">
-                        <button class="filter-button" id="save-product-btn" type="submit">Сохранить</button>
-                        <button class="btn-remove" id="cancel-product-btn" type="button">Отмена</button>
+                        <button class="admin-action-btn" id="save-product-btn" type="submit">Сохранить</button>
+                        <button class="admin-cancel-btn" id="cancel-product-btn" type="button">Отмена</button>
                     </div>
                 </form>
             </div>
@@ -247,7 +267,7 @@ npm start
 
 ================================================================================
 ФАЙЛ: css/style.css
-РАЗМЕР: 29341 символов
+РАЗМЕР: 36772 символов
 РАСШИРЕНИЕ: .css
 ================================================================================
 
@@ -306,11 +326,15 @@ body {
 .filters { display: flex; justify-content: space-between; align-items: center; gap: 2rem; margin-bottom: 2rem; padding: 1rem; background: var(--bg-secondary); border-radius: 0.75rem; border: 1px solid var(--border-color); box-shadow: 0 2px 8px var(--shadow-color); }
 .sort-section { display: flex; align-items: center; gap: 0.75rem; }
 .sort-section label { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
-.filter-button { padding: 0.85rem 1.4rem; border-radius: 1rem; border: none; background: linear-gradient(135deg, #3B5223 0%, #6B8A3A 100%); color: white; cursor: pointer; font-size: 1rem; font-weight: 700; transition: box-shadow 0.15s ease, background-position 0.35s ease, filter 0.15s ease; box-shadow: 0 12px 24px rgba(59, 82, 35, 0.22); background-size: 200% 200%; background-position: 0% 50%; }
-.filter-button:hover { background-position: 100% 50%; filter: brightness(1.02); box-shadow: 0 12px 22px rgba(59, 82, 35, 0.25); }
-.filter-button:active { background-position: 100% 50%; box-shadow: inset 0 4px 14px rgba(0, 0, 0, 0.22), inset 0 0 0 1px rgba(255,255,255,0.06), 0 4px 10px rgba(59, 82, 35, 0.14); transform: translateY(0.5px); }
-.filter-button:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(182, 197, 63, 0.25); }
-.sort-section select { padding: 0.5rem 1rem; font-size: 1rem; border: 2px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; transition: all 0.2s ease; min-width: 150px; }
+.filter-button, .admin-action-btn { padding: 0.85rem 1.4rem; border-radius: 0.75rem; border: none; background: linear-gradient(135deg, #3B5223 0%, #6B8A3A 100%); color: white; cursor: pointer; font-size: 1rem; font-weight: 700; transition: box-shadow 0.15s ease, background-position 0.35s ease, filter 0.15s ease; box-shadow: 0 2px 8px rgba(59, 82, 35, 0.15); background-size: 200% 200%; background-position: 0% 50%; }
+.filter-button:hover, .admin-action-btn:hover { background-position: 100% 50%; filter: brightness(1.02); box-shadow: 0 4px 12px rgba(59, 82, 35, 0.22); }
+.filter-button:active, .admin-action-btn:active { background-position: 100% 50%; box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2); transform: translateY(0.5px); }
+.filter-button:focus-visible, .admin-action-btn:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(182, 197, 63, 0.25); }
+.admin-cancel-btn { padding: 0.85rem 1.4rem; border-radius: 0.75rem; border: 1px solid var(--border-color); background: transparent; color: var(--text-primary); cursor: pointer; font-size: 1rem; font-weight: 700; transition: all 0.2s ease; }
+.admin-cancel-btn:hover { background: var(--bg-secondary); border-color: var(--accent-color); color: var(--text-primary); }
+.admin-cancel-btn:active { transform: translateY(0.5px); background: rgba(182, 197, 63, 0.08); }
+.admin-cancel-btn:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(182, 197, 63, 0.15); }
+.sort-section select { padding: 0.5rem 1rem; font-size: 1rem; border: 2px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-primary); color: var(--text-primary); cursor: pointer; transition: all 0.2s ease; min-width: 150px; }
 .sort-section select:hover { border-color: #B6C53F; }
 .sort-section select[multiple] { min-height: 2.75rem; height: 2.75rem; overflow: hidden; }
 .sort-section select:focus { outline: none; border-color: #727B26; box-shadow: 0 0 0 3px rgba(182, 197, 63, 0.1); }
@@ -333,7 +357,7 @@ body {
 .card-img-container { position: relative; }
 .card-img-container .card-hover-overlay { position: absolute; bottom: 0; left: 0; right: 0; height: 45%; background: rgba(0, 0, 0, 0.7); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0.25rem; opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
 .card-img-container:hover .card-hover-overlay { opacity: 1; pointer-events: auto; }
-.card-hover-btn { padding: 0.75rem 1rem; border: none; border-radius: 0.35rem; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: white; width: 95%; max-width: 200px; transition: all 0.2s ease; }
+.card-hover-btn { padding: 0.75rem 1rem; border: none; border-radius: 0.75rem; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: white; width: 95%; max-width: 200px; transition: all 0.2s ease; }
 .card-hover-btn:hover { transform: scale(1.02); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3); }
 .card-favorite-btn { background: var(--accent-color); }
 .card-cart-btn { background: var(--primary-color); }
@@ -376,7 +400,7 @@ body {
 .product-material-list li, .product-size-list li { margin-bottom: 0.5rem; }
 .product-actions { display: flex; flex-direction: column; gap: 0.8rem; width: 100%; margin-top: 0; }
 .product-actions button { width: 100%; }
-.price-btn, .favorite-btn { background: #24352a; color: white; border: none; padding: 0.85rem 1.5rem; border-radius: 0.5rem; cursor: pointer; font-size: 1rem; }
+.price-btn, .favorite-btn { background: #24352a; color: white; border: none; padding: 0.85rem 1.5rem; border-radius: 0.75rem; cursor: pointer; font-size: 1rem; }
 .price-btn:hover, .favorite-btn:hover { background: #606060; }
 .inquire-action-btn { background: rgba(182, 197, 63, 0.95); color: #24352a; border: 1px solid rgba(36, 53, 42, 0.12); }
 .inquire-action-btn:hover { background: #d9dc9b; }
@@ -384,33 +408,37 @@ body {
 .favorite-btn.in-favorites { background: #727B26; }
 .cart-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1rem; }
 .modal-item-info h3 small { color: #6b6b6b; font-weight: 400; font-size: 0.95rem; }
-.modal-item-actions .btn-remove { background: #c53d3d; color: #fff; border: none; border-radius: 0.45rem; padding: 0.65rem 1rem; cursor: pointer; }
+.modal-item-actions .btn-remove { background: #c53d3d; color: #fff; border: none; border-radius: 0.75rem; padding: 0.65rem 1rem; cursor: pointer; }
 
-.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; opacity: 0; transition: opacity 0.3s ease; backdrop-filter: blur(5px); }
-.modal.show { opacity: 1; }
-.modal-content { background: var(--bg-primary); border-radius: 1rem; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3); transform: scale(0.9); transition: transform 0.3s ease; }
+.modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); display: flex; justify-content: center; align-items: center; z-index: 1000; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 0.3s ease, visibility 0.3s ease; backdrop-filter: blur(5px); }
+.modal.show { opacity: 1; visibility: visible; pointer-events: auto; }
+body.modal-open { pointer-events: none; }
+body.modal-open .modal { pointer-events: auto; }
+.modal-content { background: var(--bg-primary); border-radius: 1rem; max-width: 600px; width: 90%; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.3); transform: scale(0.9); transition: transform 0.3s ease; overflow: hidden; }
 .modal.show .modal-content { transform: scale(1); }
 .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem; border-bottom: 2px solid var(--border-color); }
 .modal-header h2 { margin: 0; color: var(--primary-color); font-size: 1.5rem; }
 .modal-close { background: none; border: none; font-size: 2rem; cursor: pointer; color: var(--text-primary); line-height: 1; padding: 0; width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center; transition: color 0.2s ease; }
 .modal-close:hover { color: var(--accent-color); }
-.modal-body { padding: 1.5rem; }
+.modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
 .filter-modal-description { margin: 0 0 1rem 0; color: var(--text-secondary); line-height: 1.5; }
 .filter-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
 .filter-option { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: #f6f8f6; cursor: pointer; transition: border-color 0.2s ease, background 0.2s ease; }
 .filter-option input { width: 1rem; height: 1rem; accent-color: var(--secondary-color); }
 .filter-option span { font-size: 0.95rem; color: var(--text-primary); }
 .filter-option:hover { border-color: var(--accent-color); background: #f0f3ef; }
-.modal-footer { display: flex; justify-content: flex-end; gap: 0.75rem; padding: 1rem 1.5rem 1.5rem; border-top: 1px solid var(--border-color); }
-.filter-apply-btn, .filter-clear-btn { padding: 0.8rem 1.2rem; border-radius: 0.65rem; border: none; font-weight: 700; cursor: pointer; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 1rem; padding: 1.5rem; border-top: 1px solid var(--border-color); }
+.filter-apply-btn, .filter-clear-btn { padding: 0.85rem 1.4rem; border-radius: 0.75rem; border: none; font-weight: 700; cursor: pointer; transition: all 0.2s ease; }
 .filter-apply-btn { background: var(--secondary-color); color: white; }
-.filter-apply-btn:hover { background: #1d2f1f; }
+.filter-apply-btn:hover { background: #1d2f1f; filter: brightness(1.05); }
+.filter-apply-btn:active { transform: translateY(0.5px); }
 .filter-clear-btn { background: transparent; color: var(--secondary-color); border: 1px solid var(--secondary-color); }
-.filter-clear-btn:hover { background: rgba(36, 53, 42, 0.05); }
+.filter-clear-btn:hover { background: rgba(36, 53, 42, 0.08); border-color: #1d2f1f; }
+.filter-clear-btn:active { transform: translateY(0.5px); }
 .empty-message { text-align: center; color: var(--text-secondary); font-size: 1.1rem; padding: 2rem 0; }
 .modal-items { display: flex; flex-direction: column; gap: 1rem; }
-.modal-item { display: flex; gap: 1rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-secondary); align-items: stretch; }
-.modal-item-img { width: 110px; height: 120px; object-fit: cover; border-radius: 0.5rem; }
+.modal-item { display: flex; gap: 1rem; padding: 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-secondary); align-items: stretch; }
+.modal-item-img { width: 110px; height: 120px; object-fit: cover; border-radius: 0.75rem; }
 .modal-item-info { flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
 .modal-item-info h3 { margin: 0 0 0.5rem 0; color: var(--text-primary); font-size: 1rem; }
 .modal-item-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: auto; }
@@ -451,41 +479,294 @@ body {
 .admin-sorting select { min-width: 220px; }
 .admin-summary-note { color: var(--text-secondary); font-size: 0.95rem; padding: 0 1rem 1rem; }
 .admin-count { color: var(--text-secondary); font-size: 0.98rem; }
-.admin-table-container { overflow-x: auto; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 1rem; box-shadow: 0 1rem 2rem rgba(36, 53, 42, 0.06); padding: 1rem; }
-.admin-table { width: 100%; border-collapse: collapse; }
-.admin-table th { background: rgba(182, 197, 63, 0.08); color: var(--primary-color); font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.08em; padding: 1rem 0.75rem; border-bottom: 2px solid var(--border-color); font-weight: 700; text-align: left; }
-.admin-table td { color: var(--text-primary); font-size: 0.9rem; padding: 0.85rem 0.75rem; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
-.admin-table tbody tr { height: auto; }
-.admin-table tbody tr:nth-child(odd) { background: rgba(182, 197, 63, 0.03); }
-.admin-table tbody tr:hover { background: rgba(182, 197, 63, 0.1); transition: background 0.15s ease; }
-.admin-table td.cell-id { width: 6%; text-align: center; font-weight: 600; }
-.admin-table td.cell-name { width: 18%; }
-.admin-table td.cell-name strong { display: block; margin-bottom: 0.15rem; color: var(--text-primary); font-weight: 600; }
-.admin-table td.cell-description { width: 22%; color: var(--text-secondary); font-size: 0.85rem; line-height: 1.4; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; max-height: 2.8rem; }
-.admin-table td:nth-child(4) { width: 15%; }
-.admin-table td:nth-child(5) { width: 12%; text-align: center; }
-.admin-table td.cell-price { width: 12%; text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
-.admin-table td.admin-actions-cell { width: 15%; display: flex; gap: 0.4rem; flex-wrap: nowrap; justify-content: flex-end; align-items: center; }
-.admin-table td.admin-actions-cell button { padding: 0.55rem 0.75rem; font-size: 0.85rem; border: none; border-radius: 0.4rem; cursor: pointer; transition: all 0.2s ease; font-weight: 500; }
-.admin-table td.admin-actions-cell .btn-edit { background: var(--primary-color); color: white; }
-.admin-table td.admin-actions-cell .btn-edit:hover { background: var(--accent-color); }
-.admin-table td.admin-actions-cell .btn-delete { background: #c53d3d; color: white; }
-.admin-table td.admin-actions-cell .btn-delete:hover { background: #a53030; }
-.admin-filter-body { display: grid; gap: 1rem; }
-.filter-section { display: flex; flex-direction: column; gap: 0.4rem; }
-.filter-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.admin-table-container { overflow-x: auto; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 1rem; box-shadow: 0 1rem 2rem rgba(36, 53, 42, 0.06); }
+.admin-table { width: 100%; border-collapse: collapse; min-width: 720px; table-layout: fixed; }
+.admin-table th,
+.admin-table td { text-align: left; padding: 1rem 0.75rem; border-bottom: 1px solid var(--border-color); }
+.admin-table th { text-align: center; padding: 1rem 0.75rem; border-bottom: 1px solid var(--border-color); background: rgba(182, 197, 63, 0.08); color: var(--primary-color); font-size: 0.95rem; text-transform: uppercase; letter-spacing: 0.08em; position: relative; }
+.admin-table td { color: var(--text-primary); font-size: 0.95rem; vertical-align: middle; }
+.admin-table tbody tr:nth-child(odd) { background: rgba(182, 197, 63, 0.04); }
+.admin-table tbody tr:hover { background: rgba(182, 197, 63, 0.08); }
+.admin-table th,
+.admin-table td { overflow: hidden; text-overflow: ellipsis; }
+
+.admin-table td.cell-id { text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
+.admin-table td.cell-price { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.admin-table .cell-name { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.admin-table .cell-name strong { display: block; }
+.admin-table .cell-name span { color: var(--text-secondary); font-size: 0.9rem; line-height: 1.3; }
+.admin-table .cell-description { color: var(--text-secondary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.admin-table .admin-actions-cell { display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: flex-end; }
+.admin-table .admin-actions-cell .btn-add-to-cart,
+.admin-table .admin-actions-cell .btn-remove { padding: 0.65rem 0.95rem; font-size: 0.9rem; }
+.admin-table .admin-actions-cell .btn-remove { background: #c53d3d; }
+.admin-table .admin-actions-cell .btn-add-to-cart { background: var(--primary-color); }
+.admin-table .admin-actions-cell button:hover { opacity: 0.95; }
+.admin-filter-body { display: grid; gap: 1.5rem; }
+.filter-section { display: flex; flex-direction: column; gap: 0.5rem; }
+.filter-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.5rem; }
 .filter-price input { width: 100%; }
 .empty-row td { text-align: center; color: var(--text-secondary); padding: 2rem; }
-.admin-modal-content { max-width: 680px; padding: 0; }
-.admin-form { display: grid; gap: 1rem; }
-.form-row { display: flex; flex-direction: column; gap: 0.35rem; }
+
+#product-modal .modal-content {
+    width: min(900px, calc(100vw - 2rem));
+    max-width: 900px;
+    max-height: min(90vh, 900px);
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+}
+
+#filter-modal .modal-header,
+#product-modal .modal-header {
+    padding: 1.25rem 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+#product-modal .modal-body {
+    padding: 1.25rem 1.5rem;
+    overflow: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+}
+
+#filter-modal .modal-footer {
+    padding: 1rem 1.5rem 1.25rem;
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: var(--bg-primary);
+    border-top: 1px solid var(--border-color);
+}
+
+.admin-modal-content { /* max-width: 1000px; - removed to prevent overflow */ }
+.admin-form { display: grid; gap: 1.5rem; }
+.form-row { display: flex; flex-direction: column; gap: 0.5rem; }
 .form-row label { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); }
 .form-row input,
 .form-row select,
-.form-row textarea { width: 100%; padding: 0.85rem 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-primary); color: var(--text-primary); font-size: 1rem; }
+.form-row textarea { width: 100%; padding: 0.85rem 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-primary); color: var(--text-primary); font-size: 1rem; line-height: 1.5; }
 .form-row textarea { resize: vertical; min-height: 7rem; }
-.form-grid { display: grid; gap: 1rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.admin-form-actions { display: flex; justify-content: flex-end; gap: 0.75rem; flex-wrap: wrap; padding-top: 0.5rem; }
+.form-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.form-grid > div { display: flex; flex-direction: column; gap: 0.5rem; }
+.admin-form-actions { display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap; padding-top: 1rem; margin-top: 0.5rem; }
+
+
+
+#product-modal .admin-form .form-row textarea {
+    min-height: 6.25rem;
+}
+
+.filter-section select {
+    appearance: auto;
+    -webkit-appearance: menulist;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    opacity: 1;
+    min-height: 3.1rem;
+    line-height: 1.2;
+}
+
+.admin-multiselect-trigger {
+    appearance: auto;
+    -webkit-appearance: menulist;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    opacity: 1;
+    min-height: 3.1rem;
+    line-height: 1.2;
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+    font-size: 1rem;
+    width: 100%;
+}
+
+.admin-image-help {
+    margin-top: 0.35rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+}
+.admin-image-list {
+    margin-top: 0.75rem;
+    display: grid;
+    gap: 0.6rem;
+}
+.admin-image-item {
+    display: grid;
+    grid-template-columns: 72px 1fr 140px;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.85rem;
+    background: var(--bg-secondary);
+}
+.admin-image-thumb {
+    width: 72px;
+    height: 72px;
+    border-radius: 0.65rem;
+    overflow: hidden;
+    background: rgba(0,0,0,0.04);
+    border: 1px solid rgba(36, 53, 42, 0.08);
+}
+.admin-image-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+.admin-image-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+}
+.admin-image-meta code {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.admin-image-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.admin-image-actions label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    user-select: none;
+    cursor: pointer;
+}
+.admin-image-actions button {
+    border: 0;
+    border-radius: 0.75rem;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: rgba(197, 61, 61, 0.12);
+    color: #8f1f1f;
+    border: 1px solid rgba(197, 61, 61, 0.22);
+}
+.admin-image-actions button:hover { filter: brightness(0.98); }
+
+@media (max-width: 768px) {
+    .admin-table { min-width: 860px; }
+    #filter-modal .modal-content,
+    #product-modal .modal-content { width: calc(100vw - 1.25rem); }
+    #filter-modal .modal-header,
+    #product-modal .modal-header,
+    #filter-modal .modal-body,
+    #product-modal .modal-body,
+    #filter-modal .modal-footer { padding-left: 1rem; padding-right: 1rem; }
+    .admin-image-item { grid-template-columns: 64px 1fr; }
+    .admin-image-actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+.admin-table .btn-edit,
+.admin-table .btn-delete {
+    border: 0;
+    border-radius: 0.75rem;
+    padding: 0.65rem 0.95rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: filter 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
+}
+.admin-table .btn-edit {
+    background: rgba(36, 53, 42, 0.08);
+    color: var(--primary-color);
+    border: 1px solid rgba(36, 53, 42, 0.12);
+}
+.admin-table .btn-edit:hover { filter: brightness(0.98); box-shadow: 0 8px 18px rgba(36, 53, 42, 0.08); }
+.admin-table .btn-delete {
+    background: rgba(197, 61, 61, 0.12);
+    color: #8f1f1f;
+    border: 1px solid rgba(197, 61, 61, 0.22);
+}
+.admin-table .btn-delete:hover { filter: brightness(0.98); box-shadow: 0 8px 18px rgba(197, 61, 61, 0.12); }
+.admin-table button:active { transform: translateY(0.5px); }
+
+.admin-table th .admin-col-resizer {
+    position: absolute;
+    top: 0;
+    right: -4px;
+    width: 10px;
+    height: 100%;
+    cursor: col-resize;
+    user-select: none;
+    touch-action: none;
+}
+.admin-table th .admin-col-resizer::after {
+    content: '';
+    position: absolute;
+    left: 4px;
+    top: 25%;
+    bottom: 25%;
+    width: 2px;
+    border-radius: 2px;
+    background: rgba(36, 53, 42, 0.18);
+}
+.admin-table th:hover .admin-col-resizer::after { background: rgba(36, 53, 42, 0.32); }
+
+.admin-multiselect { position: relative; }
+.admin-multiselect-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-radius: 0.75rem;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    cursor: pointer;
+}
+.admin-multiselect-trigger:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(182, 197, 63, 0.18); }
+.admin-multiselect-caret { color: var(--text-secondary); font-size: 0.95rem; }
+.admin-multiselect-dropdown {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 0.5rem);
+    z-index: 1100;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.85rem;
+    box-shadow: 0 18px 40px rgba(0,0,0,0.18);
+    padding: 0.5rem;
+    display: none;
+    max-height: 320px;
+    overflow: auto;
+}
+.admin-multiselect.open .admin-multiselect-dropdown { display: block; }
+.admin-multiselect-option {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.7rem 0.75rem;
+    border-radius: 0.65rem;
+    cursor: pointer;
+    user-select: none;
+}
+.admin-multiselect-option:hover { background: rgba(182, 197, 63, 0.10); }
+.admin-multiselect-option input { width: 1rem; height: 1rem; accent-color: var(--secondary-color); }
+.admin-multiselect-option span { font-size: 0.95rem; }
 
 .footer { background: linear-gradient(135deg, #24352a 0%, #3B5223 100%); color: white; padding: 3rem 0 1.5rem 0; margin-top: 4rem; width: 100%; }
 .footer .container { margin: 0 auto; padding: 0 4rem; max-width: 1400px; }
@@ -621,7 +902,7 @@ body {
 
 ================================================================================
 ФАЙЛ: db.js
-РАЗМЕР: 11041 символов
+РАЗМЕР: 15909 символов
 РАСШИРЕНИЕ: .js
 ================================================================================
 
@@ -637,6 +918,18 @@ const pool = new Pool({
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000
 });
+
+function slugifyProductName(text) {
+    if (!text || typeof text !== 'string') return '';
+    return text
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9\-]+/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
 
 async function connectDB() {
     const client = await pool.connect();
@@ -676,8 +969,53 @@ function buildCategoryCondition(category, values, startIndex) {
     };
 }
 
+function normalizeCategoryInput(category) {
+    if (!category) return [];
+    if (Array.isArray(category)) {
+        return category
+            .flatMap((value) => typeof value === 'string' ? value.split(',') : [])
+            .map((value) => value.trim())
+            .filter(Boolean);
+    }
+    if (typeof category === 'string') {
+        return category
+            .split(',')
+            .map((value) => value.trim())
+            .filter(Boolean);
+    }
+    return [];
+}
+
+function buildCategoriesCondition(categories, values, startIndex) {
+    const items = normalizeCategoryInput(categories);
+    if (!items.length) {
+        return { condition: null, nextIndex: startIndex };
+    }
+
+    const conditions = [];
+    let nextIndex = startIndex;
+
+    items.forEach((category) => {
+        const built = buildCategoryCondition(category, values, nextIndex);
+        if (built.condition) {
+            conditions.push(built.condition);
+            nextIndex = built.nextIndex;
+        }
+    });
+
+    if (!conditions.length) {
+        return { condition: null, nextIndex: startIndex };
+    }
+
+    return {
+        condition: conditions.length === 1 ? conditions[0] : `(${conditions.join(' OR ')})`,
+        nextIndex
+    };
+}
+
 async function getProducts(gender, options = {}) {
     const {
+        gender: genderFilter,
         category,
         material,
         size,
@@ -701,12 +1039,17 @@ async function getProducts(gender, options = {}) {
         conditions.push(`p.gender_code = $${nextIndex}`);
         nextIndex += 1;
     }
+    if (!gender && genderFilter) {
+        values.push(genderFilter);
+        conditions.push(`p.gender_code = $${nextIndex}`);
+        nextIndex += 1;
+    }
 
     if (category) {
         if (category === 'popular') {
             internalTag = 'popular';
         } else {
-            const categoryCondition = buildCategoryCondition(category, values, nextIndex);
+            const categoryCondition = buildCategoriesCondition(category, values, nextIndex);
             if (categoryCondition.condition) {
                 conditions.push(categoryCondition.condition);
                 nextIndex = categoryCondition.nextIndex;
@@ -746,12 +1089,28 @@ async function getProducts(gender, options = {}) {
     }
 
     if (q) {
-        values.push(`%${q}%`);
-        conditions.push(`(
-            p.name ILIKE $${nextIndex}
-            OR p.description ILIKE $${nextIndex}
-        )`);
-        nextIndex += 1;
+        const queryText = String(q).trim();
+        const isIdSearch = /^\d+$/.test(queryText);
+        if (isIdSearch) {
+            values.push(Number(queryText));
+            const idIndex = nextIndex;
+            nextIndex += 1;
+            values.push(`%${queryText}%`);
+            const textIndex = nextIndex;
+            nextIndex += 1;
+            conditions.push(`(
+                p.id = $${idIndex}
+                OR p.name ILIKE $${textIndex}
+                OR p.description ILIKE $${textIndex}
+            )`);
+        } else {
+            values.push(`%${queryText}%`);
+            conditions.push(`(
+                p.name ILIKE $${nextIndex}
+                OR p.description ILIKE $${nextIndex}
+            )`);
+            nextIndex += 1;
+        }
     }
 
     if (price_min != null && price_min !== '') {
@@ -767,11 +1126,12 @@ async function getProducts(gender, options = {}) {
     }
 
     const allowedSortFields = {
+        id: 'p.id',
         created_at: 'p.created_at',
         name: 'p.name',
         price: 'p.price'
     };
-    const sortField = allowedSortFields[sort_by] || 'p.created_at';
+    const sortField = allowedSortFields[sort_by] || 'p.id';
     const direction = sort_direction === 'asc' ? 'ASC' : 'DESC';
 
     values.push(Number(limit) || 20, Number(offset) || 0);
@@ -935,51 +1295,120 @@ async function getCategories() {
 }
 
 async function createProduct(product) {
-    const query = `
-        INSERT INTO products (name, slug, description, price, image_path, gender_code, category_code, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
-        RETURNING id, name, slug, description, price, image_path AS image, gender_code AS gender, category_code AS category, created_at;
-    `;
-    const values = [
-        product.name,
-        product.slug,
-        product.description || null,
-        product.price,
-        product.image_path || null,
-        product.gender_code,
-        product.category_code
-    ];
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const slug = (product.slug && product.slug.trim()) || slugifyProductName(product.name);
+        const query = `
+            INSERT INTO products (id, name, slug, description, price, image_path, gender_code, category_code, created_at)
+            VALUES (DEFAULT, $1, $2, $3, $4, $5, $6, $7, NOW())
+            RETURNING id, name, slug, description, price, image_path AS image, gender_code AS gender, category_code AS category, created_at;
+        `;
+        const values = [
+            product.name,
+            slug,
+            product.description || null,
+            product.price,
+            product.image_path || null,
+            product.gender_code,
+            product.category_code
+        ];
 
-    const result = await pool.query(query, values);
-    return result.rows[0];
+        const result = await client.query(query, values);
+        const created = result.rows[0];
+
+        if (created?.id && Array.isArray(product.images) && product.images.length) {
+            await replaceProductImages(client, created.id, product.images);
+        }
+
+        await client.query('COMMIT');
+        return created;
+    } catch (error) {
+        try { await client.query('ROLLBACK'); } catch {}
+        throw error;
+    } finally {
+        client.release();
+    }
 }
 
 async function updateProduct(id, product) {
-    const query = `
-        UPDATE products
-        SET name = $1,
-            slug = $2,
-            description = $3,
-            price = $4,
-            image_path = $5,
-            gender_code = $6,
-            category_code = $7
-        WHERE id = $8
-        RETURNING id, name, slug, description, price, image_path AS image, gender_code AS gender, category_code AS category, created_at;
-    `;
-    const values = [
-        product.name,
-        product.slug,
-        product.description || null,
-        product.price,
-        product.image_path || null,
-        product.gender_code,
-        product.category_code,
-        id
-    ];
+    const client = await pool.connect();
+    try {
+        await client.query('BEGIN');
+        const slug = (product.slug && product.slug.trim()) || slugifyProductName(product.name);
+        const query = `
+            UPDATE products
+            SET name = $1,
+                slug = $2,
+                description = $3,
+                price = $4,
+                image_path = $5,
+                gender_code = $6,
+                category_code = $7
+            WHERE id = $8
+            RETURNING id, name, slug, description, price, image_path AS image, gender_code AS gender, category_code AS category, created_at;
+        `;
+        const values = [
+            product.name,
+            slug,
+            product.description || null,
+            product.price,
+            product.image_path || null,
+            product.gender_code,
+            product.category_code,
+            id
+        ];
 
-    const result = await pool.query(query, values);
-    return result.rows[0] || null;
+        const result = await client.query(query, values);
+        const updated = result.rows[0] || null;
+
+        if (updated && Array.isArray(product.images)) {
+            await replaceProductImages(client, id, product.images);
+        }
+
+        await client.query('COMMIT');
+        return updated;
+    } catch (error) {
+        try { await client.query('ROLLBACK'); } catch {}
+        throw error;
+    } finally {
+        client.release();
+    }
+}
+
+function normalizeImagesInput(images) {
+    if (!Array.isArray(images)) return [];
+    return images
+        .map((img, idx) => {
+            if (!img || typeof img !== 'object') return null;
+            const path = typeof img.path === 'string' ? img.path.trim() : '';
+            if (!path) return null;
+            return {
+                path,
+                is_main: Boolean(img.is_main),
+                sort_order: Number.isFinite(Number(img.sort_order)) ? Number(img.sort_order) : idx
+            };
+        })
+        .filter(Boolean);
+}
+
+async function replaceProductImages(client, productId, images) {
+    const normalized = normalizeImagesInput(images);
+    await client.query('DELETE FROM product_images WHERE product_id = $1', [productId]);
+    if (!normalized.length) return;
+
+    const hasMain = normalized.some((i) => i.is_main);
+    const rows = hasMain
+        ? normalized
+        : normalized.map((item, idx) => ({ ...item, is_main: idx === 0 }));
+
+    for (let i = 0; i < rows.length; i += 1) {
+        const item = rows[i];
+        await client.query(
+            'INSERT INTO product_images (product_id, image_path, is_main, sort_order) VALUES ($1, $2, $3, $4)',
+            [productId, item.path, item.is_main, item.sort_order]
+        );
+    }
 }
 
 async function deleteProduct(id) {
@@ -1014,7 +1443,7 @@ module.exports = {
 
 ================================================================================
 ФАЙЛ: js/admin.js
-РАЗМЕР: 14176 символов
+РАЗМЕР: 32917 символов
 РАСШИРЕНИЕ: .js
 ================================================================================
 
@@ -1022,13 +1451,26 @@ const Admin = (() => {
     let categories = [];
     let products = [];
     let editingProductId = null;
-    let rowActionsSetup = false;
+    let productImages = [];
     const state = {
         gender: '',
-        category: '',
+        categories: [],
         minPrice: '',
         maxPrice: '',
-        sortOption: 'created_at_desc'
+        sortOption: 'id_asc'
+    };
+
+    const ui = {
+        productsBody: null,
+        productCount: null,
+        filterCategoryHidden: null,
+        filterCategoryMultiselect: null,
+        filterCategoryDropdown: null,
+        filterCategoryLabel: null,
+        filterCategoryTrigger: null,
+        productCategorySelect: null,
+        productImagesInput: null,
+        productImagesList: null
     };
 
     function slugify(text) {
@@ -1042,57 +1484,164 @@ const Admin = (() => {
             .replace(/^-+|-+$/g, '');
     }
 
+    function notify(message, kind = 'info') {
+        const existing = document.querySelector('.notification');
+        if (existing) existing.remove();
+
+        const node = document.createElement('div');
+        node.className = 'notification show';
+        node.setAttribute('role', 'status');
+        node.innerHTML = `
+            <div class="notification-handle" aria-hidden="true"></div>
+            <div class="notification-content">
+                <strong>${escapeHtml(kind === 'error' ? 'Ошибка' : kind === 'success' ? 'Готово' : 'Сообщение')}</strong>
+                <span>${escapeHtml(message)}</span>
+            </div>
+            <button class="notification-close" type="button" aria-label="Закрыть">&times;</button>
+        `;
+        document.body.appendChild(node);
+
+        const close = node.querySelector('.notification-close');
+        if (close) close.onclick = () => node.remove();
+
+        window.setTimeout(() => {
+            if (node.isConnected) node.remove();
+        }, kind === 'error' ? 7000 : 4500);
+    }
+
+    function setTableStatusRow(message) {
+        if (!ui.productsBody || !ui.productCount) return;
+        ui.productsBody.innerHTML = `
+            <tr class="empty-row">
+                <td colspan="7">${escapeHtml(message)}</td>
+            </tr>
+        `;
+        ui.productCount.textContent = '0';
+    }
+
+    function normalizeSelectedCategories(value) {
+        if (!value) return [];
+        if (Array.isArray(value)) return value.map(String).map((v) => v.trim()).filter(Boolean);
+        return String(value)
+            .split(',')
+            .map((v) => v.trim())
+            .filter(Boolean);
+    }
+
     async function fetchCategories() {
-        const response = await fetch('/api/categories');
-        if (!response.ok) {
-            throw new Error('Не удалось загрузить категории');
+        try {
+            const response = await fetch('/api/categories');
+            if (!response.ok) {
+                throw new Error('Не удалось загрузить категории');
+            }
+            const data = await response.json();
+            categories = flattenCategories(data);
+            populateCategoryFilters();
+        } catch (error) {
+            console.error('Error fetching categories:', error);
+            categories = [];
+            populateCategoryFilters();
+            notify('Не удалось загрузить категории. Проверьте сервер и попробуйте обновить.', 'error');
         }
-        const data = await response.json();
-        categories = flattenCategories(data);
-        populateCategoryFilters();
     }
 
     function flattenCategories(list) {
         const result = [];
+        if (!Array.isArray(list)) return result;
         list.forEach((item) => {
-            result.push({ code: item.code, name: item.name });
-            if (Array.isArray(item.children) && item.children.length) {
-                result.push(...flattenCategories(item.children));
+            if (item && item.code) {
+                result.push({ code: item.code, name: item.name || item.code });
+                if (Array.isArray(item.children) && item.children.length) {
+                    result.push(...flattenCategories(item.children));
+                }
             }
         });
         return result;
     }
 
     function populateCategoryFilters() {
-        const filterSelect = document.getElementById('filter-category-modal');
-        const formSelect = document.getElementById('product-category');
+        if (!ui.filterCategoryDropdown || !ui.filterCategoryHidden || !ui.productCategorySelect) return;
 
-        if (!filterSelect || !formSelect) return;
+        ui.filterCategoryDropdown.innerHTML = '';
+        categories.forEach((category) => {
+            const option = document.createElement('label');
+            option.className = 'admin-multiselect-option';
+            option.innerHTML = `
+                <input type="checkbox" value="${escapeHtml(category.code)}" />
+                <span>${escapeHtml(category.name)}</span>
+            `;
+            ui.filterCategoryDropdown.appendChild(option);
+        });
 
-        filterSelect.innerHTML = '<option value="">Все категории</option>' + categories
-            .map((category) => `<option value="${category.code}">${category.name}</option>`)
+        ui.productCategorySelect.innerHTML = categories
+            .map((category) => `<option value="${category.code}">${escapeHtml(category.name)}</option>`)
             .join('');
 
-        formSelect.innerHTML = categories
-            .map((category) => `<option value="${category.code}">${category.name}</option>`)
-            .join('');
+        const next = normalizeSelectedCategories(state.categories);
+        setSelectedCategories(next);
+    }
+
+    function getSelectedCategories() {
+        if (!ui.filterCategoryDropdown) return [];
+        return Array.from(ui.filterCategoryDropdown.querySelectorAll('input[type="checkbox"]:checked'))
+            .map((input) => input.value)
+            .filter(Boolean);
+    }
+
+    function setSelectedCategories(codes) {
+        const selected = normalizeSelectedCategories(codes);
+        state.categories = selected;
+
+        if (ui.filterCategoryHidden) {
+            ui.filterCategoryHidden.value = selected.join(',');
+        }
+
+        if (ui.filterCategoryDropdown) {
+            const set = new Set(selected);
+            ui.filterCategoryDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                input.checked = set.has(input.value);
+            });
+        }
+
+        if (ui.filterCategoryLabel) {
+            if (!selected.length) {
+                ui.filterCategoryLabel.textContent = 'Все категории';
+            } else if (selected.length === 1) {
+                const name = categories.find((c) => c.code === selected[0])?.name || selected[0];
+                ui.filterCategoryLabel.textContent = name;
+            } else {
+                ui.filterCategoryLabel.textContent = `Выбрано категорий: ${selected.length}`;
+            }
+        }
+    }
+
+    function openCategoryDropdown() {
+        if (!ui.filterCategoryMultiselect) return;
+        ui.filterCategoryMultiselect.classList.add('open');
+    }
+
+    function closeCategoryDropdown() {
+        if (!ui.filterCategoryMultiselect) return;
+        ui.filterCategoryMultiselect.classList.remove('open');
     }
 
     function getSortValues() {
-        // Parse sortOption like 'created_at_desc' or 'name_asc'
         const parts = state.sortOption.split('_');
-        const sortDir = parts.pop(); // Get last part (asc or desc)
-        const sortBy = parts.join('_'); // Join remaining parts (e.g., 'created_at' or 'name')
+        const sortDir = parts.pop();
+        const sortBy = parts.join('_');
         return { sortBy, sortDir };
     }
 
     async function fetchProducts() {
         try {
+            setTableStatusRow('Загрузка товаров…');
             const searchInput = document.getElementById('search-input');
             const params = new URLSearchParams();
-            if (searchInput.value.trim()) params.set('q', searchInput.value.trim());
+            if (searchInput && searchInput.value.trim()) params.set('q', searchInput.value.trim());
             if (state.gender) params.set('gender', state.gender);
-            if (state.category) params.set('category', state.category);
+            if (state.categories && state.categories.length) {
+                state.categories.forEach((code) => params.append('category', code));
+            }
             if (state.minPrice) params.set('price_min', state.minPrice);
             if (state.maxPrice) params.set('price_max', state.maxPrice);
             const { sortBy, sortDir } = getSortValues();
@@ -1103,133 +1652,341 @@ const Admin = (() => {
 
             const response = await fetch(`/api/admin/products?${params.toString()}`);
             if (!response.ok) {
-                throw new Error('Не удалось загрузить товары');
+                throw new Error(`Не удалось загрузить товары (код ${response.status})`);
             }
             products = await response.json();
             renderProducts();
         } catch (error) {
-            console.error(error);
-            alert('Ошибка загрузки товаров');
+            console.error('Error fetching products:', error);
+            products = [];
+            setTableStatusRow('Не удалось загрузить товары. Проверьте подключение к серверу и обновите страницу.');
+            notify(error.message || 'Не удалось загрузить товары.', 'error');
         }
     }
 
     function renderProducts() {
-        const body = document.getElementById('products-body');
-        const count = document.getElementById('product-count');
+        if (!ui.productsBody || !ui.productCount) return;
 
-        if (!body || !count) return;
-
-        // Clear any previous event listeners first
-        if (rowActionsSetup) {
-            const newBody = body.cloneNode(true);
-            body.parentNode.replaceChild(newBody, body);
-        }
-
-        if (!products.length) {
-            body.innerHTML = `
+        if (!products || products.length === 0) {
+            ui.productsBody.innerHTML = `
                 <tr class="empty-row">
                     <td colspan="7">Товары не найдены по текущим условиям поиска и фильтрам.</td>
                 </tr>
             `;
-            count.textContent = '0';
+            ui.productCount.textContent = '0';
             return;
         }
 
-        body.innerHTML = products.map((product) => {
-            const category = categories.find((item) => item.code === product.category)?.name || product.category;
-            const genderLabel = product.gender === 'mens' ? 'Мужской' : product.gender === 'womens' ? 'Женский' : product.gender;
+        ui.productsBody.innerHTML = products.map((product) => {
+            const category = categories.find((item) => item.code === product.category)?.name || product.category || '-';
+            const genderLabel = product.gender === 'mens' ? 'Мужской' : product.gender === 'womens' ? 'Женский' : (product.gender || '-');
+            const description = product.description || '-';
+            const shortDescription = description.length > 80 ? description.substring(0, 80) + '...' : description;
+            
             return `
-                <tr>
+                <tr data-product-id="${product.id}">
                     <td class="cell-id">${product.id}</td>
-                    <td class="cell-name"><strong>${product.name}</strong></td>
-                    <td class="cell-description">${product.description || '-'}</td>
-                    <td>${category || '-'}</td>
-                    <td>${genderLabel}</td>
-                    <td class="cell-price">${product.price !== null && product.price !== undefined ? product.price.toFixed(2) : '-'}</td>
-                    <td class="admin-actions-cell">
-                        <button class="btn-add-to-cart btn-edit" data-action="edit" data-id="${product.id}">Редактировать</button>
-                        <button class="btn-remove btn-delete" data-action="delete" data-id="${product.id}">Удалить</button>
+                    <td>
+                        <div class="cell-name">
+                            <strong>${escapeHtml(product.name)}</strong>
+                        </div>
+                    </td>
+                    <td title="${escapeHtml(description)}">
+                        <div class="cell-description">${escapeHtml(shortDescription)}</div>
+                    </td>
+                    <td>${escapeHtml(category)}</td>
+                    <td>${escapeHtml(genderLabel)}</td>
+                    <td class="cell-price">${product.price !== null && product.price !== undefined ? product.price.toFixed(2) : 'По запросу'}</td>
+                    <td>
+                        <div class="admin-actions-cell">
+                            <button type="button" class="btn-edit" data-action="edit" data-id="${product.id}">Редактировать</button>
+                            <button type="button" class="btn-delete" data-action="delete" data-id="${product.id}">Удалить</button>
+                        </div>
                     </td>
                 </tr>
             `;
         }).join('');
 
-        count.textContent = products.length.toString();
-        // Re-setup event listeners after rendering
-        setupRowActions();
+        ui.productCount.textContent = products.length.toString();
     }
 
-    function setupRowActions() {
-        const productsBody = document.getElementById('products-body');
-        if (!productsBody) return;
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
 
-        // Use event delegation - listener will work for dynamically added elements
-        // Only add listener once, since we're using event delegation
-        if (!rowActionsSetup) {
-            productsBody.addEventListener('click', handleRowAction);
-            rowActionsSetup = true;
+    function normalizeImagePath(path) {
+        if (!path || typeof path !== 'string') return null;
+        const trimmed = path.trim();
+        return trimmed ? trimmed : null;
+    }
+
+    function dedupeImages(images) {
+        const seen = new Set();
+        const out = [];
+        images.forEach((img) => {
+            const p = normalizeImagePath(img?.path);
+            if (!p) return;
+            if (seen.has(p)) return;
+            seen.add(p);
+            out.push({ path: p, is_main: Boolean(img?.is_main), sort_order: out.length });
+        });
+        if (!out.length) return [];
+        if (!out.some((i) => i.is_main)) out[0].is_main = true;
+        return out;
+    }
+
+    function setProductImages(nextImages) {
+        productImages = dedupeImages(Array.isArray(nextImages) ? nextImages : []);
+        renderProductImages();
+    }
+
+    function renderProductImages() {
+        if (!ui.productImagesList) return;
+        if (!productImages.length) {
+            ui.productImagesList.innerHTML = '';
+            return;
         }
+
+        ui.productImagesList.innerHTML = productImages.map((img, idx) => {
+            const safePath = escapeHtml(img.path);
+            const checked = img.is_main ? 'checked' : '';
+            return `
+                <div class="admin-image-item" data-index="${idx}">
+                    <div class="admin-image-thumb">
+                        <img src="${safePath}" alt="image ${idx + 1}">
+                    </div>
+                    <div class="admin-image-meta">
+                        <strong>Картинка ${idx + 1}</strong>
+                        <code title="${safePath}">${safePath}</code>
+                    </div>
+                    <div class="admin-image-actions">
+                        <label for="main-image-${idx}">
+                            <input type="radio" id="main-image-${idx}" name="main-image" value="${idx}" ${checked} />
+                            Главная
+                        </label>
+                        <button type="button" data-action="remove-image" data-index="${idx}">Удалить</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        ui.productImagesList.querySelectorAll('input[type="radio"][name="main-image"]').forEach((radio) => {
+            radio.addEventListener('change', () => {
+                const index = Number(radio.value);
+                if (!Number.isFinite(index)) return;
+                productImages = productImages.map((img, i) => ({ ...img, is_main: i === index }));
+                renderProductImages();
+            });
+        });
+
+        ui.productImagesList.querySelectorAll('[data-action="remove-image"]').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const index = Number(btn.getAttribute('data-index'));
+                if (!Number.isFinite(index)) return;
+                productImages.splice(index, 1);
+                if (productImages.length && !productImages.some((i) => i.is_main)) {
+                    productImages[0].is_main = true;
+                }
+                productImages = dedupeImages(productImages);
+                renderProductImages();
+            });
+        });
     }
 
-    function handleRowAction(event) {
-        const button = event.target.closest('button[data-action]');
-        if (!button) return;
+    async function uploadSelectedFiles(files) {
+        const list = Array.from(files || []).filter(Boolean);
+        if (!list.length) return [];
+        const form = new FormData();
+        list.forEach((file) => form.append('images', file, file.name));
 
-        const action = button.dataset.action;
-        const id = Number(button.dataset.id);
+        const res = await fetch('/api/admin/uploads', { method: 'POST', body: form });
+        if (!res.ok) {
+            let details = '';
+            try {
+                const err = await res.json();
+                if (err && err.error) details = String(err.error);
+            } catch {}
+            throw new Error(details || `Не удалось загрузить изображения (код ${res.status})`);
+        }
+        const data = await res.json();
+        const uploaded = Array.isArray(data?.files) ? data.files : [];
+        return uploaded.map((p) => ({ path: p, is_main: false, sort_order: 0 }));
+    }
 
-        if (action === 'edit') {
-            const product = products.find((item) => item.id === id);
-            if (product) openProductModal(product);
-        } else if (action === 'delete') {
-            if (confirm('Удалить товар?')) {
-                deleteProduct(id);
+    async function loadProductImagesForEdit(productId) {
+        try {
+            const res = await fetch(`/api/product/${encodeURIComponent(productId)}`);
+            if (!res.ok) return;
+            const full = await res.json();
+            const images = Array.isArray(full?.images) ? full.images : [];
+            if (images.length) {
+                setProductImages(images.map((img) => ({
+                    path: img.path || img.image_path || img.image || '',
+                    is_main: Boolean(img.is_main),
+                    sort_order: Number(img.sort_order) || 0
+                })));
+                return;
             }
+            if (full?.image) {
+                setProductImages([{ path: full.image, is_main: true, sort_order: 0 }]);
+            }
+        } catch (error) {
+            console.error('Failed to load product images:', error);
         }
+    }
+
+    function setupTableDelegation() {
+        const tableContainer = document.querySelector('.admin-table-container');
+        if (!tableContainer) return;
+        
+        if (tableContainer._handlerSet) return;
+        tableContainer._handlerSet = true;
+        
+        tableContainer.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-action]');
+            if (!button) return;
+            
+            const action = button.getAttribute('data-action');
+            const id = parseInt(button.getAttribute('data-id'), 10);
+            
+            if (isNaN(id)) {
+                console.error('Invalid product ID');
+                return;
+            }
+            
+            event.preventDefault();
+            event.stopPropagation();
+            
+            if (action === 'edit') {
+                const product = products.find((item) => item.id === id);
+                if (product) {
+                    openProductModal(product);
+                } else {
+                    alert('Товар не найден');
+                }
+            } else if (action === 'delete') {
+                if (confirm(`Вы уверены, что хотите удалить товар ID: ${id}?`)) {
+                    deleteProduct(id);
+                }
+            }
+        });
+    }
+
+    function setupResizableColumns() {
+        const table = document.querySelector('.admin-table');
+        if (!table) return;
+        if (table._resizableSet) return;
+        table._resizableSet = true;
+
+        const headerRow = table.querySelector('thead tr');
+        const cols = Array.from(table.querySelectorAll('colgroup col'));
+        const ths = Array.from(table.querySelectorAll('thead th'));
+        if (!headerRow || !cols.length || ths.length !== cols.length) return;
+
+        ths.forEach((th, index) => {
+            if (index === ths.length - 1) return;
+            const handle = document.createElement('span');
+            handle.className = 'admin-col-resizer';
+            handle.setAttribute('role', 'separator');
+            handle.setAttribute('aria-orientation', 'vertical');
+            th.appendChild(handle);
+
+            const minWidths = [60, 180, 220, 140, 110, 110, 160];
+            const minWidth = minWidths[index] || 80;
+
+            const onPointerDown = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                try { handle.setPointerCapture(e.pointerId); } catch {}
+                const startX = e.clientX;
+                const startWidth = th.getBoundingClientRect().width;
+
+                const onMove = (moveEvent) => {
+                    const dx = moveEvent.clientX - startX;
+                    const nextWidth = Math.max(minWidth, Math.round(startWidth + dx));
+                    cols[index].style.width = `${nextWidth}px`;
+                };
+
+                const onUp = () => {
+                    document.removeEventListener('pointermove', onMove);
+                    document.removeEventListener('pointerup', onUp);
+                };
+
+                document.addEventListener('pointermove', onMove);
+                document.addEventListener('pointerup', onUp);
+            };
+
+            handle.addEventListener('pointerdown', onPointerDown);
+        });
     }
 
     function openFiltersModal() {
         const modal = document.getElementById('filter-modal');
         if (!modal) return;
-        document.getElementById('filter-gender-modal').value = state.gender;
-        document.getElementById('filter-category-modal').value = state.category;
-        document.getElementById('min-price').value = state.minPrice;
-        document.getElementById('max-price').value = state.maxPrice;
-        modal.classList.add('show');
+        
+        const genderSelect = document.getElementById('filter-gender-modal');
+        const minPriceInput = document.getElementById('min-price');
+        const maxPriceInput = document.getElementById('max-price');
+        
+        if (genderSelect) genderSelect.value = state.gender || '';
+        setSelectedCategories(state.categories);
+        if (minPriceInput) minPriceInput.value = state.minPrice || '';
+        if (maxPriceInput) maxPriceInput.value = state.maxPrice || '';
+        
+        document.body.classList.add('modal-open');
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('show'), 10);
     }
 
     function closeFiltersModal() {
         const modal = document.getElementById('filter-modal');
         if (!modal) return;
         modal.classList.remove('show');
+        setTimeout(() => {
+            if (!modal.classList.contains('show')) {
+                modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
+            }
+        }, 300);
     }
 
     function applyFilters() {
-        state.gender = document.getElementById('filter-gender-modal').value;
-        state.category = document.getElementById('filter-category-modal').value;
-        state.minPrice = document.getElementById('min-price').value.trim();
-        state.maxPrice = document.getElementById('max-price').value.trim();
+        const genderSelect = document.getElementById('filter-gender-modal');
+        const minPriceInput = document.getElementById('min-price');
+        const maxPriceInput = document.getElementById('max-price');
+        
+        state.gender = genderSelect ? genderSelect.value : '';
+        state.categories = getSelectedCategories();
+        state.minPrice = minPriceInput ? minPriceInput.value.trim() : '';
+        state.maxPrice = maxPriceInput ? maxPriceInput.value.trim() : '';
+        
         closeFiltersModal();
-        fetchProducts().catch((error) => {
-            console.error(error);
-            alert('Не удалось применить фильтры');
-        });
+        fetchProducts();
     }
 
     function clearFilters() {
         state.gender = '';
-        state.category = '';
+        state.categories = [];
         state.minPrice = '';
         state.maxPrice = '';
-        document.getElementById('filter-gender-modal').value = '';
-        document.getElementById('filter-category-modal').value = '';
-        document.getElementById('min-price').value = '';
-        document.getElementById('max-price').value = '';
+        
+        const genderSelect = document.getElementById('filter-gender-modal');
+        const minPriceInput = document.getElementById('min-price');
+        const maxPriceInput = document.getElementById('max-price');
+        
+        if (genderSelect) genderSelect.value = '';
+        setSelectedCategories([]);
+        if (minPriceInput) minPriceInput.value = '';
+        if (maxPriceInput) maxPriceInput.value = '';
+        
         closeFiltersModal();
-        fetchProducts().catch((error) => {
-            console.error(error);
-            alert('Не удалось сбросить фильтры');
-        });
+        fetchProducts();
     }
 
     async function deleteProduct(id) {
@@ -1239,13 +1996,13 @@ const Admin = (() => {
             });
 
             if (!response.ok) {
-                alert('Не удалось удалить товар');
-                return;
+                throw new Error(`Не удалось удалить товар (код ${response.status})`);
             }
             await fetchProducts();
+            notify('Товар успешно удалён', 'success');
         } catch (error) {
-            console.error(error);
-            alert('Ошибка при удалении товара');
+            console.error('Error deleting product:', error);
+            notify(error.message || 'Не удалось удалить товар.', 'error');
         }
     }
 
@@ -1259,21 +2016,49 @@ const Admin = (() => {
         editingProductId = product?.id || null;
         title.textContent = product ? 'Редактировать товар' : 'Новый товар';
 
-        form.elements.name.value = product?.name || '';
-        form.elements.slug.value = product?.slug || '';
-        form.elements.description.value = product?.description || '';
-        form.elements.price.value = product?.price != null ? product.price : '';
-        form.elements.image.value = product?.image || '';
-        form.elements.gender.value = product?.gender || 'mens';
-        form.elements.category.value = product?.category || (categories[0]?.code || '');
-
-        modal.classList.add('show');
+        form.reset();
+        setProductImages([]);
+        if (ui.productImagesInput) ui.productImagesInput.value = '';
+        
+        if (product) {
+            const nameInput = document.getElementById('product-name');
+            const slugInput = document.getElementById('product-slug');
+            const descInput = document.getElementById('product-description');
+            const priceInput = document.getElementById('product-price');
+            const imageInput = document.getElementById('product-image');
+            const genderSelect = document.getElementById('product-gender');
+            const categorySelect = document.getElementById('product-category');
+            
+            if (nameInput) nameInput.value = product.name || '';
+            if (slugInput) slugInput.value = product.slug || '';
+            if (descInput) descInput.value = product.description || '';
+            if (priceInput) priceInput.value = product.price != null ? product.price : '';
+            if (imageInput) imageInput.value = product.image || '';
+            if (genderSelect) genderSelect.value = product.gender || 'mens';
+            if (categorySelect) categorySelect.value = product.category || (categories[0]?.code || '');
+            loadProductImagesForEdit(product.id);
+        } else {
+            const categorySelect = document.getElementById('product-category');
+            if (categorySelect && categories.length) {
+                categorySelect.value = categories[0].code;
+            }
+        }
+        
+        document.body.classList.add('modal-open');
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('show'), 10);
     }
 
     function closeProductModal() {
         const modal = document.getElementById('product-modal');
         if (!modal) return;
         modal.classList.remove('show');
+        setTimeout(() => {
+            if (!modal.classList.contains('show')) {
+                modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
+            }
+        }, 300);
         editingProductId = null;
     }
 
@@ -1282,19 +2067,34 @@ const Admin = (() => {
         const form = document.getElementById('product-form');
         if (!form) return;
 
-        const formData = new FormData(form);
+        const nameInput = document.getElementById('product-name');
+        const slugInput = document.getElementById('product-slug');
+        const descInput = document.getElementById('product-description');
+        const priceInput = document.getElementById('product-price');
+        const imageInput = document.getElementById('product-image');
+        const genderSelect = document.getElementById('product-gender');
+        const categorySelect = document.getElementById('product-category');
+        
+        const urlImage = normalizeImagePath(imageInput ? imageInput.value : null);
+        const combinedImages = dedupeImages([
+            ...(productImages || []),
+            ...(urlImage ? [{ path: urlImage, is_main: false, sort_order: 9999 }] : [])
+        ]);
+        const main = combinedImages.find((i) => i.is_main) || combinedImages[0] || null;
+
         const productData = {
-            name: formData.get('name').trim(),
-            slug: formData.get('slug').trim() || slugify(formData.get('name')),
-            description: formData.get('description').trim(),
-            price: formData.get('price') ? Number(formData.get('price')) : null,
-            image_path: formData.get('image').trim() || null,
-            gender_code: formData.get('gender'),
-            category_code: formData.get('category')
+            name: nameInput ? nameInput.value.trim() : '',
+            slug: (slugInput ? slugInput.value.trim() : '') || slugify(nameInput ? nameInput.value : ''),
+            description: descInput ? descInput.value.trim() : '',
+            price: priceInput && priceInput.value ? Number(priceInput.value) : null,
+            image_path: main ? main.path : null,
+            gender_code: genderSelect ? genderSelect.value : 'mens',
+            category_code: categorySelect ? categorySelect.value : '',
+            images: combinedImages
         };
 
-        if (!productData.name || !productData.gender_code || !productData.category_code) {
-            alert('Заполните обязательные поля: название, пол и категорию.');
+        if (!productData.name || !productData.category_code) {
+            alert('Заполните обязательные поля: название и категорию.');
             return;
         }
 
@@ -1308,14 +2108,20 @@ const Admin = (() => {
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(errorText || 'Ошибка сохранения товара');
+                let details = '';
+                try {
+                    const err = await response.json();
+                    if (err && err.error) details = String(err.error);
+                } catch {}
+                throw new Error(details || `Не удалось сохранить товар (код ${response.status})`);
             }
 
             await fetchProducts();
             closeProductModal();
+            notify(editingProductId ? 'Товар успешно обновлён' : 'Товар успешно добавлен', 'success');
         } catch (error) {
-            alert(`Ошибка: ${error.message}`);
+            console.error('Error saving product:', error);
+            notify(error.message || 'Не удалось сохранить товар.', 'error');
         }
     }
 
@@ -1328,52 +2134,124 @@ const Admin = (() => {
         const clearFiltersBtn = document.getElementById('clear-filters-btn');
         const sortBy = document.getElementById('sort-by');
         const cancelBtn = document.getElementById('cancel-product-btn');
+        
+        if (addBtn) addBtn.onclick = () => openProductModal();
+        if (refreshBtn) refreshBtn.onclick = () => fetchProducts();
+        if (searchInput) searchInput.oninput = () => fetchProducts();
+        if (openFiltersBtn) openFiltersBtn.onclick = openFiltersModal;
+        if (applyFiltersBtn) applyFiltersBtn.onclick = applyFilters;
+        if (clearFiltersBtn) clearFiltersBtn.onclick = clearFilters;
+        if (sortBy) sortBy.onchange = (e) => {
+            state.sortOption = e.target.value;
+            fetchProducts();
+        };
+        if (cancelBtn) cancelBtn.onclick = closeProductModal;
+        
         const filterModal = document.getElementById('filter-modal');
         const productModal = document.getElementById('product-modal');
         const filterModalClose = filterModal?.querySelector('.modal-close');
         const productModalClose = productModal?.querySelector('.modal-close');
+        
+        if (filterModalClose) filterModalClose.onclick = closeFiltersModal;
+        if (filterModal) filterModal.onclick = (e) => {
+            if (e.target === filterModal) closeFiltersModal();
+        };
+        if (productModalClose) productModalClose.onclick = closeProductModal;
+        if (productModal) productModal.onclick = (e) => {
+            if (e.target === productModal) closeProductModal();
+        };
+        
         const productForm = document.getElementById('product-form');
+        if (productForm) productForm.onsubmit = saveProduct;
+        
+        const productNameInput = document.getElementById('product-name');
+        const productSlugInput = document.getElementById('product-slug');
+        if (productNameInput && productSlugInput) {
+            productNameInput.addEventListener('input', () => {
+                if (!productSlugInput.value || productSlugInput.value.trim() === '') {
+                    productSlugInput.value = slugify(productNameInput.value);
+                }
+            });
+        }
 
-        if (addBtn) addBtn.addEventListener('click', () => openProductModal());
-        if (refreshBtn) refreshBtn.addEventListener('click', () => {
-            fetchProducts().catch(err => console.error(err));
-        });
-        if (searchInput) searchInput.addEventListener('input', () => {
-            fetchProducts().catch(err => console.error(err));
-        });
-        if (openFiltersBtn) openFiltersBtn.addEventListener('click', openFiltersModal);
-        if (applyFiltersBtn) applyFiltersBtn.addEventListener('click', applyFilters);
-        if (clearFiltersBtn) clearFiltersBtn.addEventListener('click', clearFilters);
-        if (sortBy) sortBy.addEventListener('change', (event) => {
-            state.sortOption = event.target.value;
-            fetchProducts().catch(err => console.error(err));
-        });
-        if (cancelBtn) cancelBtn.addEventListener('click', closeProductModal);
-        if (filterModalClose) filterModalClose.addEventListener('click', closeFiltersModal);
-        if (filterModal) filterModal.addEventListener('click', (event) => {
-            if (event.target === filterModal) closeFiltersModal();
-        });
-        if (productModalClose) productModalClose.addEventListener('click', closeProductModal);
-        if (productModal) productModal.addEventListener('click', (event) => {
-            if (event.target === productModal) closeProductModal();
-        });
-        if (productForm) productForm.addEventListener('submit', saveProduct);
+        if (ui.productImagesInput) {
+            ui.productImagesInput.addEventListener('change', async () => {
+                const files = ui.productImagesInput.files;
+                if (!files || !files.length) return;
+                try {
+                    notify('Загружаю изображения…', 'info');
+                    const uploaded = await uploadSelectedFiles(files);
+                    const next = dedupeImages([...(productImages || []), ...uploaded]);
+                    if (next.length && !next.some((i) => i.is_main)) next[0].is_main = true;
+                    setProductImages(next);
+                    notify('Изображения загружены', 'success');
+                } catch (error) {
+                    console.error('Upload failed:', error);
+                    notify(error.message || 'Не удалось загрузить изображения.', 'error');
+                } finally {
+                    ui.productImagesInput.value = '';
+                }
+            });
+        }
+        
+        setupTableDelegation();
+        setupResizableColumns();
     }
 
     function initAdminPage() {
-        attachEvents();
-        setupRowActions(); // Setup listeners once on init
-        fetchCategories()
-            .then(fetchProducts)
-            .catch((error) => {
-                console.error(error);
-                alert('Не удалось загрузить данные админ-панели');
+        ui.productsBody = document.getElementById('products-body');
+        ui.productCount = document.getElementById('product-count');
+        ui.filterCategoryHidden = document.getElementById('filter-category-modal');
+        ui.filterCategoryMultiselect = document.getElementById('filter-category-multiselect');
+        ui.filterCategoryDropdown = document.getElementById('filter-category-dropdown');
+        ui.filterCategoryLabel = document.getElementById('filter-category-label');
+        ui.filterCategoryTrigger = document.getElementById('filter-category-trigger');
+        ui.productCategorySelect = document.getElementById('product-category');
+        ui.productImagesInput = document.getElementById('product-images');
+        ui.productImagesList = document.getElementById('product-images-list');
+
+        const sortBy = document.getElementById('sort-by');
+        if (sortBy && !sortBy.value) {
+            sortBy.value = 'id_asc';
+        } else if (sortBy) {
+            sortBy.value = state.sortOption;
+        }
+
+        if (ui.filterCategoryTrigger) {
+            ui.filterCategoryTrigger.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!ui.filterCategoryMultiselect) return;
+                const isOpen = ui.filterCategoryMultiselect.classList.contains('open');
+                if (isOpen) closeCategoryDropdown();
+                else openCategoryDropdown();
             });
+        }
+
+        if (ui.filterCategoryDropdown) {
+            ui.filterCategoryDropdown.addEventListener('change', () => {
+                setSelectedCategories(getSelectedCategories());
+            });
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!ui.filterCategoryMultiselect) return;
+            if (!ui.filterCategoryMultiselect.contains(e.target)) {
+                closeCategoryDropdown();
+            }
+        });
+
+        attachEvents();
+        fetchCategories();
+        fetchProducts();
     }
 
-    window.addEventListener('DOMContentLoaded', initAdminPage);
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAdminPage);
+    } else {
+        initAdminPage();
+    }
 })();
-
 
 --------------------------------------------------------------------------------
 
@@ -2696,7 +3574,7 @@ document.querySelector('.womens').addEventListener('click', () => {
 
 ================================================================================
 ФАЙЛ: package.json
-РАЗМЕР: 298 символов
+РАЗМЕР: 322 символов
 РАСШИРЕНИЕ: .json
 ================================================================================
 
@@ -2711,6 +3589,7 @@ document.querySelector('.womens').addEventListener('click', () => {
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.18.2",
+    "multer": "^2.1.1",
     "pg": "^8.20.0"
   },
   "overrides": {
@@ -2791,13 +3670,15 @@ document.querySelector('.womens').addEventListener('click', () => {
 
 ================================================================================
 ФАЙЛ: server.js
-РАЗМЕР: 4936 символов
+РАЗМЕР: 8366 символов
 РАСШИРЕНИЕ: .js
 ================================================================================
 
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
 const {
     connectDB,
     getProducts,
@@ -2867,6 +3748,43 @@ app.get('/api/categories', async (req, res) => {
     }
 });
 
+const uploadsDir = path.join(__dirname, 'img', 'uploads');
+try {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+} catch (e) {
+    console.error('Failed to create uploads directory:', e);
+}
+
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadsDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname || '').toLowerCase() || '.bin';
+        const safeExt = ext.replace(/[^a-z0-9.]/g, '') || '.bin';
+        const unique = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        cb(null, `${unique}${safeExt}`);
+    }
+});
+
+const upload = multer({
+    storage,
+    limits: { fileSize: 12 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype && file.mimetype.startsWith('image/')) return cb(null, true);
+        cb(new Error('Only image files are allowed'));
+    }
+});
+
+app.post('/api/admin/uploads', upload.array('images', 12), (req, res) => {
+    try {
+        const files = Array.isArray(req.files) ? req.files : [];
+        const paths = files.map((f) => `/img/uploads/${f.filename}`);
+        res.status(201).json({ files: paths });
+    } catch (error) {
+        console.error('Upload error:', error);
+        res.status(500).json({ error: 'Failed to upload images' });
+    }
+});
+
 app.get('/api/admin/products', async (req, res) => {
     try {
         const {
@@ -2898,8 +3816,56 @@ app.get('/api/admin/products', async (req, res) => {
     }
 });
 
+function validateProductPayload(payload) {
+    const errors = [];
+    if (!payload || typeof payload !== 'object') {
+        return ['Некорректное тело запроса'];
+    }
+
+    const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+    const slug = typeof payload.slug === 'string' ? payload.slug.trim() : '';
+    const gender = typeof payload.gender_code === 'string' ? payload.gender_code.trim() : '';
+    const category = typeof payload.category_code === 'string' ? payload.category_code.trim() : '';
+    const price = payload.price;
+    const images = payload.images;
+
+    if (!name) errors.push('Поле name обязательно');
+    if (!gender) errors.push('Поле gender_code обязательно');
+    if (!category) errors.push('Поле category_code обязательно');
+
+    if (price !== null && price !== undefined && price !== '') {
+        const numberPrice = Number(price);
+        if (!Number.isFinite(numberPrice)) errors.push('Поле price должно быть числом');
+        if (Number.isFinite(numberPrice) && numberPrice < 0) errors.push('Поле price не может быть отрицательным');
+    }
+
+    if (images !== undefined) {
+        if (!Array.isArray(images)) {
+            errors.push('Поле images должно быть массивом');
+        } else if (images.length > 30) {
+            errors.push('Слишком много изображений');
+        } else {
+            images.forEach((img) => {
+                if (!img || typeof img !== 'object') {
+                    errors.push('Некорректный элемент images');
+                    return;
+                }
+                if (!img.path || typeof img.path !== 'string') {
+                    errors.push('В images.path должна быть строка');
+                }
+            });
+        }
+    }
+
+    return errors;
+}
+
 app.post('/api/admin/products', async (req, res) => {
     try {
+        const errors = validateProductPayload(req.body);
+        if (errors.length) {
+            return res.status(400).json({ error: errors.join('. ') });
+        }
         const product = await createProduct(req.body);
         res.status(201).json(product);
     } catch (error) {
@@ -2910,6 +3876,10 @@ app.post('/api/admin/products', async (req, res) => {
 
 app.put('/api/admin/products/:id', async (req, res) => {
     try {
+        const errors = validateProductPayload(req.body);
+        if (errors.length) {
+            return res.status(400).json({ error: errors.join('. ') });
+        }
         const updatedProduct = await updateProduct(Number(req.params.id), req.body);
         if (!updatedProduct) {
             return res.status(404).json({ error: 'Product not found' });
@@ -2969,14 +3939,13 @@ connectDB()
 
 ================================================================================
 ФАЙЛ: txt-export.js
-РАЗМЕР: 3042 символов
+РАЗМЕР: 2907 символов
 РАСШИРЕНИЕ: .js
 ================================================================================
 
 const fs = require('fs');
 const path = require('path');
 
-// Настройки
 const OUTPUT_FILE = 'project-export.txt';
 const IGNORE_PATTERNS = [
     'node_modules',
@@ -3029,18 +3998,17 @@ function getAllFiles(dirPath, arrayOfFiles = []) {
 }
 
 function generateExport() {
-    console.log('🚀 Начинаем экспорт проекта...');
+    console.log('Начинаем экспорт проекта...');
     
     const allFiles = getAllFiles(__dirname);
     
     if (allFiles.length === 0) {
-        console.log('❌ Не найдено файлов для экспорта');
+        console.log('Не найдено файлов для экспорта');
         return;
     }
     
     let output = [];
     
-    // Заголовок экспорта
     output.push('='.repeat(80));
     output.push('ЭКСПОРТ ПРОЕКТА');
     output.push(`Создано: ${new Date().toLocaleString()}`);
@@ -3048,7 +4016,6 @@ function generateExport() {
     output.push('='.repeat(80));
     output.push('');
     
-    // Обрабатываем каждый файл
     allFiles.forEach(filePath => {
         const relativePath = path.relative(__dirname, filePath);
         const fileContent = fs.readFileSync(filePath, 'utf8');
@@ -3066,19 +4033,17 @@ function generateExport() {
         output.push('');
     });
     
-    // Записываем результат
     fs.writeFileSync(OUTPUT_FILE, output.join('\n'), 'utf8');
     
-    console.log(`✅ Готово! Файл экспорта создан: ${OUTPUT_FILE}`);
-    console.log(`📊 Экспортировано файлов: ${allFiles.length}`);
-    console.log(`💾 Размер экспорта: ${(fs.statSync(OUTPUT_FILE).size / 1024).toFixed(2)} KB`);
+    console.log(`Готово. Файл экспорта создан: ${OUTPUT_FILE}`);
+    console.log(`Экспортировано файлов: ${allFiles.length}`);
+    console.log(`Размер экспорта: ${(fs.statSync(OUTPUT_FILE).size / 1024).toFixed(2)} KB`);
 }
 
-// Запускаем экспорт
 try {
     generateExport();
 } catch (error) {
-    console.error('❌ Ошибка:', error.message);
+    console.error('Ошибка:', error.message);
 }
 
 --------------------------------------------------------------------------------

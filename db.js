@@ -13,10 +13,28 @@ const pool = new Pool({
 
 function slugifyProductName(text) {
     if (!text || typeof text !== 'string') return '';
+    
+    // Транслитерация русских символов
+    const translitMap = {
+        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+        'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+        'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+        'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+        'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+        'А': 'a', 'Б': 'b', 'В': 'v', 'Г': 'g', 'Д': 'd', 'Е': 'e', 'Ё': 'e',
+        'Ж': 'zh', 'З': 'z', 'И': 'i', 'Й': 'y', 'К': 'k', 'Л': 'l', 'М': 'm',
+        'Н': 'n', 'О': 'o', 'П': 'p', 'Р': 'r', 'С': 's', 'Т': 't', 'У': 'u',
+        'Ф': 'f', 'Х': 'kh', 'Ц': 'ts', 'Ч': 'ch', 'Ш': 'sh', 'Щ': 'shch',
+        'Ъ': '', 'Ы': 'y', 'Ь': '', 'Э': 'e', 'Ю': 'yu', 'Я': 'ya'
+    };
+
     return text
         .toString()
         .trim()
         .toLowerCase()
+        .split('')
+        .map(char => translitMap[char] || char)
+        .join('')
         .replace(/\s+/g, '-')
         .replace(/[^a-z0-9\-]+/g, '')
         .replace(/\-\-+/g, '-')
@@ -182,26 +200,27 @@ async function getProducts(gender, options = {}) {
 
     if (q) {
         const queryText = String(q).trim();
-        const isIdSearch = /^\d+$/.test(queryText);
-        if (isIdSearch) {
+        values.push(`%${queryText}%`);
+        const textIndex = nextIndex;
+        nextIndex += 1;
+        
+        // Проверяем, является ли запрос числом для поиска по ID
+        const isNumeric = /^\d+$/.test(queryText);
+        if (isNumeric) {
             values.push(Number(queryText));
             const idIndex = nextIndex;
             nextIndex += 1;
-            values.push(`%${queryText}%`);
-            const textIndex = nextIndex;
-            nextIndex += 1;
             conditions.push(`(
-                p.id = $${idIndex}
+                CAST(p.id AS TEXT) ILIKE $${textIndex}
                 OR p.name ILIKE $${textIndex}
                 OR p.description ILIKE $${textIndex}
+                OR p.id = $${idIndex}
             )`);
         } else {
-            values.push(`%${queryText}%`);
             conditions.push(`(
-                p.name ILIKE $${nextIndex}
-                OR p.description ILIKE $${nextIndex}
+                p.name ILIKE $${textIndex}
+                OR p.description ILIKE $${textIndex}
             )`);
-            nextIndex += 1;
         }
     }
 
