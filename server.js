@@ -154,7 +154,6 @@ function validateProductPayload(payload) {
     const images = payload.images;
 
     if (!name) errors.push('Поле name обязательно');
-    if (!slug) errors.push('Поле slug обязательно');
     if (!gender) errors.push('Поле gender_code обязательно');
     if (!category) errors.push('Поле category_code обязательно');
 

@@ -11,6 +11,18 @@ const pool = new Pool({
     connectionTimeoutMillis: 2000
 });
 
+function slugifyProductName(text) {
+    if (!text || typeof text !== 'string') return '';
+    return text
+        .toString()
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9\-]+/g, '')
+        .replace(/\-\-+/g, '-')
+        .replace(/^-+|-+$/g, '');
+}
+
 async function connectDB() {
     const client = await pool.connect();
     try {
@@ -95,6 +107,7 @@ function buildCategoriesCondition(categories, values, startIndex) {
 
 async function getProducts(gender, options = {}) {
     const {
+        gender: genderFilter,
         category,
         material,
         size,
@@ -115,6 +128,11 @@ async function getProducts(gender, options = {}) {
 
     if (gender) {
         values.push(gender);
+        conditions.push(`p.gender_code = $${nextIndex}`);
+        nextIndex += 1;
+    }
+    if (!gender && genderFilter) {
+        values.push(genderFilter);
         conditions.push(`p.gender_code = $${nextIndex}`);
         nextIndex += 1;
     }
@@ -200,11 +218,12 @@ async function getProducts(gender, options = {}) {
     }
 
     const allowedSortFields = {
+        id: 'p.id',
         created_at: 'p.created_at',
         name: 'p.name',
         price: 'p.price'
     };
-    const sortField = allowedSortFields[sort_by] || 'p.created_at';
+    const sortField = allowedSortFields[sort_by] || 'p.id';
     const direction = sort_direction === 'asc' ? 'ASC' : 'DESC';
 
     values.push(Number(limit) || 20, Number(offset) || 0);
@@ -371,14 +390,15 @@ async function createProduct(product) {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        const slug = (product.slug && product.slug.trim()) || slugifyProductName(product.name);
         const query = `
-            INSERT INTO products (name, slug, description, price, image_path, gender_code, category_code, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+            INSERT INTO products (id, name, slug, description, price, image_path, gender_code, category_code, created_at)
+            VALUES (DEFAULT, $1, $2, $3, $4, $5, $6, $7, NOW())
             RETURNING id, name, slug, description, price, image_path AS image, gender_code AS gender, category_code AS category, created_at;
         `;
         const values = [
             product.name,
-            product.slug,
+            slug,
             product.description || null,
             product.price,
             product.image_path || null,
@@ -407,6 +427,7 @@ async function updateProduct(id, product) {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
+        const slug = (product.slug && product.slug.trim()) || slugifyProductName(product.name);
         const query = `
             UPDATE products
             SET name = $1,
@@ -421,7 +442,7 @@ async function updateProduct(id, product) {
         `;
         const values = [
             product.name,
-            product.slug,
+            slug,
             product.description || null,
             product.price,
             product.image_path || null,
