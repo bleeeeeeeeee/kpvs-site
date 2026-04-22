@@ -233,16 +233,12 @@ function openFavoritesModal() {
                     <div class="modal-items">
                         ${products.filter(product => product && product.id).map((product) => {
                             const isInCart = getCart().some(item => item.id === product.id);
-                            const source = favoritesMap.get(product.id)?.source === 'mens'
-                                ? '(мужское)'
-                                : favoritesMap.get(product.id)?.source === 'womens'
-                                ? '(женское)'
-                                : '(карточка товара)';
+                            const genderLabel = product.gender_name || 'Товар';
                             return `
                             <div class="modal-item" data-product-id="${product.id}">
                                 <img src="${product.image}" alt="${product.name}" class="modal-item-img">
                                 <div class="modal-item-info">
-                                    <h3>${product.name} <small>${source}</small></h3>
+                                    <h3>${product.name} <small>(${genderLabel})</small></h3>
                                     <div class="modal-item-actions">
                                         <button class="btn-add-to-cart ${isInCart ? 'in-cart' : ''}" data-action="toggle-cart" data-product-id="${product.id}">${isInCart ? 'Удалить из корзины' : 'В корзину'}</button>
                                         <button class="btn-remove" data-action="remove-favorite" data-product-id="${product.id}">Удалить</button>
@@ -323,16 +319,12 @@ function openCartModal() {
                 <div class="modal-body">
                     <div class="modal-items">
                         ${products.filter(product => product && product.id).map((product) => {
-                            const source = cartMap.get(product.id)?.source === 'mens'
-                                ? '(мужское)'
-                                : cartMap.get(product.id)?.source === 'womens'
-                                ? '(женское)'
-                                : '(товар)';
+                            const genderLabel = product.gender_name || 'Товар';
                             return `
                             <div class="modal-item" data-product-id="${product.id}">
                                 <img src="${product.image}" alt="${product.name}" class="modal-item-img">
                                 <div class="modal-item-info">
-                                    <h3>${product.name} <small>${source}</small></h3>
+                                    <h3>${product.name} <small>(${genderLabel})</small></h3>
                                     <div class="modal-item-actions">
                                         <button class="btn-remove" data-action="remove-from-cart" data-product-id="${product.id}">Удалить</button>
                                     </div>

@@ -89,7 +89,15 @@ const Admin = (() => {
         document.body.appendChild(node);
 
         const close = node.querySelector('.notification-close');
-        if (close) close.onclick = () => node.remove();
+        if (close) close.onclick = (e) => {
+            e.stopPropagation();
+            node.remove();
+        };
+
+        // Предотвращаем всплытие клика по уведомлению
+        node.onclick = (e) => {
+            e.stopPropagation();
+        };
 
         window.setTimeout(() => {
             if (node.isConnected) node.remove();
@@ -429,15 +437,81 @@ const Admin = (() => {
         }).filter((m) => m.code && m.percentage > 0);
     }
 
-    function saveStateToStorage() {
-        const stateToSave = {
-            gender: state.gender,
-            categories: state.categories,
-            minPrice: state.minPrice,
-            maxPrice: state.maxPrice,
-            sortOption: state.sortOption
+    function saveProductFormData() {
+        const formData = {
+            name: document.getElementById('product-name')?.value || '',
+            slug: document.getElementById('product-slug')?.value || '',
+            description: document.getElementById('product-description')?.value || '',
+            price: document.getElementById('product-price')?.value || '',
+            image: document.getElementById('product-image')?.value || '',
+            gender: document.getElementById('product-gender')?.value || 'mens',
+            category: document.getElementById('product-category')?.value || '',
+            sizes: productSizes,
+            tags: productTags,
+            materials: productMaterials,
+            images: productImages
         };
-        sessionStorage.setItem('adminFilters', JSON.stringify(stateToSave));
+        sessionStorage.setItem('productFormData', JSON.stringify(formData));
+    }
+
+    function loadProductFormData() {
+        try {
+            const saved = sessionStorage.getItem('productFormData');
+            if (saved) {
+                const formData = JSON.parse(saved);
+                const nameInput = document.getElementById('product-name');
+                const slugInput = document.getElementById('product-slug');
+                const descInput = document.getElementById('product-description');
+                const priceInput = document.getElementById('product-price');
+                const imageInput = document.getElementById('product-image');
+                const genderSelect = document.getElementById('product-gender');
+                const categorySelect = document.getElementById('product-category');
+                
+                if (nameInput) nameInput.value = formData.name || '';
+                if (slugInput) slugInput.value = formData.slug || '';
+                if (descInput) descInput.value = formData.description || '';
+                if (priceInput) priceInput.value = formData.price || '';
+                if (imageInput) imageInput.value = formData.image || '';
+                if (genderSelect) genderSelect.value = formData.gender || 'mens';
+                if (categorySelect) categorySelect.value = formData.category || '';
+                
+                productSizes = Array.isArray(formData.sizes) ? formData.sizes : [];
+                productTags = Array.isArray(formData.tags) ? formData.tags : [];
+                productMaterials = Array.isArray(formData.materials) ? formData.materials : [];
+                productImages = Array.isArray(formData.images) ? formData.images : [];
+                
+                // Обновляем UI
+                setProductImages(productImages);
+                populateSizesDropdown();
+                populateTagsDropdown();
+                populateMaterialsList();
+                
+                // Устанавливаем выбранные размеры
+                setTimeout(() => {
+                    if (productSizes.length && ui.productSizesDropdown) {
+                        const sizeSet = new Set(productSizes.map(s => s.name || s));
+                        ui.productSizesDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                            input.checked = sizeSet.has(input.value);
+                        });
+                        updateSelectedSizes();
+                    }
+                    
+                    if (productTags.length && ui.productTagsDropdown) {
+                        const tagSet = new Set(productTags.map(t => t.code));
+                        ui.productTagsDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                            input.checked = tagSet.has(input.value);
+                        });
+                        updateSelectedTags();
+                    }
+                }, 100);
+            }
+        } catch (error) {
+            console.error('Error loading product form data:', error);
+        }
+    }
+
+    function clearProductFormData() {
+        sessionStorage.removeItem('productFormData');
     }
 
     function loadStateFromStorage() {
@@ -829,6 +903,8 @@ const Admin = (() => {
         if (maxPriceInput) maxPriceInput.value = state.maxPrice || '';
         
         document.body.classList.add('modal-open');
+        document.body.style.pointerEvents = 'none';
+        modal.style.pointerEvents = 'auto';
         modal.style.display = 'flex';
         setTimeout(() => modal.classList.add('show'), 10);
     }
@@ -841,6 +917,7 @@ const Admin = (() => {
             if (!modal.classList.contains('show')) {
                 modal.style.display = 'none';
                 document.body.classList.remove('modal-open');
+                document.body.style.pointerEvents = '';
             }
         }, 300);
     }
@@ -897,7 +974,7 @@ const Admin = (() => {
         }
     }
 
-    function openProductModal(product = null) {
+    async function openProductModal(product = null) {
         const modal = document.getElementById('product-modal');
         const title = document.getElementById('modal-title');
         const form = document.getElementById('product-form');
@@ -915,50 +992,84 @@ const Admin = (() => {
         productSizes = [];
         productTags = [];
         productMaterials = [];
-        // populate функции будут вызваны после загрузки данных в fetch функциях
+        
+        document.body.classList.add('modal-open');
+        document.body.style.pointerEvents = 'none';
+        modal.style.pointerEvents = 'auto';
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('show'), 10);
+        
         if (product) {
-            const nameInput = document.getElementById('product-name');
-            const slugInput = document.getElementById('product-slug');
-            const descInput = document.getElementById('product-description');
-            const priceInput = document.getElementById('product-price');
-            const imageInput = document.getElementById('product-image');
-            const genderSelect = document.getElementById('product-gender');
-            const categorySelect = document.getElementById('product-category');
-            
-            if (nameInput) nameInput.value = product.name || '';
-            if (slugInput) slugInput.value = product.slug || '';
-            if (descInput) descInput.value = product.description || '';
-            if (priceInput) priceInput.value = product.price != null ? product.price : '';
-            if (imageInput) imageInput.value = product.image || '';
-            if (genderSelect) genderSelect.value = product.gender || 'mens';
-            if (categorySelect) categorySelect.value = product.category || (categories[0]?.code || '');
-            loadProductImagesForEdit(product.id);
-            
-            // Заполняем размеры, теги и материалы
-            productSizes = product.sizes || [];
-            productTags = product.tags || [];
-            productMaterials = product.materials || [];
-            
-            // populate функции будут вызваны после загрузки данных
-            // Устанавливаем выбранные размеры после загрузки
-            setTimeout(() => {
-                if (productSizes.length && ui.productSizesDropdown) {
-                    const sizeSet = new Set(productSizes.map(s => s.name));
-                    ui.productSizesDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
-                        input.checked = sizeSet.has(input.value);
-                    });
-                    updateSelectedSizes();
-                }
+            try {
+                // Загружаем полные данные товара из API
+                const fullProduct = await fetch(`/api/product/${encodeURIComponent(product.id)}`).then(r => r.ok ? r.json() : null);
                 
-                // Устанавливаем выбранные теги после загрузки
-                if (productTags.length && ui.productTagsDropdown) {
-                    const tagSet = new Set(productTags.map(t => t.code));
-                    ui.productTagsDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
-                        input.checked = tagSet.has(input.value);
-                    });
-                    updateSelectedTags();
+                if (fullProduct) {
+                    const nameInput = document.getElementById('product-name');
+                    const slugInput = document.getElementById('product-slug');
+                    const descInput = document.getElementById('product-description');
+                    const priceInput = document.getElementById('product-price');
+                    const imageInput = document.getElementById('product-image');
+                    const genderSelect = document.getElementById('product-gender');
+                    const categorySelect = document.getElementById('product-category');
+                    
+                    if (nameInput) nameInput.value = fullProduct.name || '';
+                    if (slugInput) slugInput.value = fullProduct.slug || '';
+                    if (descInput) descInput.value = fullProduct.description || '';
+                    if (priceInput) priceInput.value = fullProduct.price != null ? fullProduct.price : '';
+                    if (imageInput) imageInput.value = fullProduct.image || '';
+                    if (genderSelect) genderSelect.value = fullProduct.gender || 'mens';
+                    if (categorySelect) categorySelect.value = fullProduct.category || (categories[0]?.code || '');
+                    
+                    // Загружаем изображения
+                    if (Array.isArray(fullProduct.images) && fullProduct.images.length) {
+                        setProductImages(fullProduct.images.map((img) => ({
+                            path: img.path || img.image_path || img.image || '',
+                            is_main: Boolean(img.is_main),
+                            sort_order: Number(img.sort_order) || 0
+                        })));
+                    } else if (fullProduct.image) {
+                        setProductImages([{ path: fullProduct.image, is_main: true, sort_order: 0 }]);
+                    }
+                    
+                    // Заполняем размеры, теги и материалы
+                    productSizes = Array.isArray(fullProduct.sizes) ? fullProduct.sizes.map(s => ({
+                        name: s.size || s.name || '',
+                        quantity: Number(s.quantity) || 0
+                    })) : [];
+                    productTags = Array.isArray(fullProduct.tags) ? fullProduct.tags : [];
+                    productMaterials = Array.isArray(fullProduct.materials) ? fullProduct.materials.map(m => ({
+                        code: m.material || m.code || '',
+                        percentage: Number(m.percentage) || 0
+                    })) : [];
+                    
+                    // Устанавливаем выбранные размеры после загрузки
+                    setTimeout(() => {
+                        if (productSizes.length && ui.productSizesDropdown) {
+                            const sizeSet = new Set(productSizes.map(s => s.name || s));
+                            ui.productSizesDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                                input.checked = sizeSet.has(input.value);
+                            });
+                            updateSelectedSizes();
+                        }
+                        
+                        // Устанавливаем выбранные теги после загрузки
+                        if (productTags.length && ui.productTagsDropdown) {
+                            const tagSet = new Set(productTags.map(t => t.code));
+                            ui.productTagsDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                                input.checked = tagSet.has(input.value);
+                            });
+                            updateSelectedTags();
+                        }
+                        
+                        // Заполняем материалы
+                        populateMaterialsList();
+                    }, 100);
                 }
-            }, 100);
+            } catch (error) {
+                console.error('Failed to load product details:', error);
+                notify('Не удалось загрузить полные данные товара', 'error');
+            }
         } else {
             const genderSelect = document.getElementById('product-gender');
             const categorySelect = document.getElementById('product-category');
@@ -966,11 +1077,9 @@ const Admin = (() => {
             if (categorySelect && categories.length) {
                 categorySelect.value = categories[0].code;
             }
+            // Загружаем сохраненные данные формы для нового товара
+            loadProductFormData();
         }
-        
-        document.body.classList.add('modal-open');
-        modal.style.display = 'flex';
-        setTimeout(() => modal.classList.add('show'), 10);
     }
 
     function closeProductModal() {
@@ -981,6 +1090,7 @@ const Admin = (() => {
             if (!modal.classList.contains('show')) {
                 modal.style.display = 'none';
                 document.body.classList.remove('modal-open');
+                document.body.style.pointerEvents = '';
             }
         }, 300);
         editingProductId = null;
@@ -1045,6 +1155,7 @@ const Admin = (() => {
 
             await fetchProducts();
             closeProductModal();
+            clearProductFormData(); // Очищаем сохраненные данные после успешного сохранения
             notify(editingProductId ? 'Товар успешно обновлён' : 'Товар успешно добавлен', 'success');
         } catch (error) {
             console.error('Error saving product:', error);
@@ -1084,25 +1195,37 @@ const Admin = (() => {
         const productModalClose = productModal?.querySelector('.modal-close');
         
         if (filterModalClose) filterModalClose.onclick = closeFiltersModal;
-        if (filterModal) filterModal.onclick = (e) => {
-            if (e.target === filterModal) closeFiltersModal();
-        };
+        // Убран обработчик клика по фону фильтров
+        // if (filterModal) filterModal.onclick = (e) => {
+        //     if (e.target === filterModal) closeFiltersModal();
+        // };
         if (productModalClose) productModalClose.onclick = closeProductModal;
-        if (productModal) productModal.onclick = (e) => {
-            if (e.target === productModal) closeProductModal();
-        };
+        // Убран обработчик клика по фону продукта
+        // if (productModal) productModal.onclick = (e) => {
+        //     if (e.target === productModal) closeProductModal();
+        // };
         
         const productForm = document.getElementById('product-form');
-        if (productForm) productForm.onsubmit = saveProduct;
+        if (productForm) {
+            productForm.onsubmit = saveProduct;
+            
+            // Добавляем обработчики для автоматического сохранения данных формы
+            const inputs = productForm.querySelectorAll('input, textarea, select');
+            inputs.forEach(input => {
+                input.addEventListener('input', saveProductFormData);
+                input.addEventListener('change', saveProductFormData);
+            });
+        }
         
         const productNameInput = document.getElementById('product-name');
         const productSlugInput = document.getElementById('product-slug');
         if (productNameInput && productSlugInput) {
-            productNameInput.addEventListener('input', () => {
-                if (!productSlugInput.value || productSlugInput.value.trim() === '') {
-                    productSlugInput.value = slugify(productNameInput.value);
-                }
-            });
+            // Убрана автоматическая генерация slug в поле
+            // productNameInput.addEventListener('input', () => {
+            //     if (!productSlugInput.value || productSlugInput.value.trim() === '') {
+            //         productSlugInput.value = slugify(productNameInput.value);
+            //     }
+            // });
         }
 
         if (ui.productImagesInput) {

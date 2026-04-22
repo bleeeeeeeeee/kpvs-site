@@ -428,8 +428,19 @@ async function createProduct(product) {
         const result = await client.query(query, values);
         const created = result.rows[0];
 
-        if (created?.id && Array.isArray(product.images) && product.images.length) {
-            await replaceProductImages(client, created.id, product.images);
+        if (created?.id) {
+            if (Array.isArray(product.images) && product.images.length) {
+                await replaceProductImages(client, created.id, product.images);
+            }
+            if (Array.isArray(product.sizes) && product.sizes.length) {
+                await replaceProductSizes(client, created.id, product.sizes);
+            }
+            if (Array.isArray(product.tags) && product.tags.length) {
+                await replaceProductTags(client, created.id, product.tags);
+            }
+            if (Array.isArray(product.materials) && product.materials.length) {
+                await replaceProductMaterials(client, created.id, product.materials);
+            }
         }
 
         await client.query('COMMIT');
@@ -473,8 +484,19 @@ async function updateProduct(id, product) {
         const result = await client.query(query, values);
         const updated = result.rows[0] || null;
 
-        if (updated && Array.isArray(product.images)) {
-            await replaceProductImages(client, id, product.images);
+        if (updated) {
+            if (Array.isArray(product.images)) {
+                await replaceProductImages(client, id, product.images);
+            }
+            if (Array.isArray(product.sizes)) {
+                await replaceProductSizes(client, id, product.sizes);
+            }
+            if (Array.isArray(product.tags)) {
+                await replaceProductTags(client, id, product.tags);
+            }
+            if (Array.isArray(product.materials)) {
+                await replaceProductMaterials(client, id, product.materials);
+            }
         }
 
         await client.query('COMMIT');
@@ -518,6 +540,45 @@ async function replaceProductImages(client, productId, images) {
         await client.query(
             'INSERT INTO product_images (product_id, image_path, is_main, sort_order) VALUES ($1, $2, $3, $4)',
             [productId, item.path, item.is_main, item.sort_order]
+        );
+    }
+}
+
+async function replaceProductSizes(client, productId, sizes) {
+    await client.query('DELETE FROM product_sizes WHERE product_id = $1', [productId]);
+    if (!Array.isArray(sizes) || !sizes.length) return;
+
+    for (let size of sizes) {
+        if (!size.name || typeof size.quantity !== 'number') continue;
+        await client.query(
+            'INSERT INTO product_sizes (product_id, size_name, quantity) VALUES ($1, $2, $3)',
+            [productId, size.name, size.quantity]
+        );
+    }
+}
+
+async function replaceProductTags(client, productId, tags) {
+    await client.query('DELETE FROM product_tags WHERE product_id = $1', [productId]);
+    if (!Array.isArray(tags) || !tags.length) return;
+
+    for (let tag of tags) {
+        if (!tag.code) continue;
+        await client.query(
+            'INSERT INTO product_tags (product_id, tag_code) VALUES ($1, $2)',
+            [productId, tag.code]
+        );
+    }
+}
+
+async function replaceProductMaterials(client, productId, materials) {
+    await client.query('DELETE FROM product_materials WHERE product_id = $1', [productId]);
+    if (!Array.isArray(materials) || !materials.length) return;
+
+    for (let material of materials) {
+        if (!material.code || typeof material.percentage !== 'number') continue;
+        await client.query(
+            'INSERT INTO product_materials (product_id, material_name, percentage) VALUES ($1, $2, $3)',
+            [productId, material.code, material.percentage]
         );
     }
 }
