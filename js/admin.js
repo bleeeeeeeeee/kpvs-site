@@ -44,7 +44,6 @@ const Admin = (() => {
     };
 
     function slugify(text) {
-        // Транслитерация русских символов
         const translitMap = {
             'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
             'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
@@ -94,7 +93,6 @@ const Admin = (() => {
             node.remove();
         };
 
-        // Предотвращаем всплытие клика по уведомлению
         node.onclick = (e) => {
             e.stopPropagation();
         };
@@ -235,7 +233,6 @@ const Admin = (() => {
             ui.productSizesDropdown.appendChild(option);
         });
 
-        // Добавляем обработчики
         if (ui.productSizesTrigger) {
             ui.productSizesTrigger.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -252,7 +249,6 @@ const Admin = (() => {
                 updateSelectedSizes();
             });
             
-            // Добавляем обработчик клика по строкам
             ui.productSizesDropdown.addEventListener('click', (e) => {
                 const option = e.target.closest('.admin-multiselect-option');
                 if (option) {
@@ -287,7 +283,6 @@ const Admin = (() => {
             ui.productTagsDropdown.appendChild(option);
         });
 
-        // Добавляем обработчики
         if (ui.productTagsTrigger) {
             ui.productTagsTrigger.addEventListener('click', (e) => {
                 e.preventDefault();
@@ -304,7 +299,6 @@ const Admin = (() => {
                 updateSelectedTags();
             });
             
-            // Добавляем обработчик клика по строкам
             ui.productTagsDropdown.addEventListener('click', (e) => {
                 const option = e.target.closest('.admin-multiselect-option');
                 if (option) {
@@ -400,7 +394,6 @@ const Admin = (() => {
             ui.productMaterialsContainer.appendChild(materialDiv);
         });
 
-        // Добавляем обработчики для новых элементов
         ui.productMaterialsContainer.querySelectorAll('.admin-material-remove').forEach((btn) => {
             btn.addEventListener('click', (e) => {
                 const index = parseInt(e.target.dataset.index);
@@ -435,6 +428,37 @@ const Admin = (() => {
                 percentage: percentage ? parseInt(percentage.value) || 0 : 0
             };
         }).filter((m) => m.code && m.percentage > 0);
+    }
+
+    function loadStateFromStorage() {
+        try {
+            const saved = sessionStorage.getItem('adminFilters');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                state.gender = parsed.gender || '';
+                state.categories = parsed.categories || [];
+                state.minPrice = parsed.minPrice || '';
+                state.maxPrice = parsed.maxPrice || '';
+                state.sortOption = parsed.sortOption || 'id_asc';
+            }
+        } catch (error) {
+            console.error('Error loading state from storage:', error);
+        }
+    }
+
+    function saveStateToStorage() {
+        try {
+            const stateToSave = {
+                gender: state.gender,
+                categories: state.categories,
+                minPrice: state.minPrice,
+                maxPrice: state.maxPrice,
+                sortOption: state.sortOption
+            };
+            sessionStorage.setItem('adminFilters', JSON.stringify(stateToSave));
+        } catch (error) {
+            console.error('Error saving state to storage:', error);
+        }
     }
 
     function saveProductFormData() {
@@ -480,13 +504,11 @@ const Admin = (() => {
                 productMaterials = Array.isArray(formData.materials) ? formData.materials : [];
                 productImages = Array.isArray(formData.images) ? formData.images : [];
                 
-                // Обновляем UI
                 setProductImages(productImages);
                 populateSizesDropdown();
                 populateTagsDropdown();
                 populateMaterialsList();
                 
-                // Устанавливаем выбранные размеры
                 setTimeout(() => {
                     if (productSizes.length && ui.productSizesDropdown) {
                         const sizeSet = new Set(productSizes.map(s => s.name || s));
@@ -514,24 +536,7 @@ const Admin = (() => {
         sessionStorage.removeItem('productFormData');
     }
 
-    function loadStateFromStorage() {
-        try {
-            const saved = sessionStorage.getItem('adminFilters');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                state.gender = parsed.gender || '';
-                state.categories = parsed.categories || [];
-                state.minPrice = parsed.minPrice || '';
-                state.maxPrice = parsed.maxPrice || '';
-                state.sortOption = parsed.sortOption || 'id_asc';
-            }
-        } catch (error) {
-            console.error('Error loading state from storage:', error);
-        }
-    }
-
     function applySavedFilters() {
-        // Применяем сохраненные фильтры к UI
         const genderSelect = document.getElementById('filter-gender-modal');
         if (genderSelect) genderSelect.value = state.gender;
 
@@ -606,7 +611,6 @@ const Admin = (() => {
             if (state.minPrice) params.set('price_min', state.minPrice);
             if (state.maxPrice) params.set('price_max', state.maxPrice);
             
-            // Всегда передаем параметры сортировки
             const { sortBy, sortDir } = getSortValues();
             params.set('sort_by', sortBy);
             params.set('sort_direction', sortDir);
@@ -937,6 +941,15 @@ const Admin = (() => {
         fetchProducts();
     }
 
+    function getSelectedCategories() {
+        if (!ui.filterCategoryDropdown) return [];
+        const selected = [];
+        ui.filterCategoryDropdown.querySelectorAll('input[type="checkbox"]:checked').forEach((checkbox) => {
+            selected.push(checkbox.value);
+        });
+        return selected;
+    }
+
     function clearFilters() {
         state.gender = '';
         state.categories = [];
@@ -988,7 +1001,6 @@ const Admin = (() => {
         setProductImages([]);
         if (ui.productImagesInput) ui.productImagesInput.value = '';
         
-        // Инициализируем размеры, теги и материалы
         productSizes = [];
         productTags = [];
         productMaterials = [];
@@ -1001,7 +1013,6 @@ const Admin = (() => {
         
         if (product) {
             try {
-                // Загружаем полные данные товара из API
                 const fullProduct = await fetch(`/api/product/${encodeURIComponent(product.id)}`).then(r => r.ok ? r.json() : null);
                 
                 if (fullProduct) {
@@ -1021,7 +1032,6 @@ const Admin = (() => {
                     if (genderSelect) genderSelect.value = fullProduct.gender || 'mens';
                     if (categorySelect) categorySelect.value = fullProduct.category || (categories[0]?.code || '');
                     
-                    // Загружаем изображения
                     if (Array.isArray(fullProduct.images) && fullProduct.images.length) {
                         setProductImages(fullProduct.images.map((img) => ({
                             path: img.path || img.image_path || img.image || '',
@@ -1032,7 +1042,6 @@ const Admin = (() => {
                         setProductImages([{ path: fullProduct.image, is_main: true, sort_order: 0 }]);
                     }
                     
-                    // Заполняем размеры, теги и материалы
                     productSizes = Array.isArray(fullProduct.sizes) ? fullProduct.sizes.map(s => ({
                         name: s.size || s.name || '',
                         quantity: Number(s.quantity) || 0
@@ -1043,7 +1052,6 @@ const Admin = (() => {
                         percentage: Number(m.percentage) || 0
                     })) : [];
                     
-                    // Устанавливаем выбранные размеры после загрузки
                     setTimeout(() => {
                         if (productSizes.length && ui.productSizesDropdown) {
                             const sizeSet = new Set(productSizes.map(s => s.name || s));
@@ -1053,7 +1061,6 @@ const Admin = (() => {
                             updateSelectedSizes();
                         }
                         
-                        // Устанавливаем выбранные теги после загрузки
                         if (productTags.length && ui.productTagsDropdown) {
                             const tagSet = new Set(productTags.map(t => t.code));
                             ui.productTagsDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
@@ -1062,7 +1069,6 @@ const Admin = (() => {
                             updateSelectedTags();
                         }
                         
-                        // Заполняем материалы
                         populateMaterialsList();
                     }, 100);
                 }
@@ -1077,7 +1083,6 @@ const Admin = (() => {
             if (categorySelect && categories.length) {
                 categorySelect.value = categories[0].code;
             }
-            // Загружаем сохраненные данные формы для нового товара
             loadProductFormData();
         }
     }
@@ -1155,7 +1160,7 @@ const Admin = (() => {
 
             await fetchProducts();
             closeProductModal();
-            clearProductFormData(); // Очищаем сохраненные данные после успешного сохранения
+            clearProductFormData();
             notify(editingProductId ? 'Товар успешно обновлён' : 'Товар успешно добавлен', 'success');
         } catch (error) {
             console.error('Error saving product:', error);
@@ -1195,21 +1200,12 @@ const Admin = (() => {
         const productModalClose = productModal?.querySelector('.modal-close');
         
         if (filterModalClose) filterModalClose.onclick = closeFiltersModal;
-        // Убран обработчик клика по фону фильтров
-        // if (filterModal) filterModal.onclick = (e) => {
-        //     if (e.target === filterModal) closeFiltersModal();
-        // };
         if (productModalClose) productModalClose.onclick = closeProductModal;
-        // Убран обработчик клика по фону продукта
-        // if (productModal) productModal.onclick = (e) => {
-        //     if (e.target === productModal) closeProductModal();
-        // };
         
         const productForm = document.getElementById('product-form');
         if (productForm) {
             productForm.onsubmit = saveProduct;
             
-            // Добавляем обработчики для автоматического сохранения данных формы
             const inputs = productForm.querySelectorAll('input, textarea, select');
             inputs.forEach(input => {
                 input.addEventListener('input', saveProductFormData);
@@ -1220,12 +1216,6 @@ const Admin = (() => {
         const productNameInput = document.getElementById('product-name');
         const productSlugInput = document.getElementById('product-slug');
         if (productNameInput && productSlugInput) {
-            // Убрана автоматическая генерация slug в поле
-            // productNameInput.addEventListener('input', () => {
-            //     if (!productSlugInput.value || productSlugInput.value.trim() === '') {
-            //         productSlugInput.value = slugify(productNameInput.value);
-            //     }
-            // });
         }
 
         if (ui.productImagesInput) {
@@ -1253,7 +1243,6 @@ const Admin = (() => {
     }
 
     function initAdminPage() {
-        // Загружаем сохраненное состояние
         loadStateFromStorage();
         
         ui.productsBody = document.getElementById('products-body');
@@ -1309,9 +1298,7 @@ const Admin = (() => {
 
         attachEvents();
         fetchCategories().then(() => {
-            // Применяем сохраненные фильтры после загрузки категорий
             applySavedFilters();
-            // Загружаем товары с применённными фильтрами
             fetchProducts();
         });
         fetchSizes();

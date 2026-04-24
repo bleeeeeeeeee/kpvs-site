@@ -1,6 +1,6 @@
 ================================================================================
 ЭКСПОРТ ПРОЕКТА
-Создано: 4/22/2026, 10:31:52 AM
+Создано: 4/22/2026, 4:55:21 PM
 Всего файлов: 17
 ================================================================================
 
@@ -84,7 +84,7 @@ npm start
 
 ================================================================================
 ФАЙЛ: admin.html
-РАЗМЕР: 8590 символов
+РАЗМЕР: 10532 символов
 РАСШИРЕНИЕ: .html
 ================================================================================
 
@@ -108,7 +108,7 @@ npm start
         </header>
 
         <div class="admin-toolbar">
-            <input id="search-input" type="search" placeholder="Поиск по названию или описанию" />
+            <input id="search-input" type="search" placeholder="Поиск по ID, названию или описанию" />
             <button id="open-filters-btn" class="filter-button outline" type="button">Фильтры</button>
             <button id="refresh-btn" class="filter-button" type="button">Обновить</button>
         </div>
@@ -239,16 +239,47 @@ npm start
                     </div>
                     <div class="form-grid">
                         <div>
-                            <label for="product-gender">Пол</label>
-                            <select id="product-gender" name="gender" required>
+                            <label for="product-gender">Раздел</label>
+                            <select id="product-gender" name="gender">
                                 <option value="mens">Мужской</option>
                                 <option value="womens">Женский</option>
                             </select>
                         </div>
                         <div>
                             <label for="product-category">Категория</label>
-                            <select id="product-category" name="category" required></select>
+                            <select id="product-category" name="category">
+                                <!-- Категории будут загружены динамически -->
+                            </select>
                         </div>
+                    </div>
+                    <div class="form-row">
+                        <label for="product-sizes">Размеры (несколько)</label>
+                        <div id="product-sizes-container" class="admin-multiselect">
+                            <button type="button" id="product-sizes-trigger" class="admin-multiselect-trigger">Выберите размеры</button>
+                            <div id="product-sizes-dropdown" class="admin-multiselect-dropdown">
+                                <!-- Размеры будут загружены динамически -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="product-sizes-hidden" name="sizes" />
+                    </div>
+
+                    <div class="form-row">
+                        <label for="product-tags">Теги (несколько)</label>
+                        <div id="product-tags-container" class="admin-multiselect">
+                            <button type="button" id="product-tags-trigger" class="admin-multiselect-trigger">Выберите теги</button>
+                            <div id="product-tags-dropdown" class="admin-multiselect-dropdown">
+                                <!-- Теги будут загружены динамически -->
+                            </div>
+                        </div>
+                        <input type="hidden" id="product-tags-hidden" name="tags" />
+                    </div>
+
+                    <div class="form-row">
+                        <label for="product-materials">Состав (материалы)</label>
+                        <div id="product-materials-container" class="admin-materials">
+                            <!-- Материалы будут загружены динамически -->
+                        </div>
+                        <button type="button" id="add-material-btn" class="admin-add-btn">Добавить материал</button>
                     </div>
                     <div class="admin-form-actions">
                         <button class="admin-action-btn" id="save-product-btn" type="submit">Сохранить</button>
@@ -267,7 +298,7 @@ npm start
 
 ================================================================================
 ФАЙЛ: css/style.css
-РАЗМЕР: 36772 символов
+РАЗМЕР: 39432 символов
 РАСШИРЕНИЕ: .css
 ================================================================================
 
@@ -650,6 +681,12 @@ body.modal-open .modal { pointer-events: auto; }
     user-select: none;
     cursor: pointer;
 }
+
+.admin-image-actions input[type="radio"] {
+    margin: 0;
+    width: 16px;
+    height: 16px;
+}
 .admin-image-actions button {
     border: 0;
     border-radius: 0.75rem;
@@ -767,6 +804,15 @@ body.modal-open .modal { pointer-events: auto; }
 .admin-multiselect-option:hover { background: rgba(182, 197, 63, 0.10); }
 .admin-multiselect-option input { width: 1rem; height: 1rem; accent-color: var(--secondary-color); }
 .admin-multiselect-option span { font-size: 0.95rem; }
+
+.admin-materials { display: flex; flex-direction: column; gap: 0.75rem; }
+.admin-material-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-secondary); }
+.admin-material-item select { flex: 1; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-primary); color: var(--text-primary); }
+.admin-material-item input { width: 80px; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-primary); color: var(--text-primary); text-align: center; }
+.admin-material-item button { padding: 0.5rem 0.75rem; border: none; border-radius: 0.5rem; background: rgba(197, 61, 61, 0.12); color: #8f1f1f; cursor: pointer; }
+.admin-material-item button:hover { background: rgba(197, 61, 61, 0.20); }
+.admin-material-add { padding: 0.75rem; border: 2px dashed var(--border-color); border-radius: 0.75rem; background: transparent; color: var(--text-secondary); cursor: pointer; transition: all 0.2s ease; }
+.admin-material-add:hover { border-color: var(--accent-color); color: var(--accent-color); background: rgba(182, 197, 63, 0.05); }
 
 .footer { background: linear-gradient(135deg, #24352a 0%, #3B5223 100%); color: white; padding: 3rem 0 1.5rem 0; margin-top: 4rem; width: 100%; }
 .footer .container { margin: 0 auto; padding: 0 4rem; max-width: 1400px; }
@@ -897,12 +943,79 @@ body.modal-open .modal { pointer-events: auto; }
     .secTitle { font-size: 1.1rem; }
 }
 
+/* Стили для материалов в админке */
+.admin-materials {
+    margin-top: 0.5rem;
+}
+
+.admin-material-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem;
+    background-color: var(--bg-secondary);
+    border-radius: 4px;
+}
+
+.admin-material-select {
+    flex: 1;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    height: 40px;
+    box-sizing: border-box;
+}
+
+.admin-material-percentage {
+    width: 80px;
+    padding: 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    height: 40px;
+    box-sizing: border-box;
+}
+
+.admin-material-remove {
+    padding: 0.5rem;
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+}
+
+.admin-material-remove:hover {
+    background-color: #c82333;
+}
+
+.admin-add-btn {
+    margin-top: 0.5rem;
+    padding: 0.5rem 1rem;
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.admin-add-btn:hover {
+    background-color: var(--primary-color);
+}
+
 --------------------------------------------------------------------------------
 
 
 ================================================================================
 ФАЙЛ: db.js
-РАЗМЕР: 15909 символов
+РАЗМЕР: 19338 символов
 РАСШИРЕНИЕ: .js
 ================================================================================
 
@@ -921,10 +1034,28 @@ const pool = new Pool({
 
 function slugifyProductName(text) {
     if (!text || typeof text !== 'string') return '';
+    
+    // Транслитерация русских символов
+    const translitMap = {
+        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+        'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+        'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+        'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+        'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+        'А': 'a', 'Б': 'b', 'В': 'v', 'Г': 'g', 'Д': 'd', 'Е': 'e', 'Ё': 'e',
+        'Ж': 'zh', 'З': 'z', 'И': 'i', 'Й': 'y', 'К': 'k', 'Л': 'l', 'М': 'm',
+        'Н': 'n', 'О': 'o', 'П': 'p', 'Р': 'r', 'С': 's', 'Т': 't', 'У': 'u',
+        'Ф': 'f', 'Х': 'kh', 'Ц': 'ts', 'Ч': 'ch', 'Ш': 'sh', 'Щ': 'shch',
+        'Ъ': '', 'Ы': 'y', 'Ь': '', 'Э': 'e', 'Ю': 'yu', 'Я': 'ya'
+    };
+
     return text
         .toString()
         .trim()
         .toLowerCase()
+        .split('')
+        .map(char => translitMap[char] || char)
+        .join('')
         .replace(/\s+/g, '-')
         .replace(/[^a-z0-9\-]+/g, '')
         .replace(/\-\-+/g, '-')
@@ -1090,26 +1221,27 @@ async function getProducts(gender, options = {}) {
 
     if (q) {
         const queryText = String(q).trim();
-        const isIdSearch = /^\d+$/.test(queryText);
-        if (isIdSearch) {
+        values.push(`%${queryText}%`);
+        const textIndex = nextIndex;
+        nextIndex += 1;
+        
+        // Проверяем, является ли запрос числом для поиска по ID
+        const isNumeric = /^\d+$/.test(queryText);
+        if (isNumeric) {
             values.push(Number(queryText));
             const idIndex = nextIndex;
             nextIndex += 1;
-            values.push(`%${queryText}%`);
-            const textIndex = nextIndex;
-            nextIndex += 1;
             conditions.push(`(
-                p.id = $${idIndex}
+                CAST(p.id AS TEXT) ILIKE $${textIndex}
                 OR p.name ILIKE $${textIndex}
                 OR p.description ILIKE $${textIndex}
+                OR p.id = $${idIndex}
             )`);
         } else {
-            values.push(`%${queryText}%`);
             conditions.push(`(
-                p.name ILIKE $${nextIndex}
-                OR p.description ILIKE $${nextIndex}
+                p.name ILIKE $${textIndex}
+                OR p.description ILIKE $${textIndex}
             )`);
-            nextIndex += 1;
         }
     }
 
@@ -1317,8 +1449,19 @@ async function createProduct(product) {
         const result = await client.query(query, values);
         const created = result.rows[0];
 
-        if (created?.id && Array.isArray(product.images) && product.images.length) {
-            await replaceProductImages(client, created.id, product.images);
+        if (created?.id) {
+            if (Array.isArray(product.images) && product.images.length) {
+                await replaceProductImages(client, created.id, product.images);
+            }
+            if (Array.isArray(product.sizes) && product.sizes.length) {
+                await replaceProductSizes(client, created.id, product.sizes);
+            }
+            if (Array.isArray(product.tags) && product.tags.length) {
+                await replaceProductTags(client, created.id, product.tags);
+            }
+            if (Array.isArray(product.materials) && product.materials.length) {
+                await replaceProductMaterials(client, created.id, product.materials);
+            }
         }
 
         await client.query('COMMIT');
@@ -1362,8 +1505,19 @@ async function updateProduct(id, product) {
         const result = await client.query(query, values);
         const updated = result.rows[0] || null;
 
-        if (updated && Array.isArray(product.images)) {
-            await replaceProductImages(client, id, product.images);
+        if (updated) {
+            if (Array.isArray(product.images)) {
+                await replaceProductImages(client, id, product.images);
+            }
+            if (Array.isArray(product.sizes)) {
+                await replaceProductSizes(client, id, product.sizes);
+            }
+            if (Array.isArray(product.tags)) {
+                await replaceProductTags(client, id, product.tags);
+            }
+            if (Array.isArray(product.materials)) {
+                await replaceProductMaterials(client, id, product.materials);
+            }
         }
 
         await client.query('COMMIT');
@@ -1411,6 +1565,45 @@ async function replaceProductImages(client, productId, images) {
     }
 }
 
+async function replaceProductSizes(client, productId, sizes) {
+    await client.query('DELETE FROM product_sizes WHERE product_id = $1', [productId]);
+    if (!Array.isArray(sizes) || !sizes.length) return;
+
+    for (let size of sizes) {
+        if (!size.name || typeof size.quantity !== 'number') continue;
+        await client.query(
+            'INSERT INTO product_sizes (product_id, size_name, quantity) VALUES ($1, $2, $3)',
+            [productId, size.name, size.quantity]
+        );
+    }
+}
+
+async function replaceProductTags(client, productId, tags) {
+    await client.query('DELETE FROM product_tags WHERE product_id = $1', [productId]);
+    if (!Array.isArray(tags) || !tags.length) return;
+
+    for (let tag of tags) {
+        if (!tag.code) continue;
+        await client.query(
+            'INSERT INTO product_tags (product_id, tag_code) VALUES ($1, $2)',
+            [productId, tag.code]
+        );
+    }
+}
+
+async function replaceProductMaterials(client, productId, materials) {
+    await client.query('DELETE FROM product_materials WHERE product_id = $1', [productId]);
+    if (!Array.isArray(materials) || !materials.length) return;
+
+    for (let material of materials) {
+        if (!material.code || typeof material.percentage !== 'number') continue;
+        await client.query(
+            'INSERT INTO product_materials (product_id, material_name, percentage) VALUES ($1, $2, $3)',
+            [productId, material.code, material.percentage]
+        );
+    }
+}
+
 async function deleteProduct(id) {
     const result = await pool.query('DELETE FROM products WHERE id = $1', [id]);
     return result.rowCount > 0;
@@ -1443,7 +1636,7 @@ module.exports = {
 
 ================================================================================
 ФАЙЛ: js/admin.js
-РАЗМЕР: 32917 символов
+РАЗМЕР: 55868 символов
 РАСШИРЕНИЕ: .js
 ================================================================================
 
@@ -1452,6 +1645,12 @@ const Admin = (() => {
     let products = [];
     let editingProductId = null;
     let productImages = [];
+    let availableSizes = [];
+    let availableTags = [];
+    let availableMaterials = [];
+    let productSizes = [];
+    let productTags = [];
+    let productMaterials = [];
     const state = {
         gender: '',
         categories: [],
@@ -1470,14 +1669,44 @@ const Admin = (() => {
         filterCategoryTrigger: null,
         productCategorySelect: null,
         productImagesInput: null,
-        productImagesList: null
+        productImagesList: null,
+        productImagesListHandler: null,
+        productSizesContainer: null,
+        productSizesTrigger: null,
+        productSizesDropdown: null,
+        productSizesHidden: null,
+        productTagsContainer: null,
+        productTagsTrigger: null,
+        productTagsDropdown: null,
+        productTagsHidden: null,
+        productMaterialsContainer: null,
+        productMaterialsTrigger: null,
+        productMaterialsDropdown: null,
+        productMaterialsHidden: null
     };
 
     function slugify(text) {
+        // Транслитерация русских символов
+        const translitMap = {
+            'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
+            'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+            'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+            'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
+            'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+            'А': 'a', 'Б': 'b', 'В': 'v', 'Г': 'g', 'Д': 'd', 'Е': 'e', 'Ё': 'e',
+            'Ж': 'zh', 'З': 'z', 'И': 'i', 'Й': 'y', 'К': 'k', 'Л': 'l', 'М': 'm',
+            'Н': 'n', 'О': 'o', 'П': 'p', 'Р': 'r', 'С': 's', 'Т': 't', 'У': 'u',
+            'Ф': 'f', 'Х': 'kh', 'Ц': 'ts', 'Ч': 'ch', 'Ш': 'sh', 'Щ': 'shch',
+            'Ъ': '', 'Ы': 'y', 'Ь': '', 'Э': 'e', 'Ю': 'yu', 'Я': 'ya'
+        };
+
         return text
             .toString()
             .trim()
             .toLowerCase()
+            .split('')
+            .map(char => translitMap[char] || char)
+            .join('')
             .replace(/\s+/g, '-')
             .replace(/[^a-z0-9\-]+/g, '')
             .replace(/\-\-+/g, '-')
@@ -1502,7 +1731,15 @@ const Admin = (() => {
         document.body.appendChild(node);
 
         const close = node.querySelector('.notification-close');
-        if (close) close.onclick = () => node.remove();
+        if (close) close.onclick = (e) => {
+            e.stopPropagation();
+            node.remove();
+        };
+
+        // Предотвращаем всплытие клика по уведомлению
+        node.onclick = (e) => {
+            e.stopPropagation();
+        };
 
         window.setTimeout(() => {
             if (node.isConnected) node.remove();
@@ -1545,6 +1782,51 @@ const Admin = (() => {
         }
     }
 
+    async function fetchSizes() {
+        try {
+            const response = await fetch('/api/sizes');
+            if (!response.ok) {
+                throw new Error('Не удалось загрузить размеры');
+            }
+            availableSizes = await response.json();
+            populateSizesDropdown();
+        } catch (error) {
+            console.error('Error fetching sizes:', error);
+            availableSizes = [];
+            notify('Не удалось загрузить размеры.', 'error');
+        }
+    }
+
+    async function fetchTags() {
+        try {
+            const response = await fetch('/api/tags');
+            if (!response.ok) {
+                throw new Error('Не удалось загрузить теги');
+            }
+            availableTags = await response.json();
+            populateTagsDropdown();
+        } catch (error) {
+            console.error('Error fetching tags:', error);
+            availableTags = [];
+            notify('Не удалось загрузить теги.', 'error');
+        }
+    }
+
+    async function fetchMaterials() {
+        try {
+            const response = await fetch('/api/materials');
+            if (!response.ok) {
+                throw new Error('Не удалось загрузить материалы');
+            }
+            availableMaterials = await response.json();
+            populateMaterialsList();
+        } catch (error) {
+            console.error('Error fetching materials:', error);
+            availableMaterials = [];
+            notify('Не удалось загрузить материалы.', 'error');
+        }
+    }
+
     function flattenCategories(list) {
         const result = [];
         if (!Array.isArray(list)) return result;
@@ -1581,11 +1863,334 @@ const Admin = (() => {
         setSelectedCategories(next);
     }
 
-    function getSelectedCategories() {
-        if (!ui.filterCategoryDropdown) return [];
-        return Array.from(ui.filterCategoryDropdown.querySelectorAll('input[type="checkbox"]:checked'))
+    function populateSizesDropdown() {
+        if (!ui.productSizesDropdown || !availableSizes.length) return;
+
+        ui.productSizesDropdown.innerHTML = '';
+        availableSizes.forEach((size) => {
+            const option = document.createElement('div');
+            option.className = 'admin-multiselect-option';
+            option.innerHTML = `
+                <input type="checkbox" value="${size.name}" id="size-${size.name}" />
+                <label for="size-${size.name}">${escapeHtml(size.name)}</label>
+            `;
+            ui.productSizesDropdown.appendChild(option);
+        });
+
+        // Добавляем обработчики
+        if (ui.productSizesTrigger) {
+            ui.productSizesTrigger.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!ui.productSizesContainer) return;
+                const isOpen = ui.productSizesContainer.classList.contains('open');
+                if (isOpen) closeSizesDropdown();
+                else openSizesDropdown();
+            });
+        }
+
+        if (ui.productSizesDropdown) {
+            ui.productSizesDropdown.addEventListener('change', () => {
+                updateSelectedSizes();
+            });
+            
+            // Добавляем обработчик клика по строкам
+            ui.productSizesDropdown.addEventListener('click', (e) => {
+                const option = e.target.closest('.admin-multiselect-option');
+                if (option) {
+                    const checkbox = option.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        updateSelectedSizes();
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!ui.productSizesContainer) return;
+            if (!ui.productSizesContainer.contains(e.target)) {
+                closeSizesDropdown();
+            }
+        });
+    }
+
+    function populateTagsDropdown() {
+        if (!ui.productTagsDropdown || !availableTags.length) return;
+
+        ui.productTagsDropdown.innerHTML = '';
+        availableTags.forEach((tag) => {
+            const option = document.createElement('div');
+            option.className = 'admin-multiselect-option';
+            option.innerHTML = `
+                <input type="checkbox" value="${tag.code}" id="tag-${tag.code}" />
+                <label for="tag-${tag.code}">${escapeHtml(tag.name)}</label>
+            `;
+            ui.productTagsDropdown.appendChild(option);
+        });
+
+        // Добавляем обработчики
+        if (ui.productTagsTrigger) {
+            ui.productTagsTrigger.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (!ui.productTagsContainer) return;
+                const isOpen = ui.productTagsContainer.classList.contains('open');
+                if (isOpen) closeTagsDropdown();
+                else openTagsDropdown();
+            });
+        }
+
+        if (ui.productTagsDropdown) {
+            ui.productTagsDropdown.addEventListener('change', () => {
+                updateSelectedTags();
+            });
+            
+            // Добавляем обработчик клика по строкам
+            ui.productTagsDropdown.addEventListener('click', (e) => {
+                const option = e.target.closest('.admin-multiselect-option');
+                if (option) {
+                    const checkbox = option.querySelector('input[type="checkbox"]');
+                    if (checkbox) {
+                        checkbox.checked = !checkbox.checked;
+                        updateSelectedTags();
+                    }
+                }
+            });
+        }
+
+        document.addEventListener('click', (e) => {
+            if (!ui.productTagsContainer) return;
+            if (!ui.productTagsContainer.contains(e.target)) {
+                closeTagsDropdown();
+            }
+        });
+    }
+
+    function openSizesDropdown() {
+        if (!ui.productSizesContainer) return;
+        ui.productSizesContainer.classList.add('open');
+    }
+
+    function closeSizesDropdown() {
+        if (!ui.productSizesContainer) return;
+        ui.productSizesContainer.classList.remove('open');
+    }
+
+    function openTagsDropdown() {
+        if (!ui.productTagsContainer) return;
+        ui.productTagsContainer.classList.add('open');
+    }
+
+    function closeTagsDropdown() {
+        if (!ui.productTagsContainer) return;
+        ui.productTagsContainer.classList.remove('open');
+    }
+
+    function updateSelectedSizes() {
+        if (!ui.productSizesTrigger || !ui.productSizesHidden) return;
+        
+        const selected = Array.from(ui.productSizesDropdown.querySelectorAll('input[type="checkbox"]:checked'))
             .map((input) => input.value)
             .filter(Boolean);
+        
+        ui.productSizesHidden.value = selected.join(',');
+        
+        if (selected.length === 0) {
+            ui.productSizesTrigger.textContent = 'Выберите размеры';
+        } else if (selected.length === 1) {
+            ui.productSizesTrigger.textContent = selected[0];
+        } else {
+            ui.productSizesTrigger.textContent = `Выбрано размеров: ${selected.length}`;
+        }
+    }
+
+    function updateSelectedTags() {
+        if (!ui.productTagsTrigger || !ui.productTagsHidden) return;
+        
+        const selected = Array.from(ui.productTagsDropdown.querySelectorAll('input[type="checkbox"]:checked'))
+            .map((input) => input.value)
+            .filter(Boolean);
+        
+        ui.productTagsHidden.value = selected.join(',');
+        
+        if (selected.length === 0) {
+            ui.productTagsTrigger.textContent = 'Выберите теги';
+        } else if (selected.length === 1) {
+            const tag = availableTags.find((t) => t.code === selected[0]);
+            ui.productTagsTrigger.textContent = tag ? tag.name : selected[0];
+        } else {
+            ui.productTagsTrigger.textContent = `Выбрано тегов: ${selected.length}`;
+        }
+    }
+
+    function populateMaterialsList() {
+        if (!ui.productMaterialsContainer || !availableMaterials.length) return;
+
+        ui.productMaterialsContainer.innerHTML = '';
+        productMaterials.forEach((material, index) => {
+            const materialDiv = document.createElement('div');
+            materialDiv.className = 'admin-material-item';
+            materialDiv.innerHTML = `
+                <select class="admin-material-select">
+                    <option value="">Выберите материал</option>
+                    ${availableMaterials.map((m) => `<option value="${m.code}" ${m.code === material.code ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+                </select>
+                <input type="number" class="admin-material-percentage" value="${material.percentage || 0}" min="0" max="100" step="1" placeholder="%" />
+                <button type="button" class="admin-material-remove" data-index="${index}">×</button>
+            `;
+            ui.productMaterialsContainer.appendChild(materialDiv);
+        });
+
+        // Добавляем обработчики для новых элементов
+        ui.productMaterialsContainer.querySelectorAll('.admin-material-remove').forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                removeMaterial(index);
+            });
+        });
+
+        ui.productMaterialsContainer.querySelectorAll('.admin-material-select, .admin-material-percentage').forEach((el) => {
+            el.addEventListener('change', updateMaterialsData);
+        });
+    }
+
+    function addMaterial() {
+        productMaterials.push({ code: '', percentage: 0 });
+        populateMaterialsList();
+    }
+
+    function removeMaterial(index) {
+        if (index >= 0 && index < productMaterials.length) {
+            productMaterials.splice(index, 1);
+            populateMaterialsList();
+        }
+    }
+
+    function updateMaterialsData() {
+        const materialItems = ui.productMaterialsContainer.querySelectorAll('.admin-material-item');
+        productMaterials = Array.from(materialItems).map((item) => {
+            const select = item.querySelector('.admin-material-select');
+            const percentage = item.querySelector('.admin-material-percentage');
+            return {
+                code: select ? select.value : '',
+                percentage: percentage ? parseInt(percentage.value) || 0 : 0
+            };
+        }).filter((m) => m.code && m.percentage > 0);
+    }
+
+    function loadStateFromStorage() {
+        try {
+            const saved = sessionStorage.getItem('adminFilters');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                state.gender = parsed.gender || '';
+                state.categories = parsed.categories || [];
+                state.minPrice = parsed.minPrice || '';
+                state.maxPrice = parsed.maxPrice || '';
+                state.sortOption = parsed.sortOption || 'id_asc';
+            }
+        } catch (error) {
+            console.error('Error loading state from storage:', error);
+        }
+    }
+            materials: productMaterials,
+            images: productImages
+        };
+        sessionStorage.setItem('productFormData', JSON.stringify(formData));
+    }
+
+    function loadProductFormData() {
+        try {
+            const saved = sessionStorage.getItem('productFormData');
+            if (saved) {
+                const formData = JSON.parse(saved);
+                const nameInput = document.getElementById('product-name');
+                const slugInput = document.getElementById('product-slug');
+                const descInput = document.getElementById('product-description');
+                const priceInput = document.getElementById('product-price');
+                const imageInput = document.getElementById('product-image');
+                const genderSelect = document.getElementById('product-gender');
+                const categorySelect = document.getElementById('product-category');
+                
+                if (nameInput) nameInput.value = formData.name || '';
+                if (slugInput) slugInput.value = formData.slug || '';
+                if (descInput) descInput.value = formData.description || '';
+                if (priceInput) priceInput.value = formData.price || '';
+                if (imageInput) imageInput.value = formData.image || '';
+                if (genderSelect) genderSelect.value = formData.gender || 'mens';
+                if (categorySelect) categorySelect.value = formData.category || '';
+                
+                productSizes = Array.isArray(formData.sizes) ? formData.sizes : [];
+                productTags = Array.isArray(formData.tags) ? formData.tags : [];
+                productMaterials = Array.isArray(formData.materials) ? formData.materials : [];
+                productImages = Array.isArray(formData.images) ? formData.images : [];
+                
+                // Обновляем UI
+                setProductImages(productImages);
+                populateSizesDropdown();
+                populateTagsDropdown();
+                populateMaterialsList();
+                
+                // Устанавливаем выбранные размеры
+                setTimeout(() => {
+                    if (productSizes.length && ui.productSizesDropdown) {
+                        const sizeSet = new Set(productSizes.map(s => s.name || s));
+                        ui.productSizesDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                            input.checked = sizeSet.has(input.value);
+                        });
+                        updateSelectedSizes();
+                    }
+                    
+                    if (productTags.length && ui.productTagsDropdown) {
+                        const tagSet = new Set(productTags.map(t => t.code));
+                        ui.productTagsDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                            input.checked = tagSet.has(input.value);
+                        });
+                        updateSelectedTags();
+                    }
+                }, 100);
+            }
+        } catch (error) {
+            console.error('Error loading product form data:', error);
+        }
+    }
+
+    function clearProductFormData() {
+        sessionStorage.removeItem('productFormData');
+    }
+
+    function loadStateFromStorage() {
+        try {
+            const saved = sessionStorage.getItem('adminFilters');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                state.gender = parsed.gender || '';
+                state.categories = parsed.categories || [];
+                state.minPrice = parsed.minPrice || '';
+                state.maxPrice = parsed.maxPrice || '';
+                state.sortOption = parsed.sortOption || 'id_asc';
+            }
+        } catch (error) {
+            console.error('Error loading state from storage:', error);
+        }
+    }
+
+    function applySavedFilters() {
+        // Применяем сохраненные фильтры к UI
+        const genderSelect = document.getElementById('filter-gender-modal');
+        if (genderSelect) genderSelect.value = state.gender;
+
+        const minPriceInput = document.getElementById('min-price');
+        if (minPriceInput) minPriceInput.value = state.minPrice;
+
+        const maxPriceInput = document.getElementById('max-price');
+        if (maxPriceInput) maxPriceInput.value = state.maxPrice;
+
+        const sortBy = document.getElementById('sort-by');
+        if (sortBy) sortBy.value = state.sortOption;
+
+        setSelectedCategories(state.categories);
     }
 
     function setSelectedCategories(codes) {
@@ -1613,6 +2218,8 @@ const Admin = (() => {
                 ui.filterCategoryLabel.textContent = `Выбрано категорий: ${selected.length}`;
             }
         }
+
+        saveStateToStorage();
     }
 
     function openCategoryDropdown() {
@@ -1644,6 +2251,8 @@ const Admin = (() => {
             }
             if (state.minPrice) params.set('price_min', state.minPrice);
             if (state.maxPrice) params.set('price_max', state.maxPrice);
+            
+            // Всегда передаем параметры сортировки
             const { sortBy, sortDir } = getSortValues();
             params.set('sort_by', sortBy);
             params.set('sort_direction', sortDir);
@@ -1940,6 +2549,8 @@ const Admin = (() => {
         if (maxPriceInput) maxPriceInput.value = state.maxPrice || '';
         
         document.body.classList.add('modal-open');
+        document.body.style.pointerEvents = 'none';
+        modal.style.pointerEvents = 'auto';
         modal.style.display = 'flex';
         setTimeout(() => modal.classList.add('show'), 10);
     }
@@ -1952,6 +2563,7 @@ const Admin = (() => {
             if (!modal.classList.contains('show')) {
                 modal.style.display = 'none';
                 document.body.classList.remove('modal-open');
+                document.body.style.pointerEvents = '';
             }
         }, 300);
     }
@@ -1966,6 +2578,7 @@ const Admin = (() => {
         state.minPrice = minPriceInput ? minPriceInput.value.trim() : '';
         state.maxPrice = maxPriceInput ? maxPriceInput.value.trim() : '';
         
+        saveStateToStorage();
         closeFiltersModal();
         fetchProducts();
     }
@@ -1985,6 +2598,7 @@ const Admin = (() => {
         if (minPriceInput) minPriceInput.value = '';
         if (maxPriceInput) maxPriceInput.value = '';
         
+        saveStateToStorage();
         closeFiltersModal();
         fetchProducts();
     }
@@ -2006,7 +2620,7 @@ const Admin = (() => {
         }
     }
 
-    function openProductModal(product = null) {
+    async function openProductModal(product = null) {
         const modal = document.getElementById('product-modal');
         const title = document.getElementById('modal-title');
         const form = document.getElementById('product-form');
@@ -2020,33 +2634,98 @@ const Admin = (() => {
         setProductImages([]);
         if (ui.productImagesInput) ui.productImagesInput.value = '';
         
+        // Инициализируем размеры, теги и материалы
+        productSizes = [];
+        productTags = [];
+        productMaterials = [];
+        
+        document.body.classList.add('modal-open');
+        document.body.style.pointerEvents = 'none';
+        modal.style.pointerEvents = 'auto';
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('show'), 10);
+        
         if (product) {
-            const nameInput = document.getElementById('product-name');
-            const slugInput = document.getElementById('product-slug');
-            const descInput = document.getElementById('product-description');
-            const priceInput = document.getElementById('product-price');
-            const imageInput = document.getElementById('product-image');
+            try {
+                // Загружаем полные данные товара из API
+                const fullProduct = await fetch(`/api/product/${encodeURIComponent(product.id)}`).then(r => r.ok ? r.json() : null);
+                
+                if (fullProduct) {
+                    const nameInput = document.getElementById('product-name');
+                    const slugInput = document.getElementById('product-slug');
+                    const descInput = document.getElementById('product-description');
+                    const priceInput = document.getElementById('product-price');
+                    const imageInput = document.getElementById('product-image');
+                    const genderSelect = document.getElementById('product-gender');
+                    const categorySelect = document.getElementById('product-category');
+                    
+                    if (nameInput) nameInput.value = fullProduct.name || '';
+                    if (slugInput) slugInput.value = fullProduct.slug || '';
+                    if (descInput) descInput.value = fullProduct.description || '';
+                    if (priceInput) priceInput.value = fullProduct.price != null ? fullProduct.price : '';
+                    if (imageInput) imageInput.value = fullProduct.image || '';
+                    if (genderSelect) genderSelect.value = fullProduct.gender || 'mens';
+                    if (categorySelect) categorySelect.value = fullProduct.category || (categories[0]?.code || '');
+                    
+                    // Загружаем изображения
+                    if (Array.isArray(fullProduct.images) && fullProduct.images.length) {
+                        setProductImages(fullProduct.images.map((img) => ({
+                            path: img.path || img.image_path || img.image || '',
+                            is_main: Boolean(img.is_main),
+                            sort_order: Number(img.sort_order) || 0
+                        })));
+                    } else if (fullProduct.image) {
+                        setProductImages([{ path: fullProduct.image, is_main: true, sort_order: 0 }]);
+                    }
+                    
+                    // Заполняем размеры, теги и материалы
+                    productSizes = Array.isArray(fullProduct.sizes) ? fullProduct.sizes.map(s => ({
+                        name: s.size || s.name || '',
+                        quantity: Number(s.quantity) || 0
+                    })) : [];
+                    productTags = Array.isArray(fullProduct.tags) ? fullProduct.tags : [];
+                    productMaterials = Array.isArray(fullProduct.materials) ? fullProduct.materials.map(m => ({
+                        code: m.material || m.code || '',
+                        percentage: Number(m.percentage) || 0
+                    })) : [];
+                    
+                    // Устанавливаем выбранные размеры после загрузки
+                    setTimeout(() => {
+                        if (productSizes.length && ui.productSizesDropdown) {
+                            const sizeSet = new Set(productSizes.map(s => s.name || s));
+                            ui.productSizesDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                                input.checked = sizeSet.has(input.value);
+                            });
+                            updateSelectedSizes();
+                        }
+                        
+                        // Устанавливаем выбранные теги после загрузки
+                        if (productTags.length && ui.productTagsDropdown) {
+                            const tagSet = new Set(productTags.map(t => t.code));
+                            ui.productTagsDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
+                                input.checked = tagSet.has(input.value);
+                            });
+                            updateSelectedTags();
+                        }
+                        
+                        // Заполняем материалы
+                        populateMaterialsList();
+                    }, 100);
+                }
+            } catch (error) {
+                console.error('Failed to load product details:', error);
+                notify('Не удалось загрузить полные данные товара', 'error');
+            }
+        } else {
             const genderSelect = document.getElementById('product-gender');
             const categorySelect = document.getElementById('product-category');
-            
-            if (nameInput) nameInput.value = product.name || '';
-            if (slugInput) slugInput.value = product.slug || '';
-            if (descInput) descInput.value = product.description || '';
-            if (priceInput) priceInput.value = product.price != null ? product.price : '';
-            if (imageInput) imageInput.value = product.image || '';
-            if (genderSelect) genderSelect.value = product.gender || 'mens';
-            if (categorySelect) categorySelect.value = product.category || (categories[0]?.code || '');
-            loadProductImagesForEdit(product.id);
-        } else {
-            const categorySelect = document.getElementById('product-category');
+            if (genderSelect) genderSelect.value = 'mens';
             if (categorySelect && categories.length) {
                 categorySelect.value = categories[0].code;
             }
+            // Загружаем сохраненные данные формы для нового товара
+            loadProductFormData();
         }
-        
-        document.body.classList.add('modal-open');
-        modal.style.display = 'flex';
-        setTimeout(() => modal.classList.add('show'), 10);
     }
 
     function closeProductModal() {
@@ -2057,6 +2736,7 @@ const Admin = (() => {
             if (!modal.classList.contains('show')) {
                 modal.style.display = 'none';
                 document.body.classList.remove('modal-open');
+                document.body.style.pointerEvents = '';
             }
         }, 300);
         editingProductId = null;
@@ -2090,7 +2770,10 @@ const Admin = (() => {
             image_path: main ? main.path : null,
             gender_code: genderSelect ? genderSelect.value : 'mens',
             category_code: categorySelect ? categorySelect.value : '',
-            images: combinedImages
+            images: combinedImages,
+            sizes: productSizes,
+            tags: productTags,
+            materials: productMaterials
         };
 
         if (!productData.name || !productData.category_code) {
@@ -2118,6 +2801,7 @@ const Admin = (() => {
 
             await fetchProducts();
             closeProductModal();
+            clearProductFormData(); // Очищаем сохраненные данные после успешного сохранения
             notify(editingProductId ? 'Товар успешно обновлён' : 'Товар успешно добавлен', 'success');
         } catch (error) {
             console.error('Error saving product:', error);
@@ -2143,9 +2827,13 @@ const Admin = (() => {
         if (clearFiltersBtn) clearFiltersBtn.onclick = clearFilters;
         if (sortBy) sortBy.onchange = (e) => {
             state.sortOption = e.target.value;
+            saveStateToStorage();
             fetchProducts();
         };
         if (cancelBtn) cancelBtn.onclick = closeProductModal;
+        
+        const addMaterialBtn = document.getElementById('add-material-btn');
+        if (addMaterialBtn) addMaterialBtn.onclick = addMaterial;
         
         const filterModal = document.getElementById('filter-modal');
         const productModal = document.getElementById('product-modal');
@@ -2153,25 +2841,37 @@ const Admin = (() => {
         const productModalClose = productModal?.querySelector('.modal-close');
         
         if (filterModalClose) filterModalClose.onclick = closeFiltersModal;
-        if (filterModal) filterModal.onclick = (e) => {
-            if (e.target === filterModal) closeFiltersModal();
-        };
+        // Убран обработчик клика по фону фильтров
+        // if (filterModal) filterModal.onclick = (e) => {
+        //     if (e.target === filterModal) closeFiltersModal();
+        // };
         if (productModalClose) productModalClose.onclick = closeProductModal;
-        if (productModal) productModal.onclick = (e) => {
-            if (e.target === productModal) closeProductModal();
-        };
+        // Убран обработчик клика по фону продукта
+        // if (productModal) productModal.onclick = (e) => {
+        //     if (e.target === productModal) closeProductModal();
+        // };
         
         const productForm = document.getElementById('product-form');
-        if (productForm) productForm.onsubmit = saveProduct;
+        if (productForm) {
+            productForm.onsubmit = saveProduct;
+            
+            // Добавляем обработчики для автоматического сохранения данных формы
+            const inputs = productForm.querySelectorAll('input, textarea, select');
+            inputs.forEach(input => {
+                input.addEventListener('input', saveProductFormData);
+                input.addEventListener('change', saveProductFormData);
+            });
+        }
         
         const productNameInput = document.getElementById('product-name');
         const productSlugInput = document.getElementById('product-slug');
         if (productNameInput && productSlugInput) {
-            productNameInput.addEventListener('input', () => {
-                if (!productSlugInput.value || productSlugInput.value.trim() === '') {
-                    productSlugInput.value = slugify(productNameInput.value);
-                }
-            });
+            // Убрана автоматическая генерация slug в поле
+            // productNameInput.addEventListener('input', () => {
+            //     if (!productSlugInput.value || productSlugInput.value.trim() === '') {
+            //         productSlugInput.value = slugify(productNameInput.value);
+            //     }
+            // });
         }
 
         if (ui.productImagesInput) {
@@ -2199,6 +2899,9 @@ const Admin = (() => {
     }
 
     function initAdminPage() {
+        // Загружаем сохраненное состояние
+        loadStateFromStorage();
+        
         ui.productsBody = document.getElementById('products-body');
         ui.productCount = document.getElementById('product-count');
         ui.filterCategoryHidden = document.getElementById('filter-category-modal');
@@ -2209,6 +2912,15 @@ const Admin = (() => {
         ui.productCategorySelect = document.getElementById('product-category');
         ui.productImagesInput = document.getElementById('product-images');
         ui.productImagesList = document.getElementById('product-images-list');
+        ui.productSizesContainer = document.getElementById('product-sizes-container');
+        ui.productSizesTrigger = document.getElementById('product-sizes-trigger');
+        ui.productSizesDropdown = document.getElementById('product-sizes-dropdown');
+        ui.productSizesHidden = document.getElementById('product-sizes-hidden');
+        ui.productTagsContainer = document.getElementById('product-tags-container');
+        ui.productTagsTrigger = document.getElementById('product-tags-trigger');
+        ui.productTagsDropdown = document.getElementById('product-tags-dropdown');
+        ui.productTagsHidden = document.getElementById('product-tags-hidden');
+        ui.productMaterialsContainer = document.getElementById('product-materials-container');
 
         const sortBy = document.getElementById('sort-by');
         if (sortBy && !sortBy.value) {
@@ -2242,8 +2954,15 @@ const Admin = (() => {
         });
 
         attachEvents();
-        fetchCategories();
-        fetchProducts();
+        fetchCategories().then(() => {
+            // Применяем сохраненные фильтры после загрузки категорий
+            applySavedFilters();
+            // Загружаем товары с применённными фильтрами
+            fetchProducts();
+        });
+        fetchSizes();
+        fetchTags();
+        fetchMaterials();
     }
 
     if (document.readyState === 'loading') {
@@ -2952,7 +3671,7 @@ const Catalog = (() => {
 
 ================================================================================
 ФАЙЛ: js/product.js
-РАЗМЕР: 20645 символов
+РАЗМЕР: 20195 символов
 РАСШИРЕНИЕ: .js
 ================================================================================
 
@@ -3191,16 +3910,12 @@ function openFavoritesModal() {
                     <div class="modal-items">
                         ${products.filter(product => product && product.id).map((product) => {
                             const isInCart = getCart().some(item => item.id === product.id);
-                            const source = favoritesMap.get(product.id)?.source === 'mens'
-                                ? '(мужское)'
-                                : favoritesMap.get(product.id)?.source === 'womens'
-                                ? '(женское)'
-                                : '(карточка товара)';
+                            const genderLabel = product.gender_name || 'Товар';
                             return `
                             <div class="modal-item" data-product-id="${product.id}">
                                 <img src="${product.image}" alt="${product.name}" class="modal-item-img">
                                 <div class="modal-item-info">
-                                    <h3>${product.name} <small>${source}</small></h3>
+                                    <h3>${product.name} <small>(${genderLabel})</small></h3>
                                     <div class="modal-item-actions">
                                         <button class="btn-add-to-cart ${isInCart ? 'in-cart' : ''}" data-action="toggle-cart" data-product-id="${product.id}">${isInCart ? 'Удалить из корзины' : 'В корзину'}</button>
                                         <button class="btn-remove" data-action="remove-favorite" data-product-id="${product.id}">Удалить</button>
@@ -3281,16 +3996,12 @@ function openCartModal() {
                 <div class="modal-body">
                     <div class="modal-items">
                         ${products.filter(product => product && product.id).map((product) => {
-                            const source = cartMap.get(product.id)?.source === 'mens'
-                                ? '(мужское)'
-                                : cartMap.get(product.id)?.source === 'womens'
-                                ? '(женское)'
-                                : '(товар)';
+                            const genderLabel = product.gender_name || 'Товар';
                             return `
                             <div class="modal-item" data-product-id="${product.id}">
                                 <img src="${product.image}" alt="${product.name}" class="modal-item-img">
                                 <div class="modal-item-info">
-                                    <h3>${product.name} <small>${source}</small></h3>
+                                    <h3>${product.name} <small>(${genderLabel})</small></h3>
                                     <div class="modal-item-actions">
                                         <button class="btn-remove" data-action="remove-from-cart" data-product-id="${product.id}">Удалить</button>
                                     </div>
@@ -3670,7 +4381,7 @@ document.querySelector('.womens').addEventListener('click', () => {
 
 ================================================================================
 ФАЙЛ: server.js
-РАЗМЕР: 8366 символов
+РАЗМЕР: 10076 символов
 РАСШИРЕНИЕ: .js
 ================================================================================
 
@@ -3689,6 +4400,18 @@ const {
     updateProduct,
     deleteProduct
 } = require('./db');
+
+const { Pool } = require('pg');
+const dbPool = new Pool({
+    host: process.env.PGHOST || 'localhost',
+    port: Number(process.env.PGPORT || 5433),
+    database: process.env.PGDATABASE || 'kpvs_db',
+    user: process.env.PGUSER || 'postgres',
+    password: process.env.PGPASSWORD || '12345678',
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000
+});
 
 const app = express();
 const PORT = Number(process.env.PORT || 3000);
@@ -3915,6 +4638,48 @@ app.get('/api/search', async (req, res) => {
     } catch (error) {
         console.error('Error searching products:', error);
         res.status(500).json({ error: 'Search failed' });
+    }
+});
+
+app.get('/api/sizes', async (req, res) => {
+    try {
+        const result = await dbPool.query(`
+            SELECT name FROM sizes 
+            ORDER BY 
+                CASE name 
+                    WHEN 'XS' THEN 1
+                    WHEN 'S' THEN 2
+                    WHEN 'M' THEN 3
+                    WHEN 'L' THEN 4
+                    WHEN 'XL' THEN 5
+                    WHEN 'XXL' THEN 6
+                    ELSE 7
+                END, name
+        `);
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching sizes:', error);
+        res.status(500).json({ error: 'Failed to load sizes' });
+    }
+});
+
+app.get('/api/tags', async (req, res) => {
+    try {
+        const result = await dbPool.query('SELECT code, name FROM tags ORDER BY sort_order');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching tags:', error);
+        res.status(500).json({ error: 'Failed to load tags' });
+    }
+});
+
+app.get('/api/materials', async (req, res) => {
+    try {
+        const result = await dbPool.query('SELECT name, name as code FROM materials ORDER BY name');
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Error fetching materials:', error);
+        res.status(500).json({ error: 'Failed to load materials' });
     }
 });
 
