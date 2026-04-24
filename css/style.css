@@ -185,7 +185,7 @@ body.modal-open .modal { pointer-events: auto; }
 .notification-content { flex: 1; display: flex; flex-direction: column; }
 .notification-close { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; padding: 0; line-height: 1; width: 1.5rem; height: 1.5rem; display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease; }
 .notification-close:hover { transform: scale(1.2); }
-.notification-handle { width: 8px; min-height: 50px; background: rgba(255, 255, 255, 0.5); border-radius: 4px; cursor: grab; flex-shrink: 0; transition: background 0.2s ease; border: 1px solid rgba(255, 255, 255, 0.3); }
+.notification-handle { width: 8px; min-height: 50px; background: rgba(255, 255, 255, 0.5); border-radius: 0.75rem; cursor: grab; flex-shrink: 0; transition: background 0.2s ease; border: 1px solid rgba(255, 255, 255, 0.3); }
 .notification-handle:hover { background: rgba(255, 255, 255, 0.7); border-color: rgba(255, 255, 255, 0.5); }
 .notification-handle:active { cursor: grabbing; }
 .notification.dragging { opacity: 0.9; box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.4); }
@@ -503,9 +503,9 @@ body.modal-open .modal { pointer-events: auto; }
 
 .admin-materials { display: flex; flex-direction: column; gap: 0.75rem; }
 .admin-material-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-secondary); }
-.admin-material-item select { flex: 1; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-primary); color: var(--text-primary); }
-.admin-material-item input { width: 80px; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.5rem; background: var(--bg-primary); color: var(--text-primary); text-align: center; }
-.admin-material-item button { padding: 0.5rem 0.75rem; border: none; border-radius: 0.5rem; background: rgba(197, 61, 61, 0.12); color: #8f1f1f; cursor: pointer; }
+.admin-material-item select { flex: 1; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-primary); color: var(--text-primary); }
+.admin-material-item input { width: 80px; padding: 0.5rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-primary); color: var(--text-primary); text-align: center; }
+.admin-material-item button { padding: 0.5rem 0.75rem; border: none; border-radius: 0.75rem; background: rgba(197, 61, 61, 0.12); color: #8f1f1f; cursor: pointer; }
 .admin-material-item button:hover { background: rgba(197, 61, 61, 0.20); }
 .admin-material-add { padding: 0.75rem; border: 2px dashed var(--border-color); border-radius: 0.75rem; background: transparent; color: var(--text-secondary); cursor: pointer; transition: all 0.2s ease; }
 .admin-material-add:hover { border-color: var(--accent-color); color: var(--accent-color); background: rgba(182, 197, 63, 0.05); }
@@ -651,14 +651,14 @@ body.modal-open .modal { pointer-events: auto; }
     margin-bottom: 0.5rem;
     padding: 0.5rem;
     background-color: var(--bg-secondary);
-    border-radius: 4px;
+    border-radius: 0.75rem;
 }
 
 .admin-material-select {
     flex: 1;
     padding: 0.5rem;
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: 0.75rem;
     background-color: var(--bg-primary);
     color: var(--text-primary);
     height: 40px;
@@ -669,7 +669,7 @@ body.modal-open .modal { pointer-events: auto; }
     width: 80px;
     padding: 0.5rem;
     border: 1px solid var(--border-color);
-    border-radius: 4px;
+    border-radius: 0.75rem;
     background-color: var(--bg-primary);
     color: var(--text-primary);
     height: 40px;
@@ -681,7 +681,7 @@ body.modal-open .modal { pointer-events: auto; }
     background-color: #dc3545;
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 0.75rem;
     cursor: pointer;
     font-size: 16px;
     line-height: 1;
@@ -697,7 +697,7 @@ body.modal-open .modal { pointer-events: auto; }
     background-color: var(--secondary-color);
     color: white;
     border: none;
-    border-radius: 4px;
+    border-radius: 0.75rem;
     cursor: pointer;
     font-size: 14px;
 }

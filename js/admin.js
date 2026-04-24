@@ -226,9 +226,12 @@ const Admin = (() => {
         availableSizes.forEach((size) => {
             const option = document.createElement('div');
             option.className = 'admin-multiselect-option';
+            const existingSize = productSizes.find(s => s.name === size.name);
+            const quantity = existingSize ? existingSize.quantity : '';
             option.innerHTML = `
-                <input type="checkbox" value="${size.name}" id="size-${size.name}" />
-                <label for="size-${size.name}">${escapeHtml(size.name)}</label>
+                <input type="checkbox" value="${size.name}" id="size-${size.name}" class="size-checkbox" />
+                <label for="size-${size.name}" style="flex: 1">${escapeHtml(size.name)}</label>
+                <input type="number" class="size-quantity" placeholder="Кол-во" min="0" value="${quantity}" style="width: 80px; margin-left: 10px;" />
             `;
             ui.productSizesDropdown.appendChild(option);
         });
@@ -252,9 +255,11 @@ const Admin = (() => {
             ui.productSizesDropdown.addEventListener('click', (e) => {
                 const option = e.target.closest('.admin-multiselect-option');
                 if (option) {
-                    const checkbox = option.querySelector('input[type="checkbox"]');
-                    if (checkbox) {
+                    const checkbox = option.querySelector('.size-checkbox');
+                    if (checkbox && e.target !== checkbox) {
                         checkbox.checked = !checkbox.checked;
+                        updateSelectedSizes();
+                    } else if (checkbox && e.target === checkbox) {
                         updateSelectedSizes();
                     }
                 }
@@ -340,20 +345,36 @@ const Admin = (() => {
     }
 
     function updateSelectedSizes() {
-        if (!ui.productSizesTrigger || !ui.productSizesHidden) return;
+        if (!ui.productSizesTrigger || !ui.productSizesHidden || !ui.productSizesDropdown) return;
         
-        const selected = Array.from(ui.productSizesDropdown.querySelectorAll('input[type="checkbox"]:checked'))
-            .map((input) => input.value)
-            .filter(Boolean);
+        const options = ui.productSizesDropdown.querySelectorAll('.admin-multiselect-option');
+        const selected = [];
         
-        ui.productSizesHidden.value = selected.join(',');
+        options.forEach((option) => {
+            const checkbox = option.querySelector('.size-checkbox');
+            const quantityInput = option.querySelector('.size-quantity');
+            
+            if (checkbox && checkbox.checked) {
+                const quantity = quantityInput ? parseInt(quantityInput.value) || 0 : 0;
+                if (quantity > 0) {
+                    selected.push({
+                        name: checkbox.value,
+                        quantity: quantity
+                    });
+                }
+            }
+        });
         
-        if (selected.length === 0) {
+        productSizes = selected;
+        const names = selected.map(s => s.name);
+        ui.productSizesHidden.value = names.join(',');
+        
+        if (names.length === 0) {
             ui.productSizesTrigger.textContent = 'Выберите размеры';
-        } else if (selected.length === 1) {
-            ui.productSizesTrigger.textContent = selected[0];
+        } else if (names.length === 1) {
+            ui.productSizesTrigger.textContent = names[0];
         } else {
-            ui.productSizesTrigger.textContent = `Выбрано размеров: ${selected.length}`;
+            ui.productSizesTrigger.textContent = `Выбрано размеров: ${names.length}`;
         }
     }
 
@@ -364,6 +385,7 @@ const Admin = (() => {
             .map((input) => input.value)
             .filter(Boolean);
         
+        productTags = selected.map(code => ({ code }));
         ui.productTagsHidden.value = selected.join(',');
         
         if (selected.length === 0) {
@@ -511,15 +533,21 @@ const Admin = (() => {
                 
                 setTimeout(() => {
                     if (productSizes.length && ui.productSizesDropdown) {
-                        const sizeSet = new Set(productSizes.map(s => s.name || s));
-                        ui.productSizesDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
-                            input.checked = sizeSet.has(input.value);
+                        const sizeMap = new Map(productSizes.map(s => [s.name || s, s.quantity || 0]));
+                        ui.productSizesDropdown.querySelectorAll('.size-checkbox').forEach((input) => {
+                            input.checked = sizeMap.has(input.value);
+                        });
+                        ui.productSizesDropdown.querySelectorAll('.size-quantity').forEach((input) => {
+                            const sizeName = input.closest('.admin-multiselect-option')?.querySelector('.size-checkbox')?.value;
+                            if (sizeName && sizeMap.has(sizeName)) {
+                                input.value = sizeMap.get(sizeName);
+                            }
                         });
                         updateSelectedSizes();
                     }
                     
                     if (productTags.length && ui.productTagsDropdown) {
-                        const tagSet = new Set(productTags.map(t => t.code));
+                        const tagSet = new Set(productTags.map(t => t.code || t));
                         ui.productTagsDropdown.querySelectorAll('input[type="checkbox"]').forEach((input) => {
                             input.checked = tagSet.has(input.value);
                         });
@@ -1105,6 +1133,9 @@ const Admin = (() => {
         event.preventDefault();
         const form = document.getElementById('product-form');
         if (!form) return;
+
+        updateMaterialsData();
+        updateSelectedSizes();
 
         const nameInput = document.getElementById('product-name');
         const slugInput = document.getElementById('product-slug');
