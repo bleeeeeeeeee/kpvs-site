@@ -167,13 +167,12 @@ const Catalog = (() => {
 
         if (isAll) {
             const popular = products.filter((item) => item.tags?.some((tag) => tag.code === 'popular'));
-            const others = products.filter((item) => !item.tags?.some((tag) => tag.code === 'popular'));
 
             return [
                 { key: 'popular', title: filterTitles.popular, items: popular },
-                { key: 'outerwear', title: filterTitles.outerwear, items: others.filter((item) => mapCategoryToSection(item.category) === 'outerwear') },
-                { key: 'underwear', title: filterTitles.underwear, items: others.filter((item) => mapCategoryToSection(item.category) === 'underwear') },
-                { key: 'accessories', title: filterTitles.accessories, items: others.filter((item) => mapCategoryToSection(item.category) === 'accessories') }
+                { key: 'outerwear', title: filterTitles.outerwear, items: products.filter((item) => mapCategoryToSection(item.category) === 'outerwear') },
+                { key: 'underwear', title: filterTitles.underwear, items: products.filter((item) => mapCategoryToSection(item.category) === 'underwear') },
+                { key: 'accessories', title: filterTitles.accessories, items: products.filter((item) => mapCategoryToSection(item.category) === 'accessories') }
             ];
         }
 
