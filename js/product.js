@@ -27,13 +27,17 @@ async function loadProduct() {
             .map((tag) => `<span class="product-tag" style="background:${tag.color || '#eee'}">${tag.icon || ''} ${tag.name}</span>`)
             .join('');
 
-        const materialsHtml = (product.materials || [])
-            .map((material) => `<li>${material.material} — ${material.percentage}%</li>`)
-            .join('');
+        const materialsHtml = (product.materials && product.materials.length > 0)
+            ? product.materials
+                .map((material) => `<li>${material.material} — ${material.percentage}%</li>`)
+                .join('')
+            : '';
 
-        const sizesHtml = (product.sizes || [])
-            .map((size) => `<li>${size.size}${size.quantity != null ? ` — ${size.quantity} шт.` : ''}</li>`)
-            .join('');
+        const sizesHtml = (product.sizes && product.sizes.length > 0)
+            ? product.sizes
+                .map((size) => `<li>${size.size}${size.quantity != null ? ` — ${size.quantity} шт.` : ''}</li>`)
+                .join('')
+            : '';
 
         const images = Array.isArray(product.images) && product.images.length ? product.images : [{ path: product.image, is_main: true }];
         const mainImage = images.find((img) => img.is_main) || images[0];
@@ -75,11 +79,11 @@ async function loadProduct() {
                         <div class="product-spec-group">
                             <div>
                                 <p class="product-spec-heading">Состав</p>
-                                <ul class="product-material-list">${materialsHtml || '<li>Информация о материалах будет добавлена позже.</li>'}</ul>
+                                <ul class="product-material-list">${materialsHtml || '<li>Информация о составе будет добавлена позже.</li>'}</ul>
                             </div>
                             <div>
                                 <p class="product-spec-heading">Размеры</p>
-                                <ul class="product-size-list">${sizesHtml || '<li>Размеры отсутствуют</li>'}</ul>
+                                <ul class="product-size-list">${sizesHtml || '<li>Информация о размерах будет добавлена позже.</li>'}</ul>
                             </div>
                         </div>
                         <p class="product-meta">Дата добавления: ${product.created_at ? new Date(product.created_at).toLocaleDateString('ru-RU') : 'не указана'}</p>
