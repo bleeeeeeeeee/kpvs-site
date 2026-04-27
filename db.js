@@ -64,7 +64,9 @@ function buildCategoryCondition(category, values, startIndex) {
         return { condition: null, nextIndex: startIndex };
     }
 
-    if (['outerwear', 'pants', 'accessories'].includes(code)) {
+    // Родительские категории
+    const parentCategories = ['outerwear', 'pants', 'accessories'];
+    if (parentCategories.includes(code)) {
         values.push(code, `${code}_%`);
         return {
             condition: `(p.category_code = $${startIndex} OR p.category_code LIKE $${startIndex + 1})`,
@@ -390,6 +392,7 @@ async function getCategories() {
             c.sort_order,
             c.description,
             c.is_active,
+            c.gender,
             COALESCE(cc.products_count, 0) AS products_count
         FROM categories c
         LEFT JOIN category_counts cc ON c.code = cc.category_code
@@ -400,7 +403,8 @@ async function getCategories() {
     const result = await pool.query(query);
     const categories = result.rows.map((row) => ({
         ...row,
-        products_count: Number(row.products_count)
+        products_count: Number(row.products_count),
+        gender: row.gender || 'both'
     }));
     return buildCategoryTree(categories);
 }
@@ -575,10 +579,16 @@ async function replaceProductMaterials(client, productId, materials) {
     if (!Array.isArray(materials) || !materials.length) return;
 
     for (let material of materials) {
-        if (!material.code || typeof material.percentage !== 'number') continue;
+        // Поддерживаем оба формата: code или material
+        const materialName = material.code || material.material;
+        if (!materialName || typeof material.percentage !== 'number') continue;
+        
+        const percentage = Number(material.percentage);
+        if (!materialName.trim() || percentage <= 0 || percentage > 100) continue;
+        
         await client.query(
             'INSERT INTO product_materials (product_id, material_name, percentage) VALUES ($1, $2, $3)',
-            [productId, material.code, material.percentage]
+            [productId, materialName.trim(), percentage]
         );
     }
 }

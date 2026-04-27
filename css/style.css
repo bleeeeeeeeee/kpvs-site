@@ -180,7 +180,7 @@ body.modal-open .modal { pointer-events: auto; }
 .cart-inquire-btn { background: var(--light-accent); color: var(--primary-color); padding: 0.75rem 2rem; font-size: 1rem; width: 100%; }
 .cart-inquire-btn:hover { background: var(--accent-color); color: white; }
 
-.notification { position: fixed; top: 2rem; right: 2rem; background: var(--primary-color); color: white; padding: 1rem 1.5rem; border-radius: 0.75rem; box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2); z-index: 2000; transform: translateX(400px); transition: transform 0.3s ease; display: flex; align-items: center; gap: 0.75rem; cursor: move; user-select: none; }
+.notification { position: fixed; top: 2rem; right: 2rem; background: var(--primary-color); color: white; padding: 1rem 1.5rem; border-radius: 0.75rem; box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2); z-index: 2000; transform: translateX(400px); transition: transform 0.3s ease; display: flex; align-items: center; gap: 0.75rem; cursor: move; user-select: none; pointer-events: auto; }
 .notification.show { transform: translateX(0); }
 .notification-content { flex: 1; display: flex; flex-direction: column; }
 .notification-close { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; padding: 0; line-height: 1; width: 1.5rem; height: 1.5rem; display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease; }
@@ -277,8 +277,35 @@ body.modal-open .modal { pointer-events: auto; }
 .form-row label { font-size: 0.95rem; font-weight: 600; color: var(--text-primary); }
 .form-row input,
 .form-row select,
-.form-row textarea { width: 100%; padding: 0.85rem 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-primary); color: var(--text-primary); font-size: 1rem; line-height: 1.5; }
-.form-row textarea { resize: vertical; min-height: 7rem; }
+.form-row textarea { 
+    width: 100%; 
+    padding: 0.85rem 1rem; 
+    border: 1px solid var(--border-color); 
+    border-radius: 0.75rem; 
+    background: var(--bg-primary); 
+    color: var(--text-primary); 
+    font-size: 1rem; 
+    line-height: 1.5; 
+    height: 48px;
+    box-sizing: border-box;
+}
+.form-row textarea { 
+    resize: vertical; 
+    min-height: 7rem; 
+    height: auto;
+}
+.form-row input[type="file"] {
+    padding: 0.75rem 1rem;
+    line-height: 1.5;
+    height: 48px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 1rem;
+    color: var(--text-primary);
+}
 .form-grid { display: grid; gap: 1.5rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .form-grid > div { display: flex; flex-direction: column; gap: 0.5rem; }
 .admin-form-actions { display: flex; justify-content: flex-end; gap: 1rem; flex-wrap: wrap; padding-top: 1rem; margin-top: 0.5rem; }
@@ -456,6 +483,13 @@ body.modal-open .modal { pointer-events: auto; }
 .admin-table th:hover .admin-col-resizer::after { background: rgba(36, 53, 42, 0.32); }
 
 .admin-multiselect { position: relative; }
+.admin-multiselect-option { padding: 0.75rem 1rem !important; gap: 0.75rem !important; }
+.admin-multiselect-option .size-quantity {
+    width: 100px !important;
+    padding: 0.5rem 0.75rem !important;
+    height: 40px !important;
+    box-sizing: border-box;
+}
 .admin-multiselect-trigger {
     width: 100%;
     display: flex;
@@ -469,6 +503,8 @@ body.modal-open .modal { pointer-events: auto; }
     color: var(--text-primary);
     font-size: 1rem;
     cursor: pointer;
+    height: 48px;
+    box-sizing: border-box;
 }
 .admin-multiselect-trigger:focus-visible { outline: none; box-shadow: 0 0 0 4px rgba(182, 197, 63, 0.18); }
 .admin-multiselect-caret { color: var(--text-secondary); font-size: 0.95rem; }
@@ -504,7 +540,7 @@ body.modal-open .modal { pointer-events: auto; }
 .admin-materials { display: flex; flex-direction: column; gap: 0.75rem; }
 .admin-material-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-secondary); }
 .admin-material-item select { flex: 1; padding: 0.85rem 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-primary); color: var(--text-primary); font-size: 1rem; }
-.admin-material-item input { width: 80px; padding: 0.85rem 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-primary); color: var(--text-primary); text-align: center; font-size: 1rem; }
+.admin-material-item input { flex: 0 0 120px; padding: 0.85rem 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-primary); color: var(--text-primary); text-align: center; font-size: 1rem; height: 40px; box-sizing: border-box; }
 .admin-material-item button { padding: 0.5rem 0.75rem; border: none; border-radius: 0.75rem; background: rgba(197, 61, 61, 0.12); color: #8f1f1f; cursor: pointer; }
 .admin-material-item button:hover { background: rgba(197, 61, 61, 0.20); }
 .admin-material-add { padding: 0.75rem; border: 2px dashed var(--border-color); border-radius: 0.75rem; background: transparent; color: var(--text-secondary); cursor: pointer; transition: all 0.2s ease; }
@@ -656,24 +692,27 @@ body.modal-open .modal { pointer-events: auto; }
 
 .admin-material-select {
     flex: 1;
-    padding: 0.5rem;
+    padding: 0.85rem 1rem;
     border: 1px solid var(--border-color);
     border-radius: 0.75rem;
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    height: 40px;
+    height: 48px;
     box-sizing: border-box;
+    font-size: 1rem;
 }
 
 .admin-material-percentage {
-    width: 80px;
-    padding: 0.5rem;
+    width: 140px;
+    padding: 0.85rem 1rem;
     border: 1px solid var(--border-color);
     border-radius: 0.75rem;
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    height: 40px;
+    height: 48px;
     box-sizing: border-box;
+    font-size: 1rem;
+    text-align: center;
 }
 
 .admin-material-remove {
@@ -691,17 +730,43 @@ body.modal-open .modal { pointer-events: auto; }
     background-color: #c82333;
 }
 
+.admin-materials-total {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    border-radius: 0.75rem;
+    margin-top: 0.25rem;
+}
+
 .admin-add-btn {
     margin-top: 0.5rem;
-    padding: 0.5rem 1rem;
-    background-color: var(--secondary-color);
+    padding: 0.85rem 1.4rem;
+    background: linear-gradient(135deg, #3B5223 0%, #6B8A3A 100%);
     color: white;
     border: none;
     border-radius: 0.75rem;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    box-shadow: 0 2px 8px rgba(59, 82, 35, 0.15);
+    transition: box-shadow 0.15s ease, background-position 0.35s ease, filter 0.15s ease;
+    background-size: 200% 200%;
+    background-position: 0% 50%;
+    min-width: 160px;
 }
 
 .admin-add-btn:hover {
-    background-color: var(--primary-color);
+    background-position: 100% 50%;
+    filter: brightness(1.02);
+    box-shadow: 0 4px 12px rgba(59, 82, 35, 0.22);
+}
+
+.admin-add-btn:active {
+    background-position: 100% 50%;
+    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
+    transform: translateY(0.5px);
 }

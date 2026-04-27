@@ -9,6 +9,7 @@ const Admin = (() => {
     let productSizes = [];
     let productTags = [];
     let productMaterials = [];
+    let currentProductGender = 'mens';
     const state = {
         gender: '',
         categories: [],
@@ -188,9 +189,25 @@ const Admin = (() => {
         if (!Array.isArray(list)) return result;
         list.forEach((item) => {
             if (item && item.code) {
-                result.push({ code: item.code, name: item.name || item.code });
+                result.push({ code: item.code, name: item.name || item.code, gender: item.gender || 'both' });
                 if (Array.isArray(item.children) && item.children.length) {
                     result.push(...flattenCategories(item.children));
+                }
+            }
+        });
+        return result;
+    }
+
+    // Возвращает только листовые категории (без родительских)
+    function flattenCategoriesForSelect(list, genderFilter = null) {
+        const result = [];
+        if (!Array.isArray(list)) return result;
+        list.forEach((item) => {
+            if (item && item.code) {
+                if (Array.isArray(item.children) && item.children.length) {
+                    result.push(...flattenCategoriesForSelect(item.children, genderFilter));
+                } else {
+                    result.push({ code: item.code, name: item.name || item.code });
                 }
             }
         });
@@ -200,6 +217,7 @@ const Admin = (() => {
     function populateCategoryFilters() {
         if (!ui.filterCategoryDropdown || !ui.filterCategoryHidden || !ui.productCategorySelect) return;
 
+        // Для фильтра показываем все категории (включая родительские)
         ui.filterCategoryDropdown.innerHTML = '';
         categories.forEach((category) => {
             const option = document.createElement('label');
@@ -211,7 +229,10 @@ const Admin = (() => {
             ui.filterCategoryDropdown.appendChild(option);
         });
 
-        ui.productCategorySelect.innerHTML = categories
+        // Для выбора товара показываем только листовые категории, соответствующие выбранному полу
+        // Передаем текущий gender для фильтрации
+        const leafCategories = flattenCategoriesForSelect(categories, currentProductGender);
+        ui.productCategorySelect.innerHTML = leafCategories
             .map((category) => `<option value="${category.code}">${escapeHtml(category.name)}</option>`)
             .join('');
 
@@ -224,54 +245,42 @@ const Admin = (() => {
 
         ui.productSizesDropdown.innerHTML = '';
         availableSizes.forEach((size) => {
-            const option = document.createElement('div');
-            option.className = 'admin-multiselect-option';
+            const isChecked = productSizes.some(s => s.name === size.name);
             const existingSize = productSizes.find(s => s.name === size.name);
             const quantity = existingSize ? existingSize.quantity : '';
+            
+            const option = document.createElement('label');
+            option.className = 'admin-multiselect-option';
+            option.style.display = 'flex';
+            option.style.alignItems = 'center';
+            option.style.gap = '8px';
             option.innerHTML = `
-                <input type="checkbox" value="${size.name}" id="size-${size.name}" class="size-checkbox" />
-                <label for="size-${size.name}" style="flex: 1">${escapeHtml(size.name)}</label>
-                <input type="number" class="size-quantity" placeholder="Кол-во" min="0" value="${quantity}" style="width: 80px; margin-left: 10px;" />
+                <input type="checkbox" value="${size.name}" class="size-checkbox" ${isChecked ? 'checked' : ''} />
+                <span style="flex:1">${escapeHtml(size.name)}</span>
+                <input type="number" class="size-quantity" placeholder="Кол-во" min="0" value="${quantity}" style="width:60px;" />
             `;
             ui.productSizesDropdown.appendChild(option);
         });
 
-        if (ui.productSizesTrigger) {
-            ui.productSizesTrigger.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!ui.productSizesContainer) return;
-                const isOpen = ui.productSizesContainer.classList.contains('open');
-                if (isOpen) closeSizesDropdown();
-                else openSizesDropdown();
-            });
-        }
+        // Обработчики событий
+        ui.productSizesDropdown.onchange = updateSelectedSizes;
+        ui.productSizesDropdown.oninput = updateSelectedSizes;
+    }
 
-        if (ui.productSizesDropdown) {
-            ui.productSizesDropdown.addEventListener('change', () => {
-                updateSelectedSizes();
-            });
-            
-            ui.productSizesDropdown.addEventListener('click', (e) => {
-                const option = e.target.closest('.admin-multiselect-option');
-                if (option) {
-                    const checkbox = option.querySelector('.size-checkbox');
-                    if (checkbox && e.target !== checkbox) {
-                        checkbox.checked = !checkbox.checked;
-                        updateSelectedSizes();
-                    } else if (checkbox && e.target === checkbox) {
-                        updateSelectedSizes();
-                    }
-                }
-            });
-        }
+    function openSizesDropdown() {
+        if (!ui.productSizesContainer) return;
+        closeAllDropdowns();
+        ui.productSizesContainer.classList.add('open');
+    }
 
-        document.addEventListener('click', (e) => {
-            if (!ui.productSizesContainer) return;
-            if (!ui.productSizesContainer.contains(e.target)) {
-                closeSizesDropdown();
-            }
-        });
+    function closeSizesDropdown() {
+        if (!ui.productSizesContainer) return;
+        ui.productSizesContainer.classList.remove('open');
+    }
+
+    function closeAllDropdowns() {
+        if (ui.productSizesContainer) ui.productSizesContainer.classList.remove('open');
+        if (ui.productTagsContainer) ui.productTagsContainer.classList.remove('open');
     }
 
     function populateTagsDropdown() {
@@ -279,49 +288,50 @@ const Admin = (() => {
 
         ui.productTagsDropdown.innerHTML = '';
         availableTags.forEach((tag) => {
-            const option = document.createElement('div');
+            const isChecked = productTags.some(t => t.code === tag.code);
+            const option = document.createElement('label');
             option.className = 'admin-multiselect-option';
+            option.style.display = 'flex';
+            option.style.alignItems = 'center';
+            option.style.gap = '8px';
             option.innerHTML = `
-                <input type="checkbox" value="${tag.code}" id="tag-${tag.code}" />
-                <label for="tag-${tag.code}">${escapeHtml(tag.name)}</label>
+                <input type="checkbox" value="${tag.code}" class="tag-checkbox" ${isChecked ? 'checked' : ''} />
+                <span>${escapeHtml(tag.name)}</span>
             `;
             ui.productTagsDropdown.appendChild(option);
         });
 
-        if (ui.productTagsTrigger) {
-            ui.productTagsTrigger.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                if (!ui.productTagsContainer) return;
-                const isOpen = ui.productTagsContainer.classList.contains('open');
-                if (isOpen) closeTagsDropdown();
-                else openTagsDropdown();
-            });
-        }
+        // Обработчики событий
+        ui.productTagsDropdown.onchange = updateSelectedTags;
+    }
 
-        if (ui.productTagsDropdown) {
-            ui.productTagsDropdown.addEventListener('change', () => {
-                updateSelectedTags();
-            });
-            
-            ui.productTagsDropdown.addEventListener('click', (e) => {
-                const option = e.target.closest('.admin-multiselect-option');
-                if (option) {
-                    const checkbox = option.querySelector('input[type="checkbox"]');
-                    if (checkbox) {
-                        checkbox.checked = !checkbox.checked;
-                        updateSelectedTags();
-                    }
-                }
-            });
-        }
+    function openTagsDropdown() {
+        if (!ui.productTagsContainer) return;
+        closeAllDropdowns();
+        ui.productTagsContainer.classList.add('open');
+    }
 
-        document.addEventListener('click', (e) => {
-            if (!ui.productTagsContainer) return;
-            if (!ui.productTagsContainer.contains(e.target)) {
-                closeTagsDropdown();
-            }
-        });
+    function closeTagsDropdown() {
+        if (!ui.productTagsContainer) return;
+        ui.productTagsContainer.classList.remove('open');
+    }
+
+    function toggleSizesDropdown() {
+        if (!ui.productSizesContainer) return;
+        if (ui.productSizesContainer.classList.contains('open')) {
+            closeSizesDropdown();
+        } else {
+            openSizesDropdown();
+        }
+    }
+
+    function toggleTagsDropdown() {
+        if (!ui.productTagsContainer) return;
+        if (ui.productTagsContainer.classList.contains('open')) {
+            closeTagsDropdown();
+        } else {
+            openTagsDropdown();
+        }
     }
 
     function openSizesDropdown() {
@@ -401,20 +411,43 @@ const Admin = (() => {
     function populateMaterialsList() {
         if (!ui.productMaterialsContainer || !availableMaterials.length) return;
 
+        const totalPercentage = productMaterials.reduce((sum, m) => sum + (m.percentage || 0), 0);
+        const remainingPercentage = 100 - totalPercentage;
+
         ui.productMaterialsContainer.innerHTML = '';
         productMaterials.forEach((material, index) => {
             const materialDiv = document.createElement('div');
             materialDiv.className = 'admin-material-item';
+            
+            // Получаем список уже выбранных материалов (кроме текущего)
+            const selectedMaterialCodes = productMaterials
+                .map(m => m.code)
+                .filter((code, idx) => code && idx !== index);
+            
+            // Фильтруем доступные материалы - исключаем уже выбранные
+            const availableOptions = availableMaterials.map((m) => {
+                const isUsed = selectedMaterialCodes.includes(m.code);
+                const isSelected = m.code === material.code;
+                return `<option value="${m.code}" ${isSelected ? 'selected' : (isUsed ? 'disabled' : '')}>${escapeHtml(m.name)}${isUsed && !isSelected ? ' (уже выбран)' : ''}</option>`;
+            }).join('');
+            
             materialDiv.innerHTML = `
                 <select class="admin-material-select">
                     <option value="">Выберите материал</option>
-                    ${availableMaterials.map((m) => `<option value="${m.code}" ${m.code === material.code ? 'selected' : ''}>${escapeHtml(m.name)}</option>`).join('')}
+                    ${availableOptions}
                 </select>
-                <input type="number" class="admin-material-percentage" value="${material.percentage || 0}" min="0" max="100" step="1" placeholder="%" />
+                <input type="number" class="admin-material-percentage" value="${material.percentage || 0}" min="0" max="100" step="1" placeholder="%" style="width: 80px;" />
                 <button type="button" class="admin-material-remove" data-index="${index}">×</button>
             `;
             ui.productMaterialsContainer.appendChild(materialDiv);
         });
+
+        const totalDiv = document.createElement('div');
+        totalDiv.className = 'admin-materials-total';
+        const statusClass = totalPercentage === 100 ? 'color:#28a745' : (totalPercentage > 100 ? 'color:#dc3545;font-weight:bold' : 'color:#fd7e14');
+        const statusText = totalPercentage === 100 ? ' (100%)' : (totalPercentage > 100 ? ' (превышение!)' : '');
+        totalDiv.innerHTML = `<span style="font-weight:600">Состав: ${totalPercentage}%${statusText}</span>`;
+        ui.productMaterialsContainer.appendChild(totalDiv);
 
         ui.productMaterialsContainer.querySelectorAll('.admin-material-remove').forEach((btn) => {
             btn.addEventListener('click', (e) => {
@@ -431,6 +464,13 @@ const Admin = (() => {
     function addMaterial() {
         productMaterials.push({ code: '', percentage: 0 });
         populateMaterialsList();
+        
+        setTimeout(() => {
+            const selects = ui.productMaterialsContainer.querySelectorAll('.admin-material-select');
+            if (selects[selects.length - 1]) {
+                selects[selects.length - 1].focus();
+            }
+        }, 50);
     }
 
     function removeMaterial(index) {
@@ -442,14 +482,24 @@ const Admin = (() => {
 
     function updateMaterialsData() {
         const materialItems = ui.productMaterialsContainer.querySelectorAll('.admin-material-item');
-        productMaterials = Array.from(materialItems).map((item) => {
+        const newMaterials = [];
+        
+        materialItems.forEach((item) => {
             const select = item.querySelector('.admin-material-select');
             const percentage = item.querySelector('.admin-material-percentage');
-            return {
-                code: select ? select.value : '',
-                percentage: percentage ? parseInt(percentage.value) || 0 : 0
-            };
-        }).filter((m) => m.code && m.percentage > 0);
+            let pct = percentage ? parseInt(percentage.value) || 0 : 0;
+            pct = Math.max(0, Math.min(100, pct));
+            const code = select ? select.value : '';
+            
+            if (code && pct > 0) {
+                newMaterials.push({
+                    code: code,
+                    percentage: pct
+                });
+            }
+        });
+        
+        productMaterials = newMaterials;
     }
 
     function loadStateFromStorage() {
@@ -1029,9 +1079,18 @@ const Admin = (() => {
         setProductImages([]);
         if (ui.productImagesInput) ui.productImagesInput.value = '';
         
+        // Сбрасываем массивы перед открытием
         productSizes = [];
         productTags = [];
         productMaterials = [];
+        
+        currentProductGender = 'mens';
+        
+        // Сбрасываем UI триггеры
+        if (ui.productSizesTrigger) ui.productSizesTrigger.textContent = 'Выберите размеры';
+        if (ui.productSizesHidden) ui.productSizesHidden.value = '';
+        if (ui.productTagsTrigger) ui.productTagsTrigger.textContent = 'Выберите теги';
+        if (ui.productTagsHidden) ui.productTagsHidden.value = '';
         
         document.body.classList.add('modal-open');
         document.body.style.pointerEvents = 'none';
@@ -1058,7 +1117,10 @@ const Admin = (() => {
                     if (priceInput) priceInput.value = fullProduct.price != null ? fullProduct.price : '';
                     // Очищаем URL поле - оно будет заполняться только если пользователь хочет изменить основное изображение
                     if (imageInput) imageInput.value = '';
-                    if (genderSelect) genderSelect.value = fullProduct.gender || 'mens';
+                    if (genderSelect) {
+                        genderSelect.value = fullProduct.gender || 'mens';
+                        currentProductGender = fullProduct.gender || 'mens';
+                    }
                     if (categorySelect) categorySelect.value = fullProduct.category || (categories[0]?.code || '');
                     
                     // Загружаем изображения - они сохранены в массив images
@@ -1127,6 +1189,9 @@ const Admin = (() => {
                         }
                         
                         populateMaterialsList();
+                        
+                        populateSizesDropdown();
+                        populateTagsDropdown();
                     }, 100);
                 }
             } catch (error) {
@@ -1136,11 +1201,20 @@ const Admin = (() => {
         } else {
             const genderSelect = document.getElementById('product-gender');
             const categorySelect = document.getElementById('product-category');
+            const productGenderSelect = document.getElementById('product-gender');
             if (genderSelect) genderSelect.value = 'mens';
+            if (productGenderSelect) currentProductGender = 'mens';
             if (categorySelect && categories.length) {
                 categorySelect.value = categories[0].code;
             }
+            
+            // Загружаем сохраненные данные формы
             loadProductFormData();
+            
+            // Перезаполняем выпадающие списки с очищенным состоянием
+            populateSizesDropdown();
+            populateTagsDropdown();
+            populateMaterialsList();
         }
     }
 
@@ -1202,14 +1276,23 @@ const Admin = (() => {
             quantity: Number(s.quantity) || 0
         })) : [];
 
-        // Нормализуем материалы - убедимся что у всех есть процент > 0
+        // Нормализуем материалы - убедимся что у всех есть код и процент > 0
         const normalizedMaterials = Array.isArray(productMaterials) ? productMaterials.filter((m) => {
             const pct = Number(m.percentage) || 0;
-            return m.code && pct > 0;
+            return m.code && m.code.trim() && pct > 0;
         }).map((m) => ({
-            material: m.code || m.material || m,
+            code: m.code.trim(),
             percentage: Number(m.percentage) || 0
         })) : [];
+
+        // Валидация: если есть материалы, они должны составлять 100%
+        if (normalizedMaterials.length > 0) {
+            const totalPercentage = normalizedMaterials.reduce((sum, m) => sum + (m.percentage || 0), 0);
+            if (totalPercentage !== 100) {
+                notify(`Материалы должны в сумме составлять 100%. Сейчас: ${totalPercentage}%`, 'error');
+                return;
+            }
+        }
 
         // Нормализуем теги - только если выбраны
         const normalizedTags = Array.isArray(productTags) && productTags.length > 0 ? productTags.map((t) => ({
@@ -1289,6 +1372,14 @@ const Admin = (() => {
         };
         if (cancelBtn) cancelBtn.onclick = closeProductModal;
         
+        // Обработчики для кнопок размеров и тегов
+        if (ui.productSizesTrigger) {
+            ui.productSizesTrigger.onclick = toggleSizesDropdown;
+        }
+        if (ui.productTagsTrigger) {
+            ui.productTagsTrigger.onclick = toggleTagsDropdown;
+        }
+        
         const addMaterialBtn = document.getElementById('add-material-btn');
         if (addMaterialBtn) addMaterialBtn.onclick = addMaterial;
         
@@ -1309,6 +1400,14 @@ const Admin = (() => {
                 input.addEventListener('input', saveProductFormData);
                 input.addEventListener('change', saveProductFormData);
             });
+            
+            const productGenderSelect = document.getElementById('product-gender');
+            if (productGenderSelect) {
+                productGenderSelect.addEventListener('change', () => {
+                    currentProductGender = productGenderSelect.value;
+                    populateCategoryFilters();
+                });
+            }
         }
         
         const productNameInput = document.getElementById('product-name');

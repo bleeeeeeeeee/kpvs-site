@@ -29,7 +29,11 @@ async function loadProduct() {
 
         const materialsHtml = (product.materials && product.materials.length > 0)
             ? product.materials
-                .map((material) => `<li>${material.material} — ${material.percentage}%</li>`)
+                .map((material) => {
+                    const materialCode = material.material || material.code || '';
+                    const materialName = (product.availableMaterials && product.availableMaterials.find(m => m.code === materialCode)?.name) || material.material || material.name || materialCode;
+                    return `<li>${materialName} — ${material.percentage}%</li>`;
+                })
                 .join('')
             : '';
 
@@ -75,7 +79,7 @@ async function loadProduct() {
                     </div>
 
                     <div class="product-specs">
-                        <p class="product-price">${product.price == null ? 'По запросу' : `${product.price.toFixed(2)} руб.`}</p>
+                        <p class="product-price">${!product.price ? 'По запросу' : `${product.price.toFixed(2)} руб.`}</p>
                         <div class="product-spec-group">
                             <div>
                                 <p class="product-spec-heading">Состав</p>
