@@ -260,7 +260,7 @@ const Catalog = (() => {
         if (!categoryCode) return null;
         if (categoryCode.startsWith('outerwear')) return 'outerwear';
         if (categoryCode.startsWith('pants')) return 'underwear';
-        if (categoryCode.startsWith('accessories')) return 'accessories';
+        if (categoryCode.startsWith('accessories') || categoryCode.startsWith('acc_')) return 'accessories';
         if (categoryCode === 'outerwear') return 'outerwear';
         if (categoryCode === 'pants') return 'underwear';
         if (categoryCode === 'accessories') return 'accessories';

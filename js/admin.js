@@ -1079,14 +1079,12 @@ const Admin = (() => {
         setProductImages([]);
         if (ui.productImagesInput) ui.productImagesInput.value = '';
         
-        // Сбрасываем массивы перед открытием
         productSizes = [];
         productTags = [];
         productMaterials = [];
         
         currentProductGender = 'mens';
         
-        // Сбрасываем UI триггеры
         if (ui.productSizesTrigger) ui.productSizesTrigger.textContent = 'Выберите размеры';
         if (ui.productSizesHidden) ui.productSizesHidden.value = '';
         if (ui.productTagsTrigger) ui.productTagsTrigger.textContent = 'Выберите теги';
@@ -1115,7 +1113,6 @@ const Admin = (() => {
                     if (slugInput) slugInput.value = fullProduct.slug || '';
                     if (descInput) descInput.value = fullProduct.description || '';
                     if (priceInput) priceInput.value = fullProduct.price != null ? fullProduct.price : '';
-                    // Очищаем URL поле - оно будет заполняться только если пользователь хочет изменить основное изображение
                     if (imageInput) imageInput.value = '';
                     if (genderSelect) {
                         genderSelect.value = fullProduct.gender || 'mens';
@@ -1123,7 +1120,6 @@ const Admin = (() => {
                     }
                     if (categorySelect) categorySelect.value = fullProduct.category || (categories[0]?.code || '');
                     
-                    // Загружаем изображения - они сохранены в массив images
                     if (Array.isArray(fullProduct.images) && fullProduct.images.length) {
                         setProductImages(fullProduct.images.map((img) => ({
                             path: img.path || img.image_path || img.image || '',
