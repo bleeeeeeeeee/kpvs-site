@@ -300,7 +300,7 @@ const Admin = (() => {
                     '<button type="button" class="btn-edit" data-action="edit" data-id="' + p.id + '">Редактировать</button>' +
                     '<button type="button" class="btn-delete" data-action="delete" data-id="' + p.id + '">Удалить</button>' +
                 '</div></td>' +
-                '<td><button type="button" class="btn-open-page" data-action="open-page" data-id="' + p.id + '" data-gender="' + escapeHtml(p.gender || '') + '" data-slug="' + escapeHtml(p.slug || '') + '">Открыть</button></td>' +
+                '<td><button type="button" class="btn-open-page" data-action="open-page" data-id="' + p.id + '" data-gender="' + escapeHtml(p.gender || '') + '" data-slug="' + escapeHtml(p.slug || '') + '">Открыть товар</button></td>' +
                 '</tr>';
         }).join('');
         ui.productCount.textContent = String(products.length);
