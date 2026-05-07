@@ -537,14 +537,72 @@ body.modal-open .modal { pointer-events: auto; }
 .admin-multiselect-option input { width: 1rem; height: 1rem; accent-color: var(--secondary-color); }
 .admin-multiselect-option span { font-size: 0.95rem; }
 
-.admin-materials { display: flex; flex-direction: column; gap: 0.75rem; }
-.admin-material-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-secondary); }
-.admin-material-item select { flex: 1; padding: 0.85rem 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-primary); color: var(--text-primary); font-size: 1rem; }
-.admin-material-item input { flex: 0 0 120px; padding: 0.85rem 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: var(--bg-primary); color: var(--text-primary); text-align: center; font-size: 1rem; height: 40px; box-sizing: border-box; }
-.admin-material-item button { padding: 0.5rem 0.75rem; border: none; border-radius: 0.75rem; background: rgba(197, 61, 61, 0.12); color: #8f1f1f; cursor: pointer; }
-.admin-material-item button:hover { background: rgba(197, 61, 61, 0.20); }
-.admin-material-add { padding: 0.75rem; border: 2px dashed var(--border-color); border-radius: 0.75rem; background: transparent; color: var(--text-secondary); cursor: pointer; transition: all 0.2s ease; }
-.admin-material-add:hover { border-color: var(--accent-color); color: var(--accent-color); background: rgba(182, 197, 63, 0.05); }
+/* ── Материалы ──────────────────────────────────────────── */
+.admin-materials-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+.admin-material-row {
+    display: grid;
+    grid-template-columns: 1fr 120px 36px;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+}
+.admin-material-row .mat-name {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.6rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    height: 40px;
+    box-sizing: border-box;
+}
+.admin-material-row .mat-percent-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.admin-material-row .mat-percent {
+    width: 100%;
+    padding: 0.6rem 1.6rem 0.6rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.6rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    height: 40px;
+    box-sizing: border-box;
+    text-align: right;
+    -moz-appearance: textfield;
+}
+.admin-material-row .mat-percent::-webkit-inner-spin-button,
+.admin-material-row .mat-percent::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.admin-material-row .mat-percent-sign {
+    position: absolute;
+    right: 0.5rem;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    pointer-events: none;
+}
+.admin-materials-total {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    border-radius: 0.6rem;
+    margin-top: 0.25rem;
+    border: 1px solid var(--border-color);
+}
+.admin-materials-total.materials-total-ok { color: #3B5223; border-color: rgba(59,82,35,0.25); background: rgba(59,82,35,0.06); }
+.admin-materials-total.materials-total-err { color: #8f1f1f; border-color: rgba(197,61,61,0.25); background: rgba(197,61,61,0.06); }
+.materials-warn { font-size: 0.85rem; font-weight: 700; }
 
 .footer { background: linear-gradient(135deg, #24352a 0%, #3B5223 100%); color: white; padding: 3rem 0 1.5rem 0; margin-top: 4rem; width: 100%; }
 .footer .container { margin: 0 auto; padding: 0 4rem; max-width: 1400px; }
@@ -675,98 +733,821 @@ body.modal-open .modal { pointer-events: auto; }
     .secTitle { font-size: 1.1rem; }
 }
 
-/* Стили для материалов в админке */
-.admin-materials {
-    margin-top: 0.5rem;
-}
-
-.admin-material-item {
+/* ── form-row-header (label + кнопка в одну строку) ─────── */
+.form-row-header {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.75rem;
     margin-bottom: 0.5rem;
-    padding: 0.5rem;
-    background-color: var(--bg-secondary);
-    border-radius: 0.75rem;
 }
-
-.admin-material-select {
-    flex: 1;
-    padding: 0.85rem 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 0.75rem;
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    height: 48px;
-    box-sizing: border-box;
-    font-size: 1rem;
-}
-
-.admin-material-percentage {
-    width: 140px;
-    padding: 0.85rem 1rem;
-    border: 1px solid var(--border-color);
-    border-radius: 0.75rem;
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    height: 48px;
-    box-sizing: border-box;
-    font-size: 1rem;
-    text-align: center;
-}
-
-.admin-material-remove {
-    padding: 0.5rem;
-    background-color: #dc3545;
-    color: white;
-    border: none;
-    border-radius: 0.75rem;
-    cursor: pointer;
-    font-size: 16px;
-    line-height: 1;
-}
-
-.admin-material-remove:hover {
-    background-color: #c82333;
-}
-
-.admin-materials-total {
-    display: flex;
-    gap: 0.5rem;
-    padding: 0.5rem 0.75rem;
+.form-row-header label {
     font-size: 0.95rem;
     font-weight: 600;
     color: var(--text-primary);
-    background: var(--bg-secondary);
-    border-radius: 0.75rem;
-    margin-top: 0.25rem;
+    margin: 0;
 }
 
-.admin-add-btn {
-    margin-top: 0.5rem;
-    padding: 0.85rem 1.4rem;
+/* ── Маленькая кнопка «+ Добавить» ──────────────────────── */
+.admin-add-btn-sm {
+    padding: 0.4rem 0.85rem;
     background: linear-gradient(135deg, #3B5223 0%, #6B8A3A 100%);
     color: white;
     border: none;
-    border-radius: 0.75rem;
+    border-radius: 0.6rem;
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 700;
-    box-shadow: 0 2px 8px rgba(59, 82, 35, 0.15);
-    transition: box-shadow 0.15s ease, background-position 0.35s ease, filter 0.15s ease;
-    background-size: 200% 200%;
-    background-position: 0% 50%;
-    min-width: 160px;
+    white-space: nowrap;
+    transition: filter 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 1px 4px rgba(59,82,35,0.15);
+}
+.admin-add-btn-sm:hover { filter: brightness(1.06); box-shadow: 0 3px 8px rgba(59,82,35,0.22); }
+.admin-add-btn-sm:active { transform: translateY(0.5px); }
+
+/* ── Кнопка удаления строки (×) ─────────────────────────── */
+.btn-row-remove, .btn-mat-remove {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid rgba(197,61,61,0.25);
+    border-radius: 0.5rem;
+    background: rgba(197,61,61,0.10);
+    color: #8f1f1f;
+    cursor: pointer;
+    font-size: 1.1rem;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.15s ease;
+}
+.btn-row-remove:hover, .btn-mat-remove:hover { background: rgba(197,61,61,0.20); }
+
+/* ── Кастомный чекбокс ───────────────────────────────────── */
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.6rem;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+.checkbox-label input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+.checkbox-custom {
+    width: 18px;
+    height: 18px;
+    border: 2px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--bg-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: border-color 0.15s, background 0.15s;
+}
+.checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
+    background: var(--secondary-color);
+    border-color: var(--secondary-color);
+}
+.checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
+    content: '';
+    display: block;
+    width: 5px;
+    height: 9px;
+    border: 2px solid white;
+    border-top: none;
+    border-left: none;
+    transform: rotate(45deg) translate(-1px, -1px);
+}
+.checkbox-label:hover .checkbox-custom { border-color: var(--accent-color); }
+
+/* ── Варианты ────────────────────────────────────────────── */
+.admin-variants-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.25rem; }
+.admin-variant-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 140px auto auto;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+}
+.admin-variant-row select,
+.admin-variant-row input[type="text"] {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.6rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    height: 38px;
+    box-sizing: border-box;
+}
+.variant-active-label { white-space: nowrap; }
+
+/* ── Характеристики ──────────────────────────────────────── */
+.admin-attributes-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.25rem; }
+.admin-attr-row {
+    display: grid;
+    grid-template-columns: 1fr 2fr 36px;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+}
+.admin-attr-row input {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.6rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    height: 38px;
+    box-sizing: border-box;
 }
 
-.admin-add-btn:hover {
-    background-position: 100% 50%;
-    filter: brightness(1.02);
-    box-shadow: 0 4px 12px rgba(59, 82, 35, 0.22);
+/* ── Пустые подсказки ────────────────────────────────────── */
+.admin-empty-hint {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    padding: 0.5rem 0;
+    margin: 0;
 }
 
-.admin-add-btn:active {
-    background-position: 100% 50%;
-    box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
-    transform: translateY(0.5px);
+/* ── Поле ошибки ─────────────────────────────────────────── */
+.field-error {
+    display: none;
+    color: #c0392b;
+    font-size: 0.85rem;
+    margin-top: 0.2rem;
+}
+
+/* ── Загрузка изображений ────────────────────────────────── */
+.admin-images-upload-area {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-top: 0.25rem;
+}
+.admin-file-label {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border: 2px dashed var(--border-color);
+    border-radius: 0.75rem;
+    background: var(--bg-secondary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    transition: border-color 0.2s, background 0.2s;
+}
+.admin-file-label:hover { border-color: var(--accent-color); background: rgba(182,197,63,0.05); color: var(--text-primary); }
+.admin-file-label input[type="file"] { display: none; }
+.admin-file-icon { font-size: 1.2rem; }
+.admin-image-url-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+.admin-image-url-row input {
+    flex: 1;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.6rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    height: 38px;
+    box-sizing: border-box;
+}
+
+/* ── Список изображений ──────────────────────────────────── */
+.admin-image-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; }
+.admin-image-item {
+    display: grid;
+    grid-template-columns: 60px 1fr auto;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    background: var(--bg-secondary);
+}
+.admin-image-thumb {
+    width: 60px;
+    height: 60px;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: rgba(0,0,0,0.04);
+    border: 1px solid rgba(36,53,42,0.08);
+    flex-shrink: 0;
+}
+.admin-image-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.admin-image-meta { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+.admin-image-meta strong { font-size: 0.85rem; color: var(--text-primary); }
+.admin-image-meta code { font-size: 0.78rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.admin-image-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+}
+.radio-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.radio-label input[type="radio"] {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--secondary-color);
+    margin: 0;
+    cursor: pointer;
+}
+.btn-img-remove {
+    padding: 0.35rem 0.65rem;
+    border: 1px solid rgba(197,61,61,0.25);
+    border-radius: 0.5rem;
+    background: rgba(197,61,61,0.10);
+    color: #8f1f1f;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+.btn-img-remove:hover { background: rgba(197,61,61,0.20); }
+
+@media (max-width: 600px) {
+    .admin-variant-row { grid-template-columns: 1fr 1fr; }
+    .admin-attr-row { grid-template-columns: 1fr 1fr 36px; }
+    .admin-material-row { grid-template-columns: 1fr 90px 32px; }
+    .admin-image-item { grid-template-columns: 50px 1fr; }
+    .admin-image-actions { grid-column: 1 / -1; }
+}
+
+/* ── Большая кнопка «+ Добавить» (legacy) ───────────────── */
+.admin-add-btn {
+    padding: 0.6rem 1.1rem;
+    background: linear-gradient(135deg, #3B5223 0%, #6B8A3A 100%);
+    color: white;
+    border: none;
+    border-radius: 0.6rem;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 700;
+    transition: filter 0.15s ease;
+}
+.admin-add-btn:hover { filter: brightness(1.06); }
+
+/* ── Login page ─────────────────────────────────────────── */
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #24352A 0%, #3B5223 60%, #727B26 100%);
+}
+
+.login-container {
+    width: 100%;
+    max-width: 420px;
+    padding: 1rem;
+}
+
+.login-card {
+    background: #fff;
+    border-radius: 1.25rem;
+    padding: 2.5rem 2rem;
+    box-shadow: 0 8px 40px rgba(36, 53, 42, 0.25);
+    text-align: center;
+}
+
+.login-logo img {
+    height: 4rem;
+    margin-bottom: 1rem;
+}
+
+.login-title {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin: 0 0 0.25rem;
+}
+
+.login-subtitle {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0 0 1.5rem;
+}
+
+.login-form {
+    text-align: left;
+}
+
+.login-form .form-row {
+    margin-bottom: 1rem;
+}
+
+.login-form label {
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 0.35rem;
+}
+
+.login-form input[type="text"],
+.login-form input[type="password"] {
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+    border: 1.5px solid var(--border-color);
+    border-radius: 0.6rem;
+    font-size: 1rem;
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+    box-sizing: border-box;
+    transition: border-color 0.2s;
+}
+
+.login-form input:focus {
+    outline: none;
+    border-color: var(--accent-color);
+}
+
+.login-error {
+    display: none;
+    background: #fff0f0;
+    color: #c0392b;
+    border: 1px solid #f5c6cb;
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    font-size: 0.85rem;
+    margin-bottom: 0.75rem;
+}
+
+.login-btn {
+    width: 100%;
+    margin-top: 0.5rem;
+    font-size: 1rem;
+}
+
+/* ── Admin header actions ───────────────────────────────── */
+.admin-header-actions {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* ── Form divider ───────────────────────────────────────── */
+.form-divider {
+    border: none;
+    border-top: 1px solid var(--border-color);
+    margin: 1.25rem 0;
+}
+
+.admin-variants-list,
+.admin-attributes-list {
+    margin-top: 0.5rem;
+}
+
+.admin-variant-item,
+.admin-attribute-item {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.admin-variant-remove,
+.admin-attr-remove {
+    background: #dc3545;
+    color: #fff;
+    border: none;
+    border-radius: 0.4rem;
+    padding: 0.25rem 0.6rem;
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.admin-variant-remove:hover,
+.admin-attr-remove:hover {
+    background: #b02a37;
+}
+
+.required {
+    color: #dc3545;
+    margin-left: 2px;
+}
+
+/* ── Фильтры и активные теги ────────────────────────────── */
+.active-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 0.5rem;
+    align-items: center;
+}
+
+.active-filter-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: var(--primary-color);
+    color: white;
+    padding: 0.4rem 0.75rem;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.active-filter-remove {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 0;
+    width: 1.2rem;
+    height: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+}
+
+.active-filter-remove:hover {
+    opacity: 1;
+}
+
+.active-filter-clear-all {
+    padding: 0.4rem 0.75rem;
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: background 0.2s;
+}
+
+.active-filter-clear-all:hover {
+    background: #b02a37;
+}
+
+/* ── Каталог управления контролями ──────────────────────── */
+.catalog-controls {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 0.75rem;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+.catalog-search-row,
+.catalog-sort-row {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 0.75rem;
+}
+
+.catalog-search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 200px;
+}
+
+.catalog-search-input {
+    width: 100%;
+    padding: 0.75rem 2.5rem 0.75rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    font-size: 0.95rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    transition: border-color 0.2s;
+}
+
+.catalog-search-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(182, 197, 63, 0.1);
+}
+
+.catalog-search-clear {
+    position: absolute;
+    right: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 1.25rem;
+    cursor: pointer;
+    padding: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s;
+}
+
+.catalog-search-clear:hover {
+    color: var(--primary-color);
+}
+
+.catalog-sort-label {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.catalog-sort-select {
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: 0.5rem;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.2s;
+}
+
+.catalog-sort-select:hover,
+.catalog-sort-select:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(182, 197, 63, 0.1);
+    outline: none;
+}
+
+.catalog-count {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.catalog-loading,
+.catalog-empty {
+    padding: 3rem 1rem;
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 1.05rem;
+}
+
+/* ── Модал стили для фильтров ──────────────────────────── */
+.filter-modal-content {
+    max-width: 500px;
+}
+
+.filter-group {
+    margin-bottom: 1.5rem;
+}
+
+.filter-group-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+    color: var(--primary-color);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.filter-options {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.filter-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    padding: 0.4rem 0.5rem;
+    border-radius: 0.3rem;
+    transition: background 0.2s;
+}
+
+.filter-option:hover {
+    background: rgba(182, 197, 63, 0.05);
+}
+
+.filter-option input[type="checkbox"] {
+    cursor: pointer;
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
+.filter-option span {
+    font-size: 0.95rem;
+}
+
+.filter-empty-hint {
+    color: #999;
+    font-size: 0.9rem;
+    font-style: italic;
+}
+
+/* ── Модальные окна товаров ───────────────────────────── */
+.modal-items {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.modal-item {
+    display: flex;
+    gap: 1rem;
+    padding: 0.75rem;
+    background: var(--bg-secondary);
+    border-radius: 0.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.modal-item-img {
+    width: 80px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 0.3rem;
+}
+
+.modal-item-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.modal-item-info h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 0.95rem;
+}
+
+.modal-item-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+.btn-add-to-cart,
+.btn-remove {
+    padding: 0.5rem 0.75rem;
+    border: none;
+    border-radius: 0.4rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-add-to-cart {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-add-to-cart:hover {
+    background: var(--secondary-color);
+}
+
+.btn-add-to-cart.in-cart {
+    background: var(--accent-color);
+}
+
+.btn-remove {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-remove:hover {
+    background: #b02a37;
+}
+
+.empty-message {
+    text-align: center;
+    color: var(--text-secondary);
+    padding: 2rem 1rem;
+    font-size: 1rem;
+}
+
+/* ── Открыть страницу товара попап ──────────────────── */
+.open-page-popup-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 10000;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.open-page-popup-overlay.show {
+    display: flex;
+    opacity: 1;
+}
+
+.open-page-popup {
+    background: var(--bg-primary);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+    max-width: 400px;
+    width: 90%;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.open-page-popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.open-page-popup-header span {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.open-page-popup-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: color 0.2s;
+}
+
+.open-page-popup-close:hover {
+    color: var(--primary-color);
+}
+
+.open-page-popup-hint {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    margin-bottom: 1rem;
+}
+
+.open-page-popup-btns {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.open-page-btn {
+    display: block;
+    padding: 0.75rem 1rem;
+    text-align: center;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+    cursor: pointer;
+    background: var(--primary-color);
+    color: white;
+}
+
+.open-page-btn:hover {
+    background: var(--secondary-color);
+}
+
+.open-page-btn-secondary {
+    background: var(--border-color);
+    color: var(--text-primary);
+}
+
+.open-page-btn-secondary:hover {
+    background: var(--accent-color);
+}
 }

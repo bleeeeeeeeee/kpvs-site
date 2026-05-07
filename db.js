@@ -1,8 +1,9 @@
 const { Pool } = require('pg');
+const bcrypt = require('bcryptjs');
 
 const pool = new Pool({
     host: process.env.PGHOST || 'localhost',
-    port: Number(process.env.PGPORT || 5433),
+    port: Number(process.env.PGPORT || 5432),
     database: process.env.PGDATABASE || 'kpvs_db',
     user: process.env.PGUSER || 'postgres',
     password: process.env.PGPASSWORD || '12345678',
@@ -11,34 +12,24 @@ const pool = new Pool({
     connectionTimeoutMillis: 2000
 });
 
-function slugifyProductName(text) {
+function slugify(text) {
     if (!text || typeof text !== 'string') return '';
-    
-    // Транслитерация русских символов
-    const translitMap = {
-        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'e',
-        'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
-        'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
-        'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'shch',
-        'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
-        'А': 'a', 'Б': 'b', 'В': 'v', 'Г': 'g', 'Д': 'd', 'Е': 'e', 'Ё': 'e',
-        'Ж': 'zh', 'З': 'z', 'И': 'i', 'Й': 'y', 'К': 'k', 'Л': 'l', 'М': 'm',
-        'Н': 'n', 'О': 'o', 'П': 'p', 'Р': 'r', 'С': 's', 'Т': 't', 'У': 'u',
-        'Ф': 'f', 'Х': 'kh', 'Ц': 'ts', 'Ч': 'ch', 'Ш': 'sh', 'Щ': 'shch',
-        'Ъ': '', 'Ы': 'y', 'Ь': '', 'Э': 'e', 'Ю': 'yu', 'Я': 'ya'
+    const map = {
+        'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e',
+        'ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m',
+        'н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u',
+        'ф':'f','х':'kh','ц':'ts','ч':'ch','ш':'sh','щ':'shch',
+        'ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya',
+        'А':'a','Б':'b','В':'v','Г':'g','Д':'d','Е':'e','Ё':'e',
+        'Ж':'zh','З':'z','И':'i','Й':'y','К':'k','Л':'l','М':'m',
+        'Н':'n','О':'o','П':'p','Р':'r','С':'s','Т':'t','У':'u',
+        'Ф':'f','Х':'kh','Ц':'ts','Ч':'ch','Ш':'sh','Щ':'shch',
+        'Ъ':'','Ы':'y','Ь':'','Э':'e','Ю':'yu','Я':'ya'
     };
-
-    return text
-        .toString()
-        .trim()
-        .toLowerCase()
-        .split('')
-        .map(char => translitMap[char] || char)
-        .join('')
-        .replace(/\s+/g, '-')
-        .replace(/[^a-z0-9\-]+/g, '')
-        .replace(/\-\-+/g, '-')
-        .replace(/^-+|-+$/g, '');
+    return text.toString().trim().toLowerCase()
+        .split('').map(c => map[c] !== undefined ? map[c] : c).join('')
+        .replace(/\s+/g, '-').replace(/[^a-z0-9-]+/g, '')
+        .replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '');
 }
 
 async function connectDB() {
@@ -51,200 +42,164 @@ async function connectDB() {
     }
 }
 
-function normalizeCategoryCode(category) {
-    if (!category || typeof category !== 'string') return null;
-    const normalized = category.trim().toLowerCase();
-    if (normalized === 'underwear') return 'pants';
-    return normalized;
-}
+async function getCategories() {
+    const result = await pool.query(`
+        WITH RECURSIVE cat_tree AS (
+            SELECT id, name, slug, parent_id, sort_order, 0 AS depth
+            FROM categories
+            WHERE parent_id IS NULL
+            UNION ALL
+            SELECT c.id, c.name, c.slug, c.parent_id, c.sort_order, ct.depth + 1
+            FROM categories c
+            JOIN cat_tree ct ON c.parent_id = ct.id
+        )
+        SELECT
+            ct.id,
+            ct.name,
+            ct.slug,
+            ct.parent_id,
+            ct.sort_order,
+            ct.depth,
+            COALESCE(pc.products_count, 0) AS products_count
+        FROM cat_tree ct
+        LEFT JOIN (
+            SELECT category_id, COUNT(*) AS products_count
+            FROM products
+            WHERE is_active = TRUE
+            GROUP BY category_id
+        ) pc ON pc.category_id = ct.id
+        ORDER BY ct.depth, ct.sort_order, ct.id
+    `);
 
-function buildCategoryCondition(category, values, startIndex) {
-    const code = normalizeCategoryCode(category);
-    if (!code) {
-        return { condition: null, nextIndex: startIndex };
-    }
-
-    // Родительские категории
-    const parentCategories = ['outerwear', 'pants', 'accessories'];
-    if (parentCategories.includes(code)) {
-        values.push(code, `${code}_%`);
-        return {
-            condition: `(p.category_code = $${startIndex} OR p.category_code LIKE $${startIndex + 1})`,
-            nextIndex: startIndex + 2
-        };
-    }
-
-    values.push(code);
-    return {
-        condition: `p.category_code = $${startIndex}`,
-        nextIndex: startIndex + 1
-    };
-}
-
-function normalizeCategoryInput(category) {
-    if (!category) return [];
-    if (Array.isArray(category)) {
-        return category
-            .flatMap((value) => typeof value === 'string' ? value.split(',') : [])
-            .map((value) => value.trim())
-            .filter(Boolean);
-    }
-    if (typeof category === 'string') {
-        return category
-            .split(',')
-            .map((value) => value.trim())
-            .filter(Boolean);
-    }
-    return [];
-}
-
-function buildCategoriesCondition(categories, values, startIndex) {
-    const items = normalizeCategoryInput(categories);
-    if (!items.length) {
-        return { condition: null, nextIndex: startIndex };
-    }
-
-    const conditions = [];
-    let nextIndex = startIndex;
-
-    items.forEach((category) => {
-        const built = buildCategoryCondition(category, values, nextIndex);
-        if (built.condition) {
-            conditions.push(built.condition);
-            nextIndex = built.nextIndex;
+    const map = new Map();
+    result.rows.forEach(row => {
+        map.set(row.id, { ...row, products_count: Number(row.products_count), children: [] });
+    });
+    result.rows.forEach(row => {
+        if (row.parent_id && map.has(row.parent_id)) {
+            map.get(row.parent_id).children.push(map.get(row.id));
         }
     });
+    return Array.from(map.values()).filter(r => !r.parent_id);
+}
 
-    if (!conditions.length) {
-        return { condition: null, nextIndex: startIndex };
-    }
+async function getBrands() {
+    const result = await pool.query('SELECT id, name, slug, logo_url FROM brands ORDER BY name');
+    return result.rows;
+}
 
-    return {
-        condition: conditions.length === 1 ? conditions[0] : `(${conditions.join(' OR ')})`,
-        nextIndex
-    };
+async function getSizes() {
+    const result = await pool.query(`
+        SELECT s.id, s.value, st.name AS size_type
+        FROM sizes s
+        JOIN size_types st ON s.size_type_id = st.id
+        ORDER BY st.name, s.value
+    `);
+    return result.rows;
+}
+
+async function getColors() {
+    const result = await pool.query('SELECT id, name, hex_code FROM colors ORDER BY name');
+    return result.rows;
+}
+
+async function getTags() {
+    const result = await pool.query('SELECT id, name, slug FROM tags ORDER BY name');
+    return result.rows;
 }
 
 async function getProducts(gender, options = {}) {
     const {
-        gender: genderFilter,
         category,
-        material,
-        size,
         tag,
         q,
-        price_min,
-        price_max,
+        brand,
+        season,
+        color,
+        size,
         sort_by,
         sort_direction,
         limit = 20,
         offset = 0
     } = options || {};
 
-    const conditions = ['1=1'];
+    const conditions = ['p.is_active = TRUE'];
     const values = [];
-    let nextIndex = 1;
-    let internalTag = tag;
+    let idx = 1;
 
     if (gender) {
         values.push(gender);
-        conditions.push(`p.gender_code = $${nextIndex}`);
-        nextIndex += 1;
-    }
-    if (!gender && genderFilter) {
-        values.push(genderFilter);
-        conditions.push(`p.gender_code = $${nextIndex}`);
-        nextIndex += 1;
+        conditions.push(`p.gender = $${idx++}`);
     }
 
     if (category) {
-        if (category === 'popular') {
-            internalTag = 'popular';
-        } else {
-            const categoryCondition = buildCategoriesCondition(category, values, nextIndex);
-            if (categoryCondition.condition) {
-                conditions.push(categoryCondition.condition);
-                nextIndex = categoryCondition.nextIndex;
-            }
+        const cats = Array.isArray(category) ? category : String(category).split(',').map(s => s.trim()).filter(Boolean);
+        if (cats.length) {
+            const placeholders = cats.map(() => `$${idx++}`).join(', ');
+            cats.forEach(c => values.push(c));
+            conditions.push(`(
+                p.category_id IN (
+                    SELECT id FROM categories WHERE slug IN (${placeholders})
+                )
+                OR p.category_id IN (
+                    SELECT c.id FROM categories c
+                    JOIN categories parent ON c.parent_id = parent.id
+                    WHERE parent.slug IN (${placeholders.replace(/\$(\d+)/g, (_, n) => `$${Number(n) - cats.length}`)})
+                )
+            )`);
         }
     }
 
-    if (internalTag) {
-        values.push(internalTag);
-        conditions.push(`EXISTS(
-            SELECT 1 FROM product_tags pt
-            WHERE pt.product_id = p.id AND pt.tag_code = $${nextIndex}
-        )`);
-        nextIndex += 1;
+    if (brand) {
+        values.push(brand);
+        conditions.push(`p.brand_id = (SELECT id FROM brands WHERE slug = $${idx++})`);
     }
 
-    if (material) {
-        values.push(material);
+    if (season) {
+        values.push(season);
+        conditions.push(`p.season = $${idx++}`);
+    }
+
+    if (tag) {
+        values.push(tag);
         conditions.push(`EXISTS(
-            SELECT 1 FROM product_materials pm
-            WHERE pm.product_id = p.id
-              AND pm.material_name = $${nextIndex}
-              AND pm.percentage > 0
+            SELECT 1 FROM product_tags pt
+            JOIN tags t ON pt.tag_id = t.id
+            WHERE pt.product_id = p.id AND t.slug = $${idx++}
         )`);
-        nextIndex += 1;
+    }
+
+    if (color) {
+        values.push(color);
+        conditions.push(`EXISTS(
+            SELECT 1 FROM product_variants pv
+            JOIN colors col ON pv.color_id = col.id
+            WHERE pv.product_id = p.id AND pv.is_active = TRUE AND col.name = $${idx++}
+        )`);
     }
 
     if (size) {
         values.push(size);
         conditions.push(`EXISTS(
-            SELECT 1 FROM product_sizes ps
-            WHERE ps.product_id = p.id
-              AND ps.size_name = $${nextIndex}
-              AND ps.quantity > 0
+            SELECT 1 FROM product_variants pv
+            JOIN sizes s ON pv.size_id = s.id
+            WHERE pv.product_id = p.id AND pv.is_active = TRUE AND s.value = $${idx++}
         )`);
-        nextIndex += 1;
     }
 
     if (q) {
-        const queryText = String(q).trim();
-        values.push(`%${queryText}%`);
-        const textIndex = nextIndex;
-        nextIndex += 1;
-        
-        // Проверяем, является ли запрос числом для поиска по ID
-        const isNumeric = /^\d+$/.test(queryText);
-        if (isNumeric) {
-            values.push(Number(queryText));
-            const idIndex = nextIndex;
-            nextIndex += 1;
-            conditions.push(`(
-                CAST(p.id AS TEXT) ILIKE $${textIndex}
-                OR p.name ILIKE $${textIndex}
-                OR p.description ILIKE $${textIndex}
-                OR p.id = $${idIndex}
-            )`);
-        } else {
-            conditions.push(`(
-                p.name ILIKE $${textIndex}
-                OR p.description ILIKE $${textIndex}
-            )`);
-        }
+        const qText = String(q).trim();
+        values.push(qText);
+        conditions.push(`(
+            to_tsvector('russian', coalesce(p.name,'') || ' ' || coalesce(p.description,'') || ' ' || coalesce(p.materials,''))
+            @@ plainto_tsquery('russian', $${idx++})
+            OR p.name ILIKE '%' || $${idx - 1} || '%'
+            OR p.art ILIKE '%' || $${idx - 1} || '%'
+        )`);
     }
 
-    if (price_min != null && price_min !== '') {
-        values.push(Number(price_min));
-        conditions.push(`p.price >= $${nextIndex}`);
-        nextIndex += 1;
-    }
-
-    if (price_max != null && price_max !== '') {
-        values.push(Number(price_max));
-        conditions.push(`p.price <= $${nextIndex}`);
-        nextIndex += 1;
-    }
-
-    const allowedSortFields = {
-        id: 'p.id',
-        created_at: 'p.created_at',
-        name: 'p.name',
-        price: 'p.price'
-    };
-    const sortField = allowedSortFields[sort_by] || 'p.id';
+    const allowedSort = { id: 'p.id', name: 'p.name', created_at: 'p.created_at' };
+    const sortField = allowedSort[sort_by] || 'p.id';
     const direction = sort_direction === 'asc' ? 'ASC' : 'DESC';
 
     values.push(Number(limit) || 20, Number(offset) || 0);
@@ -252,50 +207,59 @@ async function getProducts(gender, options = {}) {
     const query = `
         SELECT
             p.id,
+            p.art,
             p.name,
             p.slug,
             p.description,
-            p.price,
-            p.image_path AS image,
-            p.gender_code AS gender,
-            p.category_code AS category,
+            p.materials,
+            p.season,
+            p.gender,
+            p.is_active,
             p.created_at,
-            (SELECT json_agg(json_build_object(
-                'code', t.code,
-                'name', t.name,
-                'icon', t.icon,
-                'color', t.color
-            ) ORDER BY t.sort_order)
-             FROM product_tags pt
-             JOIN tags t ON pt.tag_code = t.code
-             WHERE pt.product_id = p.id) AS tags,
-            (SELECT json_agg(ps.size_name ORDER BY ps.size_name)
-             FROM product_sizes ps
-             WHERE ps.product_id = p.id AND ps.quantity > 0) AS available_sizes,
-            (SELECT json_agg(json_build_object(
-                'material', pm.material_name,
-                'percentage', pm.percentage
-            ) ORDER BY pm.percentage DESC)
-             FROM product_materials pm
-             WHERE pm.product_id = p.id) AS materials
+            p.updated_at,
+            c.name AS category_name,
+            c.slug AS category_slug,
+            b.name AS brand_name,
+            b.slug AS brand_slug,
+            (
+                SELECT url FROM product_images
+                WHERE product_id = p.id AND is_primary = TRUE
+                ORDER BY sort_order LIMIT 1
+            ) AS image,
+            (
+                SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'slug', t.slug) ORDER BY t.name)
+                FROM product_tags pt JOIN tags t ON pt.tag_id = t.id
+                WHERE pt.product_id = p.id
+            ) AS tags,
+            (
+                SELECT json_agg(json_build_object(
+                    'id', pv.id, 'art', pv.art,
+                    'size_id', pv.size_id, 'size_value', s.value, 'size_type', st.name,
+                    'color_id', pv.color_id, 'color_name', col.name, 'color_hex', col.hex_code,
+                    'is_active', pv.is_active
+                ) ORDER BY s.value, col.name)
+                FROM product_variants pv
+                LEFT JOIN sizes s ON pv.size_id = s.id
+                LEFT JOIN size_types st ON s.size_type_id = st.id
+                LEFT JOIN colors col ON pv.color_id = col.id
+                WHERE pv.product_id = p.id AND pv.is_active = TRUE
+            ) AS variants
         FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN brands b ON p.brand_id = b.id
         WHERE ${conditions.join(' AND ')}
         ORDER BY ${sortField} ${direction}
-        LIMIT $${nextIndex} OFFSET $${nextIndex + 1};
+        LIMIT $${idx} OFFSET $${idx + 1}
     `;
 
     const result = await pool.query(query, values);
-    return result.rows.map((row) => ({
-        ...row,
-        price: row.price === null ? null : Number(row.price)
-    }));
+    return result.rows;
 }
 
 async function getProduct(identifier) {
-    const isNumeric = /^\s*\d+\s*$/.test(identifier);
+    const isNumeric = /^\s*\d+\s*$/.test(String(identifier));
     const values = [identifier];
     let whereClause = 'p.slug = $1';
-
     if (isNumeric) {
         values.push(Number(identifier));
         whereClause = 'p.slug = $1 OR p.id = $2';
@@ -304,259 +268,190 @@ async function getProduct(identifier) {
     const query = `
         SELECT
             p.id,
+            p.art,
             p.name,
             p.slug,
             p.description,
-            p.price,
-            p.image_path AS image,
-            p.gender_code AS gender,
-            p.category_code AS category,
-            g.name AS gender_name,
-            c.name AS category_name,
-            c.parent_code AS category_parent,
+            p.materials,
+            p.season,
+            p.gender,
+            p.is_active,
             p.created_at,
-            (SELECT json_agg(json_build_object(
-                'material', pm.material_name,
-                'percentage', pm.percentage
-            ) ORDER BY pm.percentage DESC)
-             FROM product_materials pm
-             WHERE pm.product_id = p.id) AS materials,
-            (SELECT json_agg(json_build_object(
-                'size', ps.size_name,
-                'quantity', ps.quantity
-            ) ORDER BY ps.size_name)
-             FROM product_sizes ps
-             WHERE ps.product_id = p.id AND ps.quantity > 0) AS sizes,
-            (SELECT json_agg(json_build_object(
-                'code', t.code,
-                'name', t.name,
-                'icon', t.icon,
-                'color', t.color
-            ) ORDER BY t.sort_order)
-             FROM product_tags pt
-             JOIN tags t ON pt.tag_code = t.code
-             WHERE pt.product_id = p.id) AS tags,
-            (SELECT json_agg(json_build_object(
-                'path', pi.image_path,
-                'is_main', pi.is_main,
-                'sort_order', pi.sort_order
-            ) ORDER BY pi.sort_order)
-             FROM product_images pi
-             WHERE pi.product_id = p.id) AS images
+            p.updated_at,
+            p.category_id,
+            p.brand_id,
+            c.name AS category_name,
+            c.slug AS category_slug,
+            c.parent_id AS category_parent_id,
+            b.name AS brand_name,
+            b.slug AS brand_slug,
+            b.logo_url AS brand_logo,
+            (
+                SELECT json_agg(json_build_object(
+                    'id', pi.id, 'url', pi.url, 'alt_text', pi.alt_text,
+                    'is_primary', pi.is_primary, 'sort_order', pi.sort_order
+                ) ORDER BY pi.sort_order, pi.id)
+                FROM product_images pi WHERE pi.product_id = p.id
+            ) AS images,
+            (
+                SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'slug', t.slug) ORDER BY t.name)
+                FROM product_tags pt JOIN tags t ON pt.tag_id = t.id
+                WHERE pt.product_id = p.id
+            ) AS tags,
+            (
+                SELECT json_agg(json_build_object(
+                    'id', pv.id, 'art', pv.art,
+                    'size_id', pv.size_id, 'size_value', s.value, 'size_type', st.name,
+                    'color_id', pv.color_id, 'color_name', col.name, 'color_hex', col.hex_code,
+                    'is_active', pv.is_active
+                ) ORDER BY s.value, col.name)
+                FROM product_variants pv
+                LEFT JOIN sizes s ON pv.size_id = s.id
+                LEFT JOIN size_types st ON s.size_type_id = st.id
+                LEFT JOIN colors col ON pv.color_id = col.id
+                WHERE pv.product_id = p.id
+            ) AS variants,
+            (
+                SELECT json_agg(json_build_object(
+                    'id', pa.id, 'name', pa.name, 'value', pa.value, 'sort_order', pa.sort_order
+                ) ORDER BY pa.sort_order, pa.name)
+                FROM product_attributes pa WHERE pa.product_id = p.id
+            ) AS attributes
         FROM products p
-        JOIN genders g ON p.gender_code = g.code
-        JOIN categories c ON p.category_code = c.code
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN brands b ON p.brand_id = b.id
         WHERE ${whereClause}
-        LIMIT 1;
+        LIMIT 1
     `;
 
     const result = await pool.query(query, values);
-    if (!result.rows.length) {
-        return null;
-    }
-
-    const row = result.rows[0];
-    return {
-        ...row,
-        price: row.price === null ? null : Number(row.price)
-    };
+    return result.rows[0] || null;
 }
 
-function buildCategoryTree(rows) {
-    const map = new Map();
-    rows.forEach((row) => {
-        map.set(row.code, { ...row, children: [] });
-    });
-
-    rows.forEach((row) => {
-        if (row.parent_code && map.has(row.parent_code)) {
-            map.get(row.parent_code).children.push(map.get(row.code));
-        }
-    });
-
-    return Array.from(map.values()).filter((row) => !row.parent_code);
-}
-
-async function getCategories() {
-    const query = `
-        WITH category_counts AS (
-            SELECT category_code, COUNT(*) AS products_count
-            FROM products
-            GROUP BY category_code
-        )
-        SELECT
-            c.code,
-            c.name,
-            c.parent_code,
-            c.level,
-            c.sort_order,
-            c.description,
-            c.is_active,
-            c.gender,
-            COALESCE(cc.products_count, 0) AS products_count
-        FROM categories c
-        LEFT JOIN category_counts cc ON c.code = cc.category_code
-        WHERE c.is_active = true
-        ORDER BY c.level, c.sort_order;
-    `;
-
-    const result = await pool.query(query);
-    const categories = result.rows.map((row) => ({
-        ...row,
-        products_count: Number(row.products_count),
-        gender: row.gender || 'both'
-    }));
-    return buildCategoryTree(categories);
-}
-
-async function createProduct(product) {
+async function createProduct(data) {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const slug = (product.slug && product.slug.trim()) || slugifyProductName(product.name);
-        const query = `
-            INSERT INTO products (id, name, slug, description, price, image_path, gender_code, category_code, created_at)
-            VALUES (DEFAULT, $1, $2, $3, $4, $5, $6, $7, NOW())
-            RETURNING id, name, slug, description, price, image_path AS image, gender_code AS gender, category_code AS category, created_at;
-        `;
-        const values = [
-            product.name,
+
+        const slug = (data.slug && data.slug.trim()) || slugify(data.name);
+        const art = data.art && data.art.trim() ? data.art.trim().toUpperCase() : null;
+
+        const res = await client.query(`
+            INSERT INTO products (art, name, slug, description, category_id, brand_id, materials, season, gender, is_active)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+            RETURNING id
+        `, [
+            art,
+            data.name,
             slug,
-            product.description || null,
-            product.price,
-            product.image_path || null,
-            product.gender_code,
-            product.category_code
-        ];
+            data.description || null,
+            data.category_id || null,
+            data.brand_id || null,
+            data.materials || null,
+            data.season || null,
+            data.gender || null,
+            data.is_active !== false
+        ]);
 
-        const result = await client.query(query, values);
-        const created = result.rows[0];
+        const productId = res.rows[0].id;
 
-        if (created?.id) {
-            if (Array.isArray(product.images) && product.images.length) {
-                await replaceProductImages(client, created.id, product.images);
-            }
-            if (Array.isArray(product.sizes) && product.sizes.length) {
-                await replaceProductSizes(client, created.id, product.sizes);
-            }
-            if (Array.isArray(product.tags) && product.tags.length) {
-                await replaceProductTags(client, created.id, product.tags);
-            }
-            if (Array.isArray(product.materials) && product.materials.length) {
-                await replaceProductMaterials(client, created.id, product.materials);
-            }
+        if (Array.isArray(data.images) && data.images.length) {
+            await replaceProductImages(client, productId, data.images);
+        }
+        if (Array.isArray(data.tags) && data.tags.length) {
+            await replaceProductTags(client, productId, data.tags);
+        }
+        if (Array.isArray(data.variants) && data.variants.length) {
+            await replaceProductVariants(client, productId, data.variants);
+        }
+        if (Array.isArray(data.attributes) && data.attributes.length) {
+            await replaceProductAttributes(client, productId, data.attributes);
         }
 
         await client.query('COMMIT');
-        return created;
-    } catch (error) {
+        return getProduct(String(productId));
+    } catch (err) {
         try { await client.query('ROLLBACK'); } catch {}
-        throw error;
+        throw err;
     } finally {
         client.release();
     }
 }
 
-async function updateProduct(id, product) {
+async function updateProduct(id, data) {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const slug = (product.slug && product.slug.trim()) || slugifyProductName(product.name);
-        const query = `
+
+        const slug = (data.slug && data.slug.trim()) || slugify(data.name);
+        const art = data.art && data.art.trim() ? data.art.trim().toUpperCase() : null;
+
+        const res = await client.query(`
             UPDATE products
-            SET name = $1,
-                slug = $2,
-                description = $3,
-                price = $4,
-                image_path = $5,
-                gender_code = $6,
-                category_code = $7
-            WHERE id = $8
-            RETURNING id, name, slug, description, price, image_path AS image, gender_code AS gender, category_code AS category, created_at;
-        `;
-        const values = [
-            product.name,
+            SET art = $1, name = $2, slug = $3, description = $4,
+                category_id = $5, brand_id = $6, materials = $7,
+                season = $8, gender = $9, is_active = $10
+            WHERE id = $11
+            RETURNING id
+        `, [
+            art,
+            data.name,
             slug,
-            product.description || null,
-            product.price,
-            product.image_path || null,
-            product.gender_code,
-            product.category_code,
+            data.description || null,
+            data.category_id || null,
+            data.brand_id || null,
+            data.materials || null,
+            data.season || null,
+            data.gender || null,
+            data.is_active !== false,
             id
-        ];
+        ]);
 
-        const result = await client.query(query, values);
-        const updated = result.rows[0] || null;
+        if (!res.rows.length) {
+            await client.query('ROLLBACK');
+            return null;
+        }
 
-        if (updated) {
-            if (Array.isArray(product.images)) {
-                await replaceProductImages(client, id, product.images);
-            }
-            if (Array.isArray(product.sizes)) {
-                await replaceProductSizes(client, id, product.sizes);
-            }
-            if (Array.isArray(product.tags)) {
-                await replaceProductTags(client, id, product.tags);
-            }
-            if (Array.isArray(product.materials)) {
-                await replaceProductMaterials(client, id, product.materials);
-            }
+        if (Array.isArray(data.images)) {
+            await replaceProductImages(client, id, data.images);
+        }
+        if (Array.isArray(data.tags)) {
+            await replaceProductTags(client, id, data.tags);
+        }
+        if (Array.isArray(data.variants)) {
+            await replaceProductVariants(client, id, data.variants);
+        }
+        if (Array.isArray(data.attributes)) {
+            await replaceProductAttributes(client, id, data.attributes);
         }
 
         await client.query('COMMIT');
-        return updated;
-    } catch (error) {
+        return getProduct(String(id));
+    } catch (err) {
         try { await client.query('ROLLBACK'); } catch {}
-        throw error;
+        throw err;
     } finally {
         client.release();
     }
 }
 
-function normalizeImagesInput(images) {
-    if (!Array.isArray(images)) return [];
-    return images
-        .map((img, idx) => {
-            if (!img || typeof img !== 'object') return null;
-            const path = typeof img.path === 'string' ? img.path.trim() : '';
-            if (!path) return null;
-            return {
-                path,
-                is_main: Boolean(img.is_main),
-                sort_order: Number.isFinite(Number(img.sort_order)) ? Number(img.sort_order) : idx
-            };
-        })
-        .filter(Boolean);
+async function deleteProduct(id) {
+    const result = await pool.query('DELETE FROM products WHERE id = $1', [id]);
+    return result.rowCount > 0;
 }
 
 async function replaceProductImages(client, productId, images) {
-    const normalized = normalizeImagesInput(images);
     await client.query('DELETE FROM product_images WHERE product_id = $1', [productId]);
-    if (!normalized.length) return;
+    if (!Array.isArray(images) || !images.length) return;
 
-    const hasMain = normalized.some((i) => i.is_main);
-    const rows = hasMain
-        ? normalized
-        : normalized.map((item, idx) => ({ ...item, is_main: idx === 0 }));
-
-    for (let i = 0; i < rows.length; i += 1) {
-        const item = rows[i];
+    const hasPrimary = images.some(i => i.is_primary);
+    for (let i = 0; i < images.length; i++) {
+        const img = images[i];
+        const url = typeof img.url === 'string' ? img.url.trim() : '';
+        if (!url) continue;
         await client.query(
-            'INSERT INTO product_images (product_id, image_path, is_main, sort_order) VALUES ($1, $2, $3, $4)',
-            [productId, item.path, item.is_main, item.sort_order]
-        );
-    }
-}
-
-async function replaceProductSizes(client, productId, sizes) {
-    await client.query('DELETE FROM product_sizes WHERE product_id = $1', [productId]);
-    if (!Array.isArray(sizes) || !sizes.length) return;
-
-    for (let size of sizes) {
-        if (!size.name || typeof size.quantity !== 'number') continue;
-        await client.query(
-            'INSERT INTO product_sizes (product_id, size_name, quantity) VALUES ($1, $2, $3)',
-            [productId, size.name, size.quantity]
+            'INSERT INTO product_images (product_id, url, alt_text, is_primary, sort_order) VALUES ($1,$2,$3,$4,$5)',
+            [productId, url, img.alt_text || null, hasPrimary ? Boolean(img.is_primary) : i === 0, img.sort_order ?? i]
         );
     }
 }
@@ -565,37 +460,46 @@ async function replaceProductTags(client, productId, tags) {
     await client.query('DELETE FROM product_tags WHERE product_id = $1', [productId]);
     if (!Array.isArray(tags) || !tags.length) return;
 
-    for (let tag of tags) {
-        if (!tag.code) continue;
+    for (const tag of tags) {
+        const tagId = tag.id || null;
+        if (!tagId) continue;
         await client.query(
-            'INSERT INTO product_tags (product_id, tag_code) VALUES ($1, $2)',
-            [productId, tag.code]
+            'INSERT INTO product_tags (product_id, tag_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
+            [productId, tagId]
         );
     }
 }
 
-async function replaceProductMaterials(client, productId, materials) {
-    await client.query('DELETE FROM product_materials WHERE product_id = $1', [productId]);
-    if (!Array.isArray(materials) || !materials.length) return;
+async function replaceProductVariants(client, productId, variants) {
+    await client.query('DELETE FROM product_variants WHERE product_id = $1', [productId]);
+    if (!Array.isArray(variants) || !variants.length) return;
 
-    for (let material of materials) {
-        // Поддерживаем оба формата: code или material
-        const materialName = material.code || material.material;
-        if (!materialName || typeof material.percentage !== 'number') continue;
-        
-        const percentage = Number(material.percentage);
-        if (!materialName.trim() || percentage <= 0 || percentage > 100) continue;
-        
+    for (const v of variants) {
+        const art = v.art && v.art.trim() ? v.art.trim().toUpperCase() : null;
+        if (!art) continue;
         await client.query(
-            'INSERT INTO product_materials (product_id, material_name, percentage) VALUES ($1, $2, $3)',
-            [productId, materialName.trim(), percentage]
+            `INSERT INTO product_variants (product_id, size_id, color_id, art, is_active)
+             VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT (art) DO UPDATE SET size_id=$2, color_id=$3, is_active=$5`,
+            [productId, v.size_id || null, v.color_id || null, art, v.is_active !== false]
         );
     }
 }
 
-async function deleteProduct(id) {
-    const result = await pool.query('DELETE FROM products WHERE id = $1', [id]);
-    return result.rowCount > 0;
+async function replaceProductAttributes(client, productId, attributes) {
+    await client.query('DELETE FROM product_attributes WHERE product_id = $1', [productId]);
+    if (!Array.isArray(attributes) || !attributes.length) return;
+
+    for (let i = 0; i < attributes.length; i++) {
+        const attr = attributes[i];
+        if (!attr.name || !attr.value) continue;
+        await client.query(
+            `INSERT INTO product_attributes (product_id, name, value, sort_order)
+             VALUES ($1,$2,$3,$4)
+             ON CONFLICT (product_id, name) DO UPDATE SET value=$3, sort_order=$4`,
+            [productId, attr.name.trim(), attr.value.trim(), attr.sort_order ?? i]
+        );
+    }
 }
 
 async function searchProducts(q, gender, category, limit = 20, offset = 0) {
@@ -607,14 +511,73 @@ async function searchProducts(q, gender, category, limit = 20, offset = 0) {
     });
 }
 
+async function findUserByUsername(username) {
+    const result = await pool.query(
+        'SELECT id, username, password_hash, role, is_active FROM users WHERE username = $1 LIMIT 1',
+        [username]
+    );
+    return result.rows[0] || null;
+}
+
+async function verifyUser(username, password) {
+    const user = await findUserByUsername(username);
+    if (!user || !user.is_active) return null;
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) return null;
+    await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+    return { id: user.id, username: user.username, role: user.role };
+}
+
+async function createUser(username, password, role) {
+    role = role || 'admin';
+    const hash = await bcrypt.hash(password, 12);
+    const result = await pool.query(
+        `INSERT INTO users (username, password_hash, role)
+         VALUES ($1, $2, $3)
+         RETURNING id, username, role, is_active, created_at`,
+        [username, hash, role]
+    );
+    return result.rows[0];
+}
+
+async function listUsers() {
+    const result = await pool.query(
+        'SELECT id, username, role, is_active, created_at, last_login FROM users ORDER BY id'
+    );
+    return result.rows;
+}
+
+async function setUserActive(id, isActive) {
+    const result = await pool.query(
+        'UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, username, role, is_active',
+        [isActive, id]
+    );
+    return result.rows[0] || null;
+}
+
+async function changeUserPassword(id, newPassword) {
+    const hash = await bcrypt.hash(newPassword, 12);
+    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, id]);
+}
+
 module.exports = {
+    pool,
     connectDB,
+    getCategories,
+    getBrands,
+    getSizes,
+    getColors,
+    getTags,
     getProducts,
     getProduct,
-    getCategories,
     createProduct,
     updateProduct,
     deleteProduct,
-    searchProducts
+    searchProducts,
+    findUserByUsername,
+    verifyUser,
+    createUser,
+    listUsers,
+    setUserActive,
+    changeUserPassword
 };
-

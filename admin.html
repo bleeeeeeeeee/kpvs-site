@@ -12,13 +12,16 @@
         <header class="admin-header">
             <div>
                 <h1>Административная панель</h1>
-                <p class="admin-subtitle">Управление товарами, фильтрами и категориями.</p>
+                <p class="admin-subtitle">Управление товарами каталога.</p>
             </div>
-            <button id="add-product-btn" class="filter-button" type="button">Добавить товар</button>
+            <div class="admin-header-actions">
+                <button id="add-product-btn" class="filter-button" type="button">Добавить товар</button>
+                <button id="logout-btn" class="filter-button outline" type="button">Выйти</button>
+            </div>
         </header>
 
         <div class="admin-toolbar">
-            <input id="search-input" type="search" placeholder="Поиск по ID, названию или описанию" />
+            <input id="search-input" type="search" placeholder="Поиск по артикулу, названию или описанию" />
             <button id="open-filters-btn" class="filter-button outline" type="button">Фильтры</button>
             <button id="refresh-btn" class="filter-button" type="button">Обновить</button>
         </div>
@@ -28,38 +31,36 @@
             <div class="admin-sorting">
                 <label for="sort-by">Сортировка</label>
                 <select id="sort-by">
-                    <option value="id_asc">ID по возрастанию (по умолчанию)</option>
-                    <option value="id_desc">ID по убыванию</option>
-                    <option value="name_asc">Название A–Я</option>
-                    <option value="name_desc">Название Я–A</option>
-                    <option value="price_asc">Цена по возрастанию</option>
-                    <option value="price_desc">Цена по убыванию</option>
+                    <option value="id_desc">ID по убыванию (новые)</option>
+                    <option value="id_asc">ID по возрастанию</option>
+                    <option value="name_asc">Название А–Я</option>
+                    <option value="name_desc">Название Я–А</option>
                 </select>
             </div>
         </div>
 
-        <div class="admin-summary-note">Используйте фильтры для точного поиска и сортировки товаров.</div>
-
         <div class="admin-table-container">
             <table class="admin-table">
                 <colgroup>
-                    <col data-col="id" style="width: 72px;">
-                    <col data-col="name" style="width: 280px;">
+                    <col data-col="id" style="width:60px;">
+                    <col data-col="name" style="width:240px;">
                     <col data-col="description">
-                    <col data-col="category" style="width: 200px;">
-                    <col data-col="gender" style="width: 140px;">
-                    <col data-col="price" style="width: 140px;">
-                    <col data-col="actions" style="width: 220px;">
+                    <col data-col="category" style="width:160px;">
+                    <col data-col="gender" style="width:100px;">
+                    <col data-col="brand" style="width:120px;">
+                    <col data-col="actions" style="width:100px;">
+                    <col data-col="open" style="width:90px;">
                 </colgroup>
                 <thead>
                     <tr>
                         <th>ID</th>
-                        <th>Название</th>
+                        <th>Название / Артикул</th>
                         <th>Описание</th>
                         <th>Категория</th>
                         <th>Пол</th>
-                        <th>Цена</th>
+                        <th>Бренд</th>
                         <th>Действия</th>
+                        <th>Открыть</th>
                     </tr>
                 </thead>
                 <tbody id="products-body"></tbody>
@@ -67,7 +68,8 @@
         </div>
     </div>
 
-    <div class="modal" id="filter-modal">
+    <!-- Модальное окно фильтров -->
+    <div class="modal" id="filter-modal" style="display:none;">
         <div class="modal-content admin-modal-content">
             <div class="modal-header">
                 <h2>Фильтры товаров</h2>
@@ -77,31 +79,37 @@
                 <div class="filter-section">
                     <label for="filter-gender-modal">Пол</label>
                     <select id="filter-gender-modal">
-                        <option value="">Все разделы</option>
-                        <option value="mens">Мужской</option>
-                        <option value="womens">Женский</option>
+                        <option value="">Все</option>
+                        <option value="male">Мужской</option>
+                        <option value="female">Женский</option>
+                        <option value="unisex">Унисекс</option>
                     </select>
                 </div>
                 <div class="filter-section">
-                    <label for="filter-category-modal">Категория</label>
+                    <label>Категория</label>
                     <div class="admin-multiselect" id="filter-category-multiselect">
                         <button class="admin-multiselect-trigger" id="filter-category-trigger" type="button">
                             <span id="filter-category-label">Все категории</span>
                             <span class="admin-multiselect-caret" aria-hidden="true">▾</span>
                         </button>
                         <div class="admin-multiselect-dropdown" id="filter-category-dropdown" role="listbox" aria-multiselectable="true"></div>
-                        <input type="hidden" id="filter-category-modal" value="" />
                     </div>
                 </div>
-                <div class="filter-row">
-                    <div class="filter-section filter-price">
-                        <label for="min-price">Мин. цена</label>
-                        <input id="min-price" type="number" min="0" step="0.01" placeholder="0" />
-                    </div>
-                    <div class="filter-section filter-price">
-                        <label for="max-price">Макс. цена</label>
-                        <input id="max-price" type="number" min="0" step="0.01" placeholder="0" />
-                    </div>
+                <div class="filter-section">
+                    <label for="filter-brand-modal">Бренд</label>
+                    <select id="filter-brand-modal">
+                        <option value="">— Все бренды —</option>
+                    </select>
+                </div>
+                <div class="filter-section">
+                    <label for="filter-season-modal">Сезон</label>
+                    <select id="filter-season-modal">
+                        <option value="">— Все сезоны —</option>
+                        <option value="зима">Зима</option>
+                        <option value="лето">Лето</option>
+                        <option value="демисезон">Демисезон</option>
+                        <option value="всесезонный">Всесезонный</option>
+                    </select>
                 </div>
             </div>
             <div class="modal-footer">
@@ -111,86 +119,155 @@
         </div>
     </div>
 
-    <div class="modal" id="product-modal">
+    <!-- Модальное окно товара -->
+    <div class="modal" id="product-modal" style="display:none;">
         <div class="modal-content admin-modal-content">
             <div class="modal-header">
                 <h2 id="modal-title">Новый товар</h2>
                 <button class="modal-close" type="button">&times;</button>
             </div>
             <div class="modal-body">
-                <form id="product-form" class="admin-form">
+                <form id="product-form" class="admin-form" novalidate>
+
+                    <!-- Название -->
                     <div class="form-row">
-                        <label for="product-name">Название</label>
-                        <input id="product-name" name="name" type="text" required />
+                        <label for="product-name">Название <span class="required">*</span></label>
+                        <input id="product-name" name="name" type="text" placeholder="Введите название товара" autocomplete="off" />
+                        <span class="field-error" id="err-name"></span>
                     </div>
-                    <div class="form-row">
-                        <label for="product-slug">Slug</label>
-                        <input id="product-slug" name="slug" type="text" placeholder="Автоматически создаётся из названия" />
+
+                    <!-- Артикул + Slug -->
+                    <div class="form-grid">
+                        <div class="form-row">
+                            <label for="product-art">Артикул</label>
+                            <input id="product-art" name="art" type="text" placeholder="Напр. COAT-001" autocomplete="off" />
+                        </div>
+                        <div class="form-row">
+                            <label for="product-slug">Slug</label>
+                            <input id="product-slug" name="slug" type="text" placeholder="Автоматически из названия" autocomplete="off" />
+                        </div>
                     </div>
+
+                    <!-- Описание -->
                     <div class="form-row">
                         <label for="product-description">Описание</label>
-                        <textarea id="product-description" name="description" rows="4"></textarea>
+                        <textarea id="product-description" name="description" rows="3" placeholder="Краткое описание товара"></textarea>
                     </div>
+
+                    <!-- Пол + Сезон -->
                     <div class="form-grid">
-                        <div>
-                            <label for="product-price">Цена</label>
-                            <input id="product-price" name="price" type="number" step="0.01" min="0" />
+                        <div class="form-row">
+                            <label for="product-gender">Пол</label>
+                            <select id="product-gender" name="gender">
+                                <option value="">— Не указан —</option>
+                                <option value="male">Мужской</option>
+                                <option value="female">Женский</option>
+                                <option value="unisex">Унисекс</option>
+                            </select>
                         </div>
-                        <div>
-                            <label for="product-image">URL изображения</label>
-                            <input id="product-image" name="image" type="url" />
+                        <div class="form-row">
+                            <label for="product-season">Сезон</label>
+                            <select id="product-season" name="season">
+                                <option value="">— Не указан —</option>
+                                <option value="зима">Зима</option>
+                                <option value="лето">Лето</option>
+                                <option value="демисезон">Демисезон</option>
+                                <option value="всесезонный">Всесезонный</option>
+                            </select>
                         </div>
                     </div>
+
+                    <!-- Категория + Бренд -->
+                    <div class="form-grid">
+                        <div class="form-row">
+                            <label for="product-category">Категория</label>
+                            <select id="product-category" name="category_id"></select>
+                        </div>
+                        <div class="form-row">
+                            <label for="product-brand">Бренд</label>
+                            <select id="product-brand" name="brand_id"></select>
+                        </div>
+                    </div>
+
+                    <!-- Состав / Материалы -->
                     <div class="form-row">
-                        <label for="product-images">Изображения (несколько файлов)</label>
-                        <input id="product-images" name="images" type="file" accept="image/*" multiple />
-                        <div class="admin-image-help">Можно выбрать несколько файлов. После выбора они загрузятся и появятся в списке ниже.</div>
+                        <div class="form-row-header">
+                            <label>Состав / Материалы</label>
+                            <button type="button" id="add-material-btn" class="admin-add-btn-sm">+ Добавить</button>
+                        </div>
+                        <div id="product-materials-list" class="admin-materials-list"></div>
+                        <div class="admin-materials-total" id="materials-total" style="display:none;">
+                            Итого: <span id="materials-total-value">0</span>%
+                            <span id="materials-total-warn" class="materials-warn" style="display:none;">≠ 100%</span>
+                        </div>
+                    </div>
+
+                    <!-- Активен -->
+                    <div class="form-row">
+                        <label class="checkbox-label">
+                            <input id="product-active" name="is_active" type="checkbox" checked />
+                            <span class="checkbox-custom"></span>
+                            <span>Активен (отображается в каталоге)</span>
+                        </label>
+                    </div>
+
+                    <hr class="form-divider">
+
+                    <!-- Изображения -->
+                    <div class="form-row">
+                        <div class="form-row-header">
+                            <label>Изображения</label>
+                        </div>
+                        <div class="admin-images-upload-area">
+                            <label class="admin-file-label" for="product-images">
+                                <span class="admin-file-icon">📁</span>
+                                <span>Выберите файлы или перетащите сюда</span>
+                                <input id="product-images" name="images" type="file" accept="image/*" multiple />
+                            </label>
+                            <div class="admin-image-url-row">
+                                <input id="product-image-url" type="url" placeholder="Или вставьте URL изображения" />
+                                <button type="button" id="add-image-url-btn" class="admin-add-btn-sm">Добавить</button>
+                            </div>
+                        </div>
                         <div id="product-images-list" class="admin-image-list" aria-live="polite"></div>
                     </div>
-                    <div class="form-grid">
-                        <div>
-                            <label for="product-gender">Раздел</label>
-                            <select id="product-gender" name="gender">
-                                <option value="mens">Мужской</option>
-                                <option value="womens">Женский</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label for="product-category">Категория</label>
-                            <select id="product-category" name="category">
-                                <!-- Категории будут загружены динамически -->
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <label for="product-sizes">Размеры (несколько)</label>
-                        <div id="product-sizes-container" class="admin-multiselect">
-                            <button type="button" id="product-sizes-trigger" class="admin-multiselect-trigger">Выберите размеры</button>
-                            <div id="product-sizes-dropdown" class="admin-multiselect-dropdown">
-                                <!-- Размеры будут загружены динамически -->
-                            </div>
-                        </div>
-                        <input type="hidden" id="product-sizes-hidden" name="sizes" />
-                    </div>
 
+                    <hr class="form-divider">
+
+                    <!-- Теги -->
                     <div class="form-row">
-                        <label for="product-tags">Теги (несколько)</label>
+                        <label>Теги</label>
                         <div id="product-tags-container" class="admin-multiselect">
-                            <button type="button" id="product-tags-trigger" class="admin-multiselect-trigger">Выберите теги</button>
-                            <div id="product-tags-dropdown" class="admin-multiselect-dropdown">
-                                <!-- Теги будут загружены динамически -->
-                            </div>
+                            <button type="button" id="product-tags-trigger" class="admin-multiselect-trigger">
+                                <span>Выберите теги</span>
+                                <span class="admin-multiselect-caret" aria-hidden="true">▾</span>
+                            </button>
+                            <div id="product-tags-dropdown" class="admin-multiselect-dropdown"></div>
                         </div>
-                        <input type="hidden" id="product-tags-hidden" name="tags" />
                     </div>
 
+                    <hr class="form-divider">
+
+                    <!-- Варианты -->
                     <div class="form-row">
-                        <label for="product-materials">Состав (материалы)</label>
-                        <div id="product-materials-container" class="admin-materials">
-                            <!-- Материалы будут загружены динамически -->
+                        <div class="form-row-header">
+                            <label>Варианты (размер + цвет + артикул)</label>
+                            <button type="button" id="add-variant-btn" class="admin-add-btn-sm">+ Добавить вариант</button>
                         </div>
-                        <button type="button" id="add-material-btn" class="admin-add-btn">Добавить материал</button>
+                        <div id="product-variants-container" class="admin-variants-list"></div>
                     </div>
+
+                    <hr class="form-divider">
+
+                    <!-- Характеристики -->
+                    <div class="form-row">
+                        <div class="form-row-header">
+                            <label>Характеристики</label>
+                            <button type="button" id="add-attribute-btn" class="admin-add-btn-sm">+ Добавить</button>
+                        </div>
+                        <div id="product-attributes-container" class="admin-attributes-list"></div>
+                    </div>
+
                     <div class="admin-form-actions">
                         <button class="admin-action-btn" id="save-product-btn" type="submit">Сохранить</button>
                         <button class="admin-cancel-btn" id="cancel-product-btn" type="button">Отмена</button>

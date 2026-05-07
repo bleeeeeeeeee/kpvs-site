@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход — Администрирование</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/login.js" defer></script>
+</head>
+<body class="login-page">
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-logo">
+                <img src="/img/logo.png" alt="КПВС">
+            </div>
+            <h1 class="login-title">Административная панель</h1>
+            <p class="login-subtitle">Войдите для управления товарами</p>
+
+            <form id="login-form" class="login-form" novalidate>
+                <div class="form-row">
+                    <label for="login-username">Логин</label>
+                    <input id="login-username" type="text" name="username" autocomplete="username" required placeholder="Введите логин" />
+                </div>
+                <div class="form-row">
+                    <label for="login-password">Пароль</label>
+                    <input id="login-password" type="password" name="password" autocomplete="current-password" required placeholder="Введите пароль" />
+                </div>
+                <div id="login-error" class="login-error" role="alert" aria-live="polite"></div>
+                <button type="submit" id="login-btn" class="filter-button login-btn">Войти</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
