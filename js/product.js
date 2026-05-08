@@ -1,3 +1,12 @@
+let currentProductId = null;
+
+function genderDisplayLabel(g) {
+    if (g === 'mens' || g === 'male') return 'Мужской';
+    if (g === 'womens' || g === 'female') return 'Женский';
+    if (g === 'unisex') return 'Унисекс';
+    return '';
+}
+
 async function loadProduct() {
     const urlParams = new URLSearchParams(window.location.search);
     const slug = urlParams.get('slug');
@@ -5,7 +14,7 @@ async function loadProduct() {
     const identifier = slug || productId;
 
     if (!identifier) {
-        document.getElementById('product-details').innerHTML = '<p>Товар не найден.</p>';
+        document.getElementById('product-details').innerHTML = '<p class="catalog-empty">Товар не найден. Укажите корректную ссылку или откройте <a href="/mens.html">каталог</a>.</p>';
         return;
     }
 
@@ -15,10 +24,11 @@ async function loadProduct() {
 
         const product = await res.json();
         if (!product || !product.id) {
-            document.getElementById('product-details').innerHTML = '<p>Товар не найден.</p>';
+            document.getElementById('product-details').innerHTML = '<p class="catalog-empty">Товар не найден.</p>';
             return;
         }
 
+        currentProductId = product.id;
         const isFavorite = getFavorites().some(f => f.id === product.id);
         const isInCart = getCart().some(c => c.id === product.id);
 
@@ -64,21 +74,21 @@ async function loadProduct() {
                         <img src="${mainSrc}" alt="${product.name || ''}" class="product-image">
                     </div>
                     ${galleryHtml}
-                    <div class="product-actions">
-                        <button class="favorite-btn ${isFavorite ? 'in-favorites' : ''}" onclick="toggleFavorite(${product.id}, this)">
+                    <div class="product-actions site-product-actions">
+                        <button type="button" class="admin-ui-btn admin-ui-btn--primary product-page-action-btn favorite-action-btn ${isFavorite ? 'in-favorites' : ''}" onclick="toggleFavorite(${product.id}, this)">
                             ${isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
                         </button>
-                        <button class="price-btn cart-action-btn ${isInCart ? 'in-cart' : ''}" onclick="toggleCart(${product.id}, this)">
+                        <button type="button" class="admin-ui-btn admin-ui-btn--primary product-page-action-btn cart-action-btn ${isInCart ? 'in-cart' : ''}" onclick="toggleCart(${product.id}, this)">
                             ${isInCart ? 'Удалить из корзины' : 'В корзину'}
                         </button>
-                        <button class="price-btn inquire-action-btn" onclick="inquirePrice('${(product.name || '').replace(/'/g, "\\'")}', ${product.id})">
+                        <button type="button" class="admin-ui-btn inquire-action-btn" onclick="inquirePrice('${(product.name || '').replace(/'/g, "\\'")}', ${product.id})">
                             Запросить цену
                         </button>
                     </div>
                 </div>
                 <div class="product-info">
                     <h1 class="product-title">${product.name || ''}</h1>
-                    <p class="product-meta">${product.gender === 'male' ? 'Мужской' : product.gender === 'female' ? 'Женский' : product.gender === 'unisex' ? 'Унисекс' : 'Товар'}${product.category_name ? ' &bull; ' + product.category_name : ''}</p>
+                    <p class="product-meta">${genderDisplayLabel(product.gender) || 'Товар'}${product.category_name ? ' · ' + product.category_name : ''}</p>
                     ${artHtml}
                     ${brandHtml}
 
@@ -98,6 +108,8 @@ async function loadProduct() {
             </div>
         `;
 
+        document.title = (product.name || 'Товар').replace(/</g, '') + ' · КПВС';
+
         if (images.length > 1) {
             document.querySelectorAll('.product-gallery-item').forEach(thumb => {
                 thumb.addEventListener('click', () => {
@@ -108,7 +120,7 @@ async function loadProduct() {
         }
     } catch (err) {
         console.error('Error loading product:', err);
-        document.getElementById('product-details').innerHTML = '<p>Ошибка загрузки товара.</p>';
+        document.getElementById('product-details').innerHTML = '<p class="catalog-empty">Ошибка загрузки товара. Попробуйте обновить страницу.</p>';
     }
 }
 
@@ -182,6 +194,23 @@ function getProductImage(product) {
     return '/img/item.png';
 }
 
+function refreshProductButtons() {
+    if (!currentProductId) return;
+    const favorites = getFavorites();
+    const cart = getCart();
+    const isFavorite = favorites.some(i => i.id === currentProductId);
+    const isInCart = cart.some(i => i.id === currentProductId);
+
+    document.querySelectorAll('.favorite-action-btn').forEach(btn => {
+        btn.textContent = isFavorite ? 'Удалить из избранного' : 'Добавить в избранное';
+        btn.classList.toggle('in-favorites', isFavorite);
+    });
+    document.querySelectorAll('.cart-action-btn').forEach(btn => {
+        btn.textContent = isInCart ? 'Удалить из корзины' : 'В корзину';
+        btn.classList.toggle('in-cart', isInCart);
+    });
+}
+
 function toggleCart(productId, buttonElement) {
     let cart = getCart();
     const idx = cart.findIndex(i => i.id === productId);
@@ -194,6 +223,7 @@ function toggleCart(productId, buttonElement) {
         localStorage.setItem('cart', JSON.stringify(cart));
         if (buttonElement) { buttonElement.textContent = 'В корзину'; buttonElement.classList.remove('in-cart'); }
     }
+    refreshProductButtons();
 }
 
 function toggleCartFromModal(productId, buttonElement) {
@@ -209,19 +239,22 @@ function toggleFavorite(productId, buttonElement) {
         favorites.push({ id: productId, source: 'product' });
     }
     localStorage.setItem('favorites', JSON.stringify(favorites));
-    const btn = buttonElement || document.querySelector('.favorite-btn');
+    const btn = buttonElement || document.querySelector('.favorite-action-btn');
     if (btn) {
         btn.textContent = wasFavorite ? 'Добавить в избранное' : 'Удалить из избранного';
         btn.classList.toggle('in-favorites', !wasFavorite);
     }
+    refreshProductButtons();
 }
 
 function removeFromFavorites(productId) {
     localStorage.setItem('favorites', JSON.stringify(getFavorites().filter(i => i.id !== productId)));
+    refreshProductButtons();
 }
 
 function removeFromCart(productId) {
     localStorage.setItem('cart', JSON.stringify(getCart().filter(i => i.id !== productId)));
+    refreshProductButtons();
 }
 
 function getFavorites() {
@@ -275,20 +308,21 @@ function openFavoritesModal() {
 
     if (!ids.length) {
         modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header"><h2>Избранное</h2><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
+            <div class="modal-content modal-content--cart-favorites">
+                <div class="modal-header"><h2>Избранное</h2><button type="button" class="modal-close" onclick="kpvsDismissTopModal(this)">&times;</button></div>
                 <div class="modal-body"><p class="empty-message">У вас пока нет товаров в избранном</p></div>
             </div>`;
         document.body.appendChild(modal);
+        if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
         setTimeout(() => modal.classList.add('show'), 10);
-        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+        modal.addEventListener('click', e => { if (e.target === modal) window.kpvsDismissTopModal(modal); });
         return;
     }
 
     getProductsByIds(ids).then(products => {
         modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header"><h2>Избранное</h2><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
+            <div class="modal-content modal-content--cart-favorites">
+                <div class="modal-header"><h2>Избранное</h2><button type="button" class="modal-close" onclick="kpvsDismissTopModal(this)">&times;</button></div>
                 <div class="modal-body">
                     <div class="modal-items">
                         ${products.filter(p => p && p.id).map(p => {
@@ -310,8 +344,9 @@ function openFavoritesModal() {
                 </div>
             </div>`;
         document.body.appendChild(modal);
+        if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
         setTimeout(() => modal.classList.add('show'), 10);
-        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+        modal.addEventListener('click', e => { if (e.target === modal) window.kpvsDismissTopModal(modal); });
 
         modal.querySelectorAll('[data-action="toggle-cart"]').forEach(btn => {
             btn.addEventListener('click', e => {
@@ -341,20 +376,21 @@ function openCartModal() {
 
     if (!ids.length) {
         modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header"><h2>Корзина</h2><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
+            <div class="modal-content modal-content--cart-favorites">
+                <div class="modal-header"><h2>Корзина</h2><button type="button" class="modal-close" onclick="kpvsDismissTopModal(this)">&times;</button></div>
                 <div class="modal-body"><p class="empty-message">Корзина пуста</p></div>
             </div>`;
         document.body.appendChild(modal);
+        if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
         setTimeout(() => modal.classList.add('show'), 10);
-        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+        modal.addEventListener('click', e => { if (e.target === modal) window.kpvsDismissTopModal(modal); });
         return;
     }
 
     getProductsByIds(ids).then(products => {
         modal.innerHTML = `
-            <div class="modal-content">
-                <div class="modal-header"><h2>Корзина</h2><button class="modal-close" onclick="this.closest('.modal').remove()">&times;</button></div>
+            <div class="modal-content modal-content--cart-favorites">
+                <div class="modal-header"><h2>Корзина</h2><button type="button" class="modal-close" onclick="kpvsDismissTopModal(this)">&times;</button></div>
                 <div class="modal-body">
                     <div class="modal-items">
                         ${products.filter(p => p && p.id).map(p => {
@@ -372,13 +408,14 @@ function openCartModal() {
                         }).join('')}
                     </div>
                     <div class="cart-actions">
-                        <button class="cart-inquire-btn" onclick="inquirePriceFromCart(); this.closest('.modal').remove();">Узнать цену на все товары</button>
+                        <button type="button" class="cart-inquire-btn" onclick="kpvsDismissTopModal(this); inquirePriceFromCart();">Узнать цену на все товары</button>
                     </div>
                 </div>
             </div>`;
         document.body.appendChild(modal);
+        if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
         setTimeout(() => modal.classList.add('show'), 10);
-        modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+        modal.addEventListener('click', e => { if (e.target === modal) window.kpvsDismissTopModal(modal); });
 
         modal.querySelectorAll('[data-action="remove-from-cart"]').forEach(btn => {
             btn.addEventListener('click', e => {
@@ -402,12 +439,9 @@ document.addEventListener('DOMContentLoaded', () => {
     loadProduct();
 
     const logo = document.querySelector('.section #logo');
-    if (logo) logo.addEventListener('click', () => { window.location.href = 'welcome.html'; });
-
-    const locationIcon = document.querySelector('.central-top-section img[alt="location"]');
-    const locationText = document.querySelector('.central-top-section p');
-    if (locationIcon) { locationIcon.style.cursor = 'pointer'; locationIcon.addEventListener('click', openMap); }
-    if (locationText) { locationText.style.cursor = 'pointer'; locationText.addEventListener('click', openMap); }
+    if (logo && !logo.closest('a')) {
+        logo.addEventListener('click', () => { window.location.href = 'welcome.html'; });
+    }
 
     const favoritesLink = document.getElementById('favorites-link');
     if (favoritesLink) favoritesLink.addEventListener('click', openFavoritesModal);

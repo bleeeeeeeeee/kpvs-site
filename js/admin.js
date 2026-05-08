@@ -1,7 +1,7 @@
 const Admin = (() => {
     async function checkAuth() {
         try {
-            const r = await fetch('/api/auth/me');
+            const r = await apiFetch('/api/auth/me');
             if (!r.ok) {
                 window.location.replace('/login.html');
                 return false;
@@ -9,7 +9,7 @@ const Admin = (() => {
             const user = await r.json();
             const subtitle = document.querySelector('.admin-subtitle');
             if (subtitle && user.username) {
-                subtitle.textContent = 'Вы вошли как: ' + user.username + ' (' + user.role + ')';
+                subtitle.textContent = user.username + ' · ' + user.role;
             }
             return true;
         } catch {
@@ -20,7 +20,7 @@ const Admin = (() => {
 
     async function doLogout() {
         try {
-            await fetch('/api/auth/logout', { method: 'POST' });
+            await apiFetch('/api/auth/logout', { method: 'POST' });
         } catch {}
         window.location.replace('/login.html');
     }
@@ -37,6 +37,9 @@ const Admin = (() => {
     let productTags = [];
     let productAttributes = [];
     let productMaterials = [];
+    let productModalBaselineSerialized = null;
+    let productModalBaselineReady = false;
+    const PRODUCT_DRAFT_STORAGE_PREFIX = 'kpvs_admin_product_draft_v1_';
 
     const state = {
         gender: '',
@@ -48,12 +51,40 @@ const Admin = (() => {
 
     const ui = {};
 
+    let visibilityConfirmPending = null;
+    let searchInputTimer = null;
+
+    function apiFetch(url, init) {
+        init = Object.assign({}, init || {});
+        if (!init.credentials) init.credentials = 'include';
+        return window.fetch(url, init);
+    }
+
     function escapeHtml(str) {
         if (str == null) return '';
         return String(str)
             .replace(/&/g, '&amp;').replace(/</g, '&lt;')
             .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');
+    }
+
+    function formatProductCount(n) {
+        n = Number(n) || 0;
+        const abs100 = Math.abs(n) % 100;
+        const d = abs100 % 10;
+        let w = 'товаров';
+        if (abs100 < 10 || abs100 > 20) {
+            if (d === 1) w = 'товар';
+            else if (d > 1 && d < 5) w = 'товара';
+        }
+        return String(n) + ' ' + w;
+    }
+
+    function syncAdminSearchClear() {
+        const inp = document.getElementById('search-input');
+        const btn = document.getElementById('admin-search-clear');
+        if (!inp || !btn) return;
+        btn.hidden = !inp.value.trim();
     }
 
     function slugify(text) {
@@ -99,7 +130,7 @@ const Admin = (() => {
     function setTableStatus(msg) {
         if (!ui.productsBody || !ui.productCount) return;
         ui.productsBody.innerHTML = '<tr class="empty-row"><td colspan="7">' + escapeHtml(msg) + '</td></tr>';
-        ui.productCount.textContent = '0';
+        ui.productCount.textContent = formatProductCount(0);
     }
 
     function showFieldError(id, msg) {
@@ -116,7 +147,7 @@ const Admin = (() => {
 
     async function fetchCategories() {
         try {
-            const r = await fetch('/api/categories');
+            const r = await apiFetch('/api/categories');
             if (!r.ok) throw new Error();
             categories = flattenCategories(await r.json());
         } catch {
@@ -127,7 +158,7 @@ const Admin = (() => {
 
     async function fetchBrands() {
         try {
-            const r = await fetch('/api/brands');
+            const r = await apiFetch('/api/brands');
             if (!r.ok) throw new Error();
             brands = await r.json();
         } catch { brands = []; }
@@ -135,7 +166,7 @@ const Admin = (() => {
 
     async function fetchSizes() {
         try {
-            const r = await fetch('/api/sizes');
+            const r = await apiFetch('/api/sizes');
             if (!r.ok) throw new Error();
             availableSizes = await r.json();
         } catch { availableSizes = []; }
@@ -143,7 +174,7 @@ const Admin = (() => {
 
     async function fetchColors() {
         try {
-            const r = await fetch('/api/colors');
+            const r = await apiFetch('/api/colors');
             if (!r.ok) throw new Error();
             availableColors = await r.json();
         } catch { availableColors = []; }
@@ -151,7 +182,7 @@ const Admin = (() => {
 
     async function fetchTags() {
         try {
-            const r = await fetch('/api/tags');
+            const r = await apiFetch('/api/tags');
             if (!r.ok) throw new Error();
             availableTags = await r.json();
         } catch { availableTags = []; }
@@ -173,7 +204,7 @@ const Admin = (() => {
 
     function populateCategorySelect(selectEl, selectedId) {
         if (!selectEl) return;
-        selectEl.innerHTML = '<option value="">— Категория —</option>';
+        selectEl.innerHTML = '<option value="">Категория</option>';
         categories.forEach(function(cat) {
             const prefix = '\u00a0\u00a0'.repeat(cat.depth);
             const opt = document.createElement('option');
@@ -186,7 +217,7 @@ const Admin = (() => {
 
     function populateBrandSelect(selectEl, selectedId) {
         if (!selectEl) return;
-        selectEl.innerHTML = '<option value="">— Бренд —</option>';
+        selectEl.innerHTML = '<option value="">Бренд</option>';
         brands.forEach(function(b) {
             const opt = document.createElement('option');
             opt.value = b.id;
@@ -236,6 +267,8 @@ const Admin = (() => {
         try {
             const saved = sessionStorage.getItem('adminFilters');
             if (saved) Object.assign(state, JSON.parse(saved));
+            if (state.gender === 'male') state.gender = 'mens';
+            if (state.gender === 'female') state.gender = 'womens';
         } catch {}
     }
 
@@ -265,7 +298,7 @@ const Admin = (() => {
             params.set('limit', '100');
             params.set('offset', '0');
 
-            const r = await fetch('/api/admin/products?' + params.toString());
+            const r = await apiFetch('/api/admin/products?' + params.toString());
             if (!r.ok) throw new Error('Код ' + r.status);
             products = await r.json();
             renderProducts();
@@ -282,28 +315,48 @@ const Admin = (() => {
             setTableStatus('Товары не найдены по текущим условиям.');
             return;
         }
-        const genderLabels = { male: 'Мужской', female: 'Женский', unisex: 'Унисекс' };
+        const genderLabels = { mens: 'Мужской', womens: 'Женский', unisex: 'Унисекс', male: 'Мужской', female: 'Женский' };
         ui.productsBody.innerHTML = products.map(function(p) {
             const genderLabel = genderLabels[p.gender] || (p.gender || '-');
             const desc = p.description || '-';
             const shortDesc = desc.length > 80 ? desc.slice(0, 80) + '…' : desc;
+            const slugAttr = p.slug ? ' data-slug="' + escapeHtml(p.slug) + '"' : '';
+            const genderAttr = ' data-gender="' + escapeHtml(p.gender || '') + '"';
+            const isVisible = p.is_active !== false;
+            const visibleTitle = isVisible ? 'Виден в каталоге' : 'Скрыт в каталоге';
+            const iconSrc = isVisible ? '/img/visible.svg' : '/img/invisible.svg';
+            const toggleHint = isVisible ? 'Скрыть из каталога' : 'Показать в каталоге';
+            const openLabel = 'Открыть страницу товара в новой вкладке';
             return '<tr data-product-id="' + p.id + '">' +
+                '<td class="cell-visible">' +
+                    '<button type="button" class="catalog-visibility-hit"' +
+                    ' data-action="toggle-catalog-visibility"' +
+                    ' data-id="' + p.id + '"' +
+                    ' data-visible="' + (isVisible ? '1' : '0') + '"' +
+                    ' aria-pressed="' + (isVisible ? 'true' : 'false') + '"' +
+                    ' title="' + escapeHtml(toggleHint) + '"' +
+                    ' aria-label="' + escapeHtml(visibleTitle + '. ' + toggleHint + '.') + '">' +
+                        '<img src="' + escapeHtml(iconSrc) + '" alt="" width="28" height="28" draggable="false" />' +
+                    '</button>' +
+                '</td>' +
                 '<td class="cell-id">' + p.id + '</td>' +
-                '<td><div class="cell-name"><strong>' + escapeHtml(p.name) + '</strong>' +
-                    (p.art ? '<small style="color:#888">' + escapeHtml(p.art) + '</small>' : '') +
-                '</div></td>' +
+                '<td class="cell-name-with-open">' +
+                    '<div class="cell-name-block">' +
+                        '<button type="button" class="admin-product-open" data-action="open-page" data-id="' + p.id + '"' + genderAttr + slugAttr +
+                        ' title="' + escapeHtml(openLabel) + '" aria-label="' + escapeHtml(openLabel) + '">' +
+                            '<img src="/img/link.svg" alt="" class="admin-product-open-icon" draggable="false" />' +
+                        '</button>' +
+                        '<span class="cell-name-title">' + escapeHtml(p.name) + '</span>' +
+                        (p.art ? '<span class="cell-art">' + escapeHtml(p.art) + '</span>' : '') +
+                    '</div>' +
+                '</td>' +
                 '<td title="' + escapeHtml(desc) + '"><div class="cell-description">' + escapeHtml(shortDesc) + '</div></td>' +
                 '<td>' + escapeHtml(p.category_name || '-') + '</td>' +
                 '<td>' + escapeHtml(genderLabel) + '</td>' +
                 '<td>' + escapeHtml(p.brand_name || '-') + '</td>' +
-                '<td><div class="admin-actions-cell">' +
-                    '<button type="button" class="btn-edit" data-action="edit" data-id="' + p.id + '">Редактировать</button>' +
-                    '<button type="button" class="btn-delete" data-action="delete" data-id="' + p.id + '">Удалить</button>' +
-                '</div></td>' +
-                '<td><button type="button" class="btn-open-page" data-action="open-page" data-id="' + p.id + '" data-gender="' + escapeHtml(p.gender || '') + '" data-slug="' + escapeHtml(p.slug || '') + '">Открыть товар</button></td>' +
                 '</tr>';
         }).join('');
-        ui.productCount.textContent = String(products.length);
+        ui.productCount.textContent = formatProductCount(products.length);
     }
 
     function openProductPage(id, gender, slug) {
@@ -312,7 +365,6 @@ const Admin = (() => {
             : 'product.html?id=' + encodeURIComponent(id);
 
         if (gender === 'unisex') {
-            // Для унисекс — показываем выбор
             const existing = document.getElementById('open-page-popup');
             if (existing) existing.remove();
 
@@ -325,11 +377,11 @@ const Admin = (() => {
                         '<span>Открыть товар</span>' +
                         '<button type="button" class="open-page-popup-close">&times;</button>' +
                     '</div>' +
-                    '<p class="open-page-popup-hint">Товар унисекс — выберите раздел или страницу товара:</p>' +
+                    '<p class="open-page-popup-hint">Товар унисекс. Выберите раздел или страницу товара:</p>' +
                     '<div class="open-page-popup-btns">' +
-                        '<a href="' + escapeHtml(productUrl) + '" target="_blank" class="open-page-btn">Страница товара</a>' +
-                        '<a href="mens.html" target="_blank" class="open-page-btn open-page-btn-secondary">Мужской раздел</a>' +
-                        '<a href="womens.html" target="_blank" class="open-page-btn open-page-btn-secondary">Женский раздел</a>' +
+                        '<a href="' + escapeHtml(productUrl) + '" target="_blank" class="admin-ui-btn admin-ui-btn--primary">Страница товара</a>' +
+                        '<a href="mens.html" target="_blank" class="admin-ui-btn admin-ui-btn--secondary">Мужской раздел</a>' +
+                        '<a href="womens.html" target="_blank" class="admin-ui-btn admin-ui-btn--secondary">Женский раздел</a>' +
                     '</div>' +
                 '</div>';
             document.body.appendChild(popup);
@@ -337,7 +389,6 @@ const Admin = (() => {
             popup.querySelector('.open-page-popup-close').onclick = function() { popup.remove(); };
             popup.addEventListener('click', function(e) { if (e.target === popup) popup.remove(); });
         } else {
-            // Для мужского/женского — сразу открываем страницу товара
             window.open(productUrl, '_blank');
         }
     }
@@ -350,7 +401,7 @@ const Admin = (() => {
         const seasonSel = document.getElementById('filter-season-modal');
         if (genderSel) genderSel.value = state.gender || '';
         if (brandSel) {
-            brandSel.innerHTML = '<option value="">— Все бренды —</option>';
+            brandSel.innerHTML = '<option value="">Все бренды</option>';
             brands.forEach(function(b) {
                 const opt = document.createElement('option');
                 opt.value = b.slug;
@@ -397,9 +448,97 @@ const Admin = (() => {
         fetchProducts();
     }
 
+    function cancelVisibilityConfirm() {
+        visibilityConfirmPending = null;
+        const okBtn = document.getElementById('visibility-confirm-ok');
+        if (okBtn) okBtn.disabled = false;
+        closeModal(ui.visibilityConfirmModal);
+    }
+
+    function requestToggleProductCatalogVisibility(id, triggerBtn) {
+        const p = products.find(function(x) { return Number(x.id) === Number(id); });
+        if (!p) {
+            notify('Товар не найден', 'error');
+            return;
+        }
+        const currentlyVisible = p.is_active !== false;
+        const nextVisible = !currentlyVisible;
+        const title = nextVisible ? 'Показать в каталоге?' : 'Скрыть из каталога?';
+        const message = nextVisible
+            ? 'Товар станет виден покупателям в каталоге и в поиске. Продолжить?'
+            : 'Товар будет скрыт из каталога и поиска (страница по прямой ссылке может открываться). Продолжить?';
+
+        visibilityConfirmPending = { id: id, nextVisible: nextVisible, triggerBtn: triggerBtn };
+        const titleEl = document.getElementById('visibility-confirm-title');
+        const msgEl = document.getElementById('visibility-confirm-message');
+        if (titleEl) titleEl.textContent = title;
+        if (msgEl) msgEl.textContent = message;
+        const okBtn = document.getElementById('visibility-confirm-ok');
+        if (okBtn) okBtn.disabled = false;
+        openModal(ui.visibilityConfirmModal);
+    }
+
+    async function applyProductCatalogVisibilityFromConfirm() {
+        const pending = visibilityConfirmPending;
+        if (!pending) return;
+        visibilityConfirmPending = null;
+
+        const okBtn = document.getElementById('visibility-confirm-ok');
+        if (okBtn) okBtn.disabled = true;
+
+        const id = pending.id;
+        const nextVisible = pending.nextVisible;
+        const triggerBtn = pending.triggerBtn;
+
+        closeModal(ui.visibilityConfirmModal);
+
+        const p = products.find(function(x) { return Number(x.id) === Number(id); });
+        if (!p) {
+            notify('Товар не найден', 'error');
+            if (okBtn) okBtn.disabled = false;
+            return;
+        }
+
+        if (triggerBtn && triggerBtn.isConnected) triggerBtn.disabled = true;
+        try {
+            const r = await apiFetch('/api/admin/productvisibility', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: id, is_active: nextVisible })
+            });
+            if (!r.ok) {
+                let msg = 'Код ' + r.status;
+                const ct = (r.headers.get('Content-Type') || '').toLowerCase();
+                if (ct.includes('application/json')) {
+                    try {
+                        const errBody = await r.json();
+                        if (errBody.error) msg = errBody.error;
+                    } catch (_) {}
+                } else if (r.status === 404) {
+                    msg = 'Запрос не дошёл до API (404). Откройте админку с того же хоста и порта, что и сервер (npm start), например http://localhost:3000/admin.html';
+                }
+                throw new Error(msg);
+            }
+            const data = await r.json();
+            const active = data.is_active !== false;
+            p.is_active = active;
+            if (editingProductId === id) {
+                const activeChk = document.getElementById('product-active');
+                if (activeChk) activeChk.checked = active;
+            }
+            renderProducts();
+            notify(active ? 'Товар показан в каталоге' : 'Товар скрыт из каталога', 'success');
+        } catch (err) {
+            notify(err.message || 'Не удалось изменить видимость в каталоге', 'error');
+        } finally {
+            if (triggerBtn && triggerBtn.isConnected) triggerBtn.disabled = false;
+            if (okBtn) okBtn.disabled = false;
+        }
+    }
+
     async function doDeleteProduct(id) {
         try {
-            const r = await fetch('/api/admin/products/' + id, { method: 'DELETE' });
+            const r = await apiFetch('/api/admin/products/' + id, { method: 'DELETE' });
             if (!r.ok) throw new Error('Код ' + r.status);
             await fetchProducts();
             notify('Товар удалён', 'success');
@@ -410,11 +549,17 @@ const Admin = (() => {
 
     function openModal(modal) {
         if (!modal) return;
-        document.body.classList.add('modal-open');
-        document.body.style.pointerEvents = 'none';
-        modal.style.pointerEvents = 'auto';
+        modal._returnFocus = document.activeElement;
+        if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
         modal.style.display = 'flex';
         setTimeout(function() { modal.classList.add('show'); }, 10);
+        setTimeout(function() {
+            if (!modal.classList.contains('show')) return;
+            const focusable = modal.querySelector(
+                'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])'
+            );
+            if (focusable) focusable.focus();
+        }, 120);
     }
 
     function closeModal(modal) {
@@ -423,8 +568,11 @@ const Admin = (() => {
         setTimeout(function() {
             if (!modal.classList.contains('show')) {
                 modal.style.display = 'none';
-                document.body.classList.remove('modal-open');
-                document.body.style.pointerEvents = '';
+                if (window.KpvsModalOverlay) window.KpvsModalOverlay.unlock();
+                const rf = modal._returnFocus;
+                if (rf && document.contains(rf) && typeof rf.focus === 'function') {
+                    try { rf.focus(); } catch {}
+                }
             }
         }, 300);
     }
@@ -434,6 +582,17 @@ const Admin = (() => {
         if (!container || container._delegated) return;
         container._delegated = true;
         container.addEventListener('click', function(e) {
+            const row = e.target.closest('tr[data-product-id]');
+            if (row && !e.target.closest('[data-action]')) {
+                const id = parseInt(row.dataset.productId, 10);
+                if (!isNaN(id)) {
+                    const p = products.find(function(x) { return Number(x.id) === Number(id); });
+                    if (p) openProductModal(p);
+                    else notify('Товар не найден', 'error');
+                    return;
+                }
+            }
+            
             const btn = e.target.closest('[data-action]');
             if (!btn) return;
             const action = btn.dataset.action;
@@ -441,14 +600,13 @@ const Admin = (() => {
             if (isNaN(id)) return;
             e.preventDefault();
             e.stopPropagation();
-            if (action === 'edit') {
-                const p = products.find(function(x) { return x.id === id; });
-                if (p) openProductModal(p);
-                else notify('Товар не найден', 'error');
-            } else if (action === 'delete') {
-                if (confirm('Удалить товар ID ' + id + '?')) doDeleteProduct(id);
-            } else if (action === 'open-page') {
+            if (action === 'open-page') {
                 openProductPage(id, btn.dataset.gender || '', btn.dataset.slug || '');
+                return;
+            }
+            if (action === 'toggle-catalog-visibility') {
+                requestToggleProductCatalogVisibility(id, btn);
+                return;
             }
         });
     }
@@ -460,7 +618,13 @@ const Admin = (() => {
         const cols = Array.from(table.querySelectorAll('colgroup col'));
         const ths = Array.from(table.querySelectorAll('thead th'));
         if (!cols.length || ths.length !== cols.length) return;
-        const minWidths = [60, 180, 220, 140, 110, 110, 160];
+        const minWidths = [100, 52, 240, 200, 128, 84, 112];
+
+        for (let i = 0; i < ths.length; i++) {
+            const w = Math.round(ths[i].getBoundingClientRect().width);
+            if (!cols[i].style.width) cols[i].style.width = Math.max(minWidths[i] || 80, w) + 'px';
+        }
+
         ths.forEach(function(th, i) {
             if (i === ths.length - 1) return;
             const handle = document.createElement('span');
@@ -470,9 +634,15 @@ const Admin = (() => {
                 e.preventDefault();
                 try { handle.setPointerCapture(e.pointerId); } catch {}
                 const startX = e.clientX;
-                const startW = th.getBoundingClientRect().width;
+                const startW = parseInt(cols[i].style.width, 10) || Math.round(th.getBoundingClientRect().width);
+                const nextStartW = parseInt(cols[i + 1].style.width, 10) || Math.round(ths[i + 1].getBoundingClientRect().width);
                 const onMove = function(ev) {
-                    cols[i].style.width = Math.max(minWidths[i] || 80, Math.round(startW + ev.clientX - startX)) + 'px';
+                    const delta = Math.round(ev.clientX - startX);
+                    const w1 = Math.max(minWidths[i] || 80, startW + delta);
+                    const w2 = Math.max(minWidths[i + 1] || 80, nextStartW - delta);
+
+                    cols[i].style.width = w1 + 'px';
+                    cols[i + 1].style.width = w2 + 'px';
                 };
                 const onUp = function() {
                     document.removeEventListener('pointermove', onMove);
@@ -483,8 +653,6 @@ const Admin = (() => {
             });
         });
     }
-
-    // ── Изображения ──────────────────────────────────────────────────────────
 
     function renderImagesList() {
         const list = ui.productImagesList;
@@ -528,8 +696,6 @@ const Admin = (() => {
         });
     }
 
-    // ── Материалы ─────────────────────────────────────────────────────────────
-
     function renderMaterialsList() {
         const container = ui.productMaterialsList;
         if (!container) return;
@@ -540,7 +706,7 @@ const Admin = (() => {
             div.innerHTML =
                 '<input type="text" class="mat-name" placeholder="Материал (напр. Хлопок)" value="' + escapeHtml(mat.name || '') + '" />' +
                 '<div class="mat-percent-wrap">' +
-                    '<input type="number" class="mat-percent" placeholder="%" value="' + escapeHtml(String(mat.percent || '')) + '" min="1" max="100" step="1" />' +
+                    '<input type="number" class="mat-percent" placeholder="" value="' + escapeHtml(String(mat.percent || '')) + '" min="1" max="100" step="1" />' +
                     '<span class="mat-percent-sign">%</span>' +
                 '</div>' +
                 '<button type="button" class="btn-mat-remove" data-index="' + i + '" title="Удалить">×</button>';
@@ -551,56 +717,46 @@ const Admin = (() => {
             btn.addEventListener('click', function() {
                 productMaterials.splice(Number(btn.dataset.index), 1);
                 renderMaterialsList();
-                updateMaterialsTotal();
             });
         });
-        container.querySelectorAll('.mat-percent').forEach(function(inp) {
-            inp.addEventListener('input', updateMaterialsTotal);
-        });
-        updateMaterialsTotal();
     }
 
     function collectMaterials() {
         const container = ui.productMaterialsList;
-        if (!container) return;
         productMaterials = [];
-        container.querySelectorAll('.admin-material-row').forEach(function(row) {
+        if (!container) return null;
+        const rows = container.querySelectorAll('.admin-material-row');
+        const pending = [];
+        for (var i = 0; i < rows.length; i++) {
+            const row = rows[i];
             const nameEl = row.querySelector('.mat-name');
             const pctEl = row.querySelector('.mat-percent');
             const name = nameEl ? nameEl.value.trim() : '';
-            const percent = pctEl ? parseInt(pctEl.value, 10) : 0;
-            if (name) productMaterials.push({ name: name, percent: isNaN(percent) ? 0 : percent });
-        });
-    }
-
-    function updateMaterialsTotal() {
-        const container = ui.productMaterialsList;
-        const totalEl = document.getElementById('materials-total');
-        const totalVal = document.getElementById('materials-total-value');
-        const totalWarn = document.getElementById('materials-total-warn');
-        if (!container || !totalEl) return;
-        const rows = container.querySelectorAll('.admin-material-row');
-        if (!rows.length) { totalEl.style.display = 'none'; return; }
-        let sum = 0;
-        rows.forEach(function(row) {
-            const pctEl = row.querySelector('.mat-percent');
-            const v = pctEl ? parseInt(pctEl.value, 10) : 0;
-            sum += isNaN(v) ? 0 : v;
-        });
-        totalEl.style.display = 'flex';
-        if (totalVal) totalVal.textContent = sum;
-        if (totalWarn) {
-            const ok = sum === 100;
-            totalWarn.style.display = ok ? 'none' : 'inline';
-            totalEl.classList.toggle('materials-total-ok', ok);
-            totalEl.classList.toggle('materials-total-err', !ok);
+            const raw = pctEl ? String(pctEl.value).trim().replace(/\s/g, '') : '';
+            if (!name && !raw) continue;
+            if (name && raw === '') {
+                return 'Укажите процент для материала «' + name + '».';
+            }
+            if (!name && raw !== '') {
+                return 'У каждой строки с процентом должно быть название материала.';
+            }
+            if (!/^\d+$/.test(raw)) {
+                return 'Процент в составе должен быть целым числом от 1 до 100.';
+            }
+            const pct = parseInt(raw, 10);
+            if (pct < 1 || pct > 100) {
+                return 'Процент в составе должен быть от 1 до 100.';
+            }
+            pending.push({ name: name, percent: pct });
         }
+        productMaterials = pending;
+        return null;
     }
 
     function materialsToString(mats) {
         if (!Array.isArray(mats) || !mats.length) return '';
         return mats.map(function(m) {
-            return m.percent ? m.name + ' ' + m.percent + '%' : m.name;
+            return m.name + ' ' + m.percent + '%';
         }).join(', ');
     }
 
@@ -614,7 +770,145 @@ const Admin = (() => {
         }).filter(function(m) { return m.name; });
     }
 
-    // ── Варианты ──────────────────────────────────────────────────────────────
+    function normalizeGenderForForm(raw) {
+        if (!raw) return '';
+        if (raw === 'male') return 'mens';
+        if (raw === 'female') return 'womens';
+        return raw;
+    }
+
+    function snapshotMaterialsFromDom() {
+        const container = ui.productMaterialsList;
+        if (!container) return [];
+        const out = [];
+        container.querySelectorAll('.admin-material-row').forEach(function(row) {
+            const nameEl = row.querySelector('.mat-name');
+            const pctEl = row.querySelector('.mat-percent');
+            const name = nameEl ? nameEl.value.trim() : '';
+            const raw = pctEl ? String(pctEl.value).trim().replace(/\s/g, '') : '';
+            const pct = raw === '' ? NaN : parseInt(raw, 10);
+            out.push({ name: name, percent: Number.isFinite(pct) ? pct : 0 });
+        });
+        return out;
+    }
+
+    function draftStorageKey() {
+        return PRODUCT_DRAFT_STORAGE_PREFIX + (editingProductId != null ? String(editingProductId) : 'new');
+    }
+
+    function serializeProductModalStateForCompare() {
+        collectVariants();
+        collectAttributes();
+        productMaterials = snapshotMaterialsFromDom();
+        const g = function(id) { return document.getElementById(id); };
+        return JSON.stringify({
+            editingProductId: editingProductId,
+            name: g('product-name') ? g('product-name').value : '',
+            art: g('product-art') ? g('product-art').value : '',
+            slug: g('product-slug') ? g('product-slug').value : '',
+            description: g('product-description') ? g('product-description').value : '',
+            season: g('product-season') ? g('product-season').value : '',
+            gender: g('product-gender') ? g('product-gender').value : '',
+            category_id: g('product-category') ? g('product-category').value : '',
+            brand_id: g('product-brand') ? g('product-brand').value : '',
+            is_active: g('product-active') ? g('product-active').checked : true,
+            images: productImages.slice(),
+            variants: productVariants.slice(),
+            attributes: productAttributes.slice(),
+            materials: productMaterials.slice(),
+            tagIds: productTags.map(function(t) { return t.id; }).slice().sort(function(a, b) { return a - b; })
+        });
+    }
+
+    function captureProductModalBaseline() {
+        try {
+            productModalBaselineSerialized = serializeProductModalStateForCompare();
+        } catch {
+            productModalBaselineSerialized = '';
+        }
+        productModalBaselineReady = true;
+    }
+
+    function isProductModalDirty() {
+        if (!productModalBaselineReady) return false;
+        try {
+            return serializeProductModalStateForCompare() !== productModalBaselineSerialized;
+        } catch {
+            return true;
+        }
+    }
+
+    function clearProductDraftStorage() {
+        try { localStorage.removeItem(draftStorageKey()); } catch {}
+    }
+
+    function saveProductDraftToStorage() {
+        try {
+            localStorage.setItem(draftStorageKey(), serializeProductModalStateForCompare());
+        } catch (err) {
+            notify('Не удалось сохранить черновик в браузере', 'error');
+        }
+    }
+
+    function applyDraftPayload(d) {
+        if (!d || typeof d !== 'object') return;
+        const curId = editingProductId != null ? Number(editingProductId) : null;
+        const draftId = d.editingProductId != null && d.editingProductId !== '' ? Number(d.editingProductId) : null;
+        if (curId !== draftId) return;
+
+        const setVal = function(id, val) {
+            const el = document.getElementById(id);
+            if (el) el.value = val != null ? val : '';
+        };
+        setVal('product-name', d.name);
+        setVal('product-art', d.art);
+        setVal('product-slug', d.slug);
+        setVal('product-description', d.description);
+        setVal('product-season', d.season);
+        setVal('product-gender', normalizeGenderForForm(d.gender) || d.gender || '');
+
+        const catSel = document.getElementById('product-category');
+        const brandSel = document.getElementById('product-brand');
+        if (catSel) populateCategorySelect(catSel, d.category_id);
+        if (brandSel) populateBrandSelect(brandSel, d.brand_id);
+
+        const activeChk = document.getElementById('product-active');
+        if (activeChk) activeChk.checked = d.is_active !== false;
+
+        productImages = Array.isArray(d.images) ? d.images.slice() : [];
+        productVariants = Array.isArray(d.variants) ? d.variants.slice() : [];
+        productAttributes = Array.isArray(d.attributes) ? d.attributes.slice() : [];
+        productMaterials = Array.isArray(d.materials) ? d.materials.slice() : [];
+
+        const ids = Array.isArray(d.tagIds) ? d.tagIds : [];
+        productTags = availableTags.filter(function(t) { return ids.indexOf(t.id) !== -1; });
+
+        renderImagesList();
+        renderVariantsList();
+        renderAttributesList();
+        renderMaterialsList();
+        renderTagsDropdown();
+        updateSelectedTags();
+    }
+
+    function forceCloseProductModal() {
+        const exitDraft = document.getElementById('product-exit-draft-modal');
+        if (exitDraft && exitDraft.classList.contains('show')) closeModal(exitDraft);
+        const modal = document.getElementById('product-modal');
+        if (modal) closeModal(modal);
+        editingProductId = null;
+        productModalBaselineSerialized = null;
+        productModalBaselineReady = false;
+    }
+
+    function requestCloseProductModal() {
+        if (!isProductModalDirty()) {
+            forceCloseProductModal();
+            return;
+        }
+        const exitDraft = document.getElementById('product-exit-draft-modal');
+        if (exitDraft) openModal(exitDraft);
+    }
 
     function renderVariantsList() {
         const container = ui.productVariantsContainer;
@@ -628,11 +922,11 @@ const Admin = (() => {
             const div = document.createElement('div');
             div.className = 'admin-variant-row';
 
-            const sizeOptions = '<option value="">— Размер —</option>' + availableSizes.map(function(s) {
+            const sizeOptions = '<option value="">Размер</option>' + availableSizes.map(function(s) {
                 return '<option value="' + s.id + '"' + (Number(v.size_id) === s.id ? ' selected' : '') + '>' +
                     escapeHtml(s.value) + ' (' + escapeHtml(s.size_type) + ')</option>';
             }).join('');
-            const colorOptions = '<option value="">— Цвет —</option>' + availableColors.map(function(c) {
+            const colorOptions = '<option value="">Цвет</option>' + availableColors.map(function(c) {
                 return '<option value="' + c.id + '"' + (Number(v.color_id) === c.id ? ' selected' : '') + '>' +
                     escapeHtml(c.name) + '</option>';
             }).join('');
@@ -644,7 +938,7 @@ const Admin = (() => {
                 '<label class="checkbox-label variant-active-label">' +
                     '<input type="checkbox" class="variant-active" ' + (v.is_active !== false ? 'checked' : '') + ' />' +
                     '<span class="checkbox-custom"></span>' +
-                    '<span>Активен</span>' +
+                    '<span>Видимость</span>' +
                 '</label>' +
                 '<button type="button" class="btn-row-remove" data-index="' + i + '" title="Удалить">×</button>';
             container.appendChild(div);
@@ -679,8 +973,6 @@ const Admin = (() => {
             });
         });
     }
-
-    // ── Характеристики ────────────────────────────────────────────────────────
 
     function renderAttributesList() {
         const container = ui.productAttributesContainer;
@@ -721,8 +1013,6 @@ const Admin = (() => {
         });
     }
 
-    // ── Теги ──────────────────────────────────────────────────────────────────
-
     function renderTagsDropdown() {
         const dropdown = ui.productTagsDropdown;
         if (!dropdown) return;
@@ -755,12 +1045,10 @@ const Admin = (() => {
         }
     }
 
-    // ── Загрузка файлов ───────────────────────────────────────────────────────
-
     async function uploadFiles(files) {
         const form = new FormData();
         Array.from(files).forEach(function(f) { form.append('images', f, f.name); });
-        const r = await fetch('/api/admin/uploads', { method: 'POST', body: form });
+        const r = await apiFetch('/api/admin/uploads', { method: 'POST', body: form });
         if (!r.ok) {
             let msg = 'Код ' + r.status;
             try { const e = await r.json(); if (e.error) msg = e.error; } catch {}
@@ -772,8 +1060,6 @@ const Admin = (() => {
         });
     }
 
-    // ── Открытие/закрытие модального окна товара ──────────────────────────────
-
     async function openProductModal(product) {
         const modal = document.getElementById('product-modal');
         const title = document.getElementById('modal-title');
@@ -781,6 +1067,7 @@ const Admin = (() => {
         if (!modal || !title || !form) return;
 
         editingProductId = product ? product.id : null;
+        productModalBaselineReady = false;
         title.textContent = product ? 'Редактировать товар' : 'Новый товар';
         form.reset();
         clearFieldErrors();
@@ -807,11 +1094,14 @@ const Admin = (() => {
             if (span) span.textContent = 'Выберите теги';
         }
 
+        const delBtn = document.getElementById('delete-product-btn');
+        if (delBtn) delBtn.hidden = !editingProductId;
+
         openModal(modal);
 
         if (product) {
             try {
-                const r = await fetch('/api/product/' + encodeURIComponent(product.id));
+                const r = await apiFetch('/api/product/' + encodeURIComponent(product.id));
                 const full = r.ok ? await r.json() : null;
                 if (full) {
                     const setVal = function(id, val) {
@@ -823,14 +1113,13 @@ const Admin = (() => {
                     setVal('product-slug', full.slug);
                     setVal('product-description', full.description);
                     setVal('product-season', full.season);
-                    setVal('product-gender', full.gender);
+                    setVal('product-gender', normalizeGenderForForm(full.gender) || full.gender || '');
                     const activeChk = document.getElementById('product-active');
                     if (activeChk) activeChk.checked = full.is_active !== false;
 
                     populateCategorySelect(catSel, full.category_id);
                     populateBrandSelect(brandSel, full.brand_id);
 
-                    // Материалы: парсим строку или берём массив
                     if (Array.isArray(full.materials_list) && full.materials_list.length) {
                         productMaterials = full.materials_list;
                     } else if (typeof full.materials === 'string' && full.materials) {
@@ -875,25 +1164,38 @@ const Admin = (() => {
                     updateSelectedTags();
                 }
             } catch (err) {
-                console.error('Failed to load product:', err);
                 notify('Не удалось загрузить данные товара', 'error');
             }
         }
+
+        const draftRaw = localStorage.getItem(draftStorageKey());
+        if (draftRaw) {
+            try {
+                const parsed = JSON.parse(draftRaw);
+                if (confirm('Найден сохранённый черновик. Восстановить введённые данные?')) {
+                    applyDraftPayload(parsed);
+                } else {
+                    clearProductDraftStorage();
+                }
+            } catch {
+                clearProductDraftStorage();
+            }
+        }
+
+        captureProductModalBaseline();
     }
 
-    function closeProductModal() {
-        closeModal(document.getElementById('product-modal'));
-        editingProductId = null;
+    function closeProductModalAfterSave() {
+        clearProductDraftStorage();
+        forceCloseProductModal();
     }
-
-    // ── Сохранение товара ─────────────────────────────────────────────────────
 
     async function saveProduct(e) {
         e.preventDefault();
         clearFieldErrors();
         collectVariants();
         collectAttributes();
-        collectMaterials();
+        const materialsError = collectMaterials();
 
         const g = function(id) { return document.getElementById(id); };
         const name = g('product-name') ? g('product-name').value.trim() : '';
@@ -905,18 +1207,30 @@ const Admin = (() => {
             hasErrors = true;
         }
 
-        // Валидация материалов: если есть, сумма должна быть 100%
-        if (productMaterials.length) {
-            const total = productMaterials.reduce(function(s, m) { return s + (m.percent || 0); }, 0);
+        const artRaw = g('product-art') ? g('product-art').value.trim().toUpperCase() : '';
+        if (!artRaw) {
+            showFieldError('err-art', 'Поле «Артикул» обязательно');
+            if (!hasErrors) g('product-art') && g('product-art').focus();
+            hasErrors = true;
+        } else if (!/^[A-Z0-9-]+$/.test(artRaw)) {
+            showFieldError('err-art', 'Артикул может содержать только A-Z, 0-9 и дефис');
+            if (!hasErrors) g('product-art') && g('product-art').focus();
+            hasErrors = true;
+        }
+
+        if (materialsError) {
+            notify(materialsError, 'error');
+            hasErrors = true;
+        } else if (productMaterials.length) {
+            const total = productMaterials.reduce(function(s, m) { return s + m.percent; }, 0);
             if (total !== 100) {
-                notify('Сумма процентов материалов должна быть 100% (сейчас ' + total + '%)', 'error');
+                notify('Сумма процентов состава должна быть ровно 100%. Сейчас: ' + total + '%.', 'error');
                 hasErrors = true;
             }
         }
 
         if (hasErrors) return;
 
-        const artRaw = g('product-art') ? g('product-art').value.trim().toUpperCase() : '';
         const slug = g('product-slug') ? g('product-slug').value.trim() : '';
         const description = g('product-description') ? g('product-description').value.trim() : '';
         const season = g('product-season') ? g('product-season').value : '';
@@ -925,7 +1239,6 @@ const Admin = (() => {
         const brandId = g('product-brand') ? g('product-brand').value : '';
         const isActive = g('product-active') ? g('product-active').checked : true;
 
-        // Добавить URL-изображение если введено
         const urlImageInput = g('product-image-url');
         if (urlImageInput && urlImageInput.value.trim()) {
             const url = urlImageInput.value.trim();
@@ -938,7 +1251,6 @@ const Admin = (() => {
             productImages[0].is_primary = true;
         }
 
-        // Формируем строку материалов для сохранения
         const materialsStr = materialsToString(productMaterials);
 
         const payload = {
@@ -961,7 +1273,7 @@ const Admin = (() => {
         try {
             const method = editingProductId ? 'PUT' : 'POST';
             const url = editingProductId ? '/api/admin/products/' + editingProductId : '/api/admin/products';
-            const r = await fetch(url, {
+            const r = await apiFetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -972,15 +1284,17 @@ const Admin = (() => {
                 throw new Error(msg);
             }
             await fetchProducts();
-            closeProductModal();
-            notify(editingProductId ? 'Товар обновлён' : 'Товар добавлен', 'success');
+            const wasEdit = !!editingProductId;
+            closeProductModalAfterSave();
+            notify(wasEdit ? 'Товар обновлён' : 'Товар добавлен', 'success');
         } catch (err) {
-            console.error('Error saving product:', err);
-            notify(err.message || 'Не удалось сохранить товар', 'error');
+            if (err.message.includes('Артикул уже существует')) {
+                showFieldError('err-art', 'Артикул уже существует');
+            } else {
+                notify(err.message || 'Не удалось сохранить товар', 'error');
+            }
         }
     }
-
-    // ── Привязка событий ──────────────────────────────────────────────────────
 
     function attachEvents() {
         const addBtn = document.getElementById('add-product-btn');
@@ -998,11 +1312,26 @@ const Admin = (() => {
 
         if (addBtn) addBtn.onclick = function() { openProductModal(null); };
         if (refreshBtn) refreshBtn.onclick = function() { fetchProducts(); };
-        if (searchInput) searchInput.oninput = function() { fetchProducts(); };
+        if (searchInput) {
+            searchInput.oninput = function() {
+                syncAdminSearchClear();
+                clearTimeout(searchInputTimer);
+                searchInputTimer = setTimeout(fetchProducts, 320);
+            };
+        }
+        const searchClearBtn = document.getElementById('admin-search-clear');
+        if (searchClearBtn && searchInput) {
+            searchClearBtn.onclick = function() {
+                searchInput.value = '';
+                syncAdminSearchClear();
+                fetchProducts();
+            };
+        }
+        syncAdminSearchClear();
         if (openFiltersBtn) openFiltersBtn.onclick = openFiltersModal;
         if (applyFiltersBtn) applyFiltersBtn.onclick = applyFilters;
         if (clearFiltersBtn) clearFiltersBtn.onclick = clearFilters;
-        if (cancelBtn) cancelBtn.onclick = closeProductModal;
+        if (cancelBtn) cancelBtn.onclick = requestCloseProductModal;
 
         if (sortBy) {
             sortBy.onchange = function(e) {
@@ -1014,6 +1343,7 @@ const Admin = (() => {
 
         if (addVariantBtn) {
             addVariantBtn.onclick = function() {
+                collectVariants();
                 productVariants.push({ size_id: null, color_id: null, art: '', is_active: true });
                 renderVariantsList();
             };
@@ -1021,6 +1351,7 @@ const Admin = (() => {
 
         if (addAttributeBtn) {
             addAttributeBtn.onclick = function() {
+                collectAttributes();
                 productAttributes.push({ name: '', value: '', sort_order: productAttributes.length });
                 renderAttributesList();
             };
@@ -1028,6 +1359,7 @@ const Admin = (() => {
 
         if (addMaterialBtn) {
             addMaterialBtn.onclick = function() {
+                productMaterials = snapshotMaterialsFromDom();
                 productMaterials.push({ name: '', percent: 0 });
                 renderMaterialsList();
             };
@@ -1064,14 +1396,100 @@ const Admin = (() => {
         if (filterModal) {
             const closeBtn = filterModal.querySelector('.modal-close');
             if (closeBtn) closeBtn.onclick = closeFiltersModal;
+            filterModal.addEventListener('click', function(e) {
+                if (e.target === filterModal) closeFiltersModal();
+            });
         }
         if (productModal) {
             const closeBtn = productModal.querySelector('.modal-close');
-            if (closeBtn) closeBtn.onclick = closeProductModal;
+            if (closeBtn) closeBtn.onclick = requestCloseProductModal;
+            productModal.addEventListener('click', function(e) {
+                if (e.target === productModal) requestCloseProductModal();
+            });
         }
+
+        const exitDraftModal = document.getElementById('product-exit-draft-modal');
+        if (exitDraftModal) {
+            const stayBtn = document.getElementById('product-exit-draft-stay');
+            const discardBtn = document.getElementById('product-exit-draft-discard');
+            const saveDraftBtn = document.getElementById('product-exit-draft-save');
+            const exClose = exitDraftModal.querySelector('.modal-close');
+            if (stayBtn) stayBtn.onclick = function() { closeModal(exitDraftModal); };
+            if (exClose) exClose.onclick = function() { closeModal(exitDraftModal); };
+            if (discardBtn) discardBtn.onclick = function() {
+                clearProductDraftStorage();
+                closeModal(exitDraftModal);
+                forceCloseProductModal();
+            };
+            if (saveDraftBtn) saveDraftBtn.onclick = function() {
+                saveProductDraftToStorage();
+                closeModal(exitDraftModal);
+                forceCloseProductModal();
+                notify('Черновик сохранён в браузере. При следующем открытии формы его можно восстановить.', 'success');
+            };
+            exitDraftModal.addEventListener('click', function(e) {
+                if (e.target === exitDraftModal) closeModal(exitDraftModal);
+            });
+        }
+
+        const visibilityModal = document.getElementById('visibility-confirm-modal');
+        if (visibilityModal) {
+            const vClose = visibilityModal.querySelector('.modal-close');
+            if (vClose) vClose.onclick = cancelVisibilityConfirm;
+            const vCancel = document.getElementById('visibility-confirm-cancel');
+            if (vCancel) vCancel.onclick = cancelVisibilityConfirm;
+            const vOk = document.getElementById('visibility-confirm-ok');
+            if (vOk) vOk.onclick = function() { applyProductCatalogVisibilityFromConfirm(); };
+            visibilityModal.addEventListener('click', function(e) {
+                if (e.target === visibilityModal) cancelVisibilityConfirm();
+            });
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key !== 'Escape') return;
+            const exitDraft = document.getElementById('product-exit-draft-modal');
+            if (exitDraft && exitDraft.style.display !== 'none' && exitDraft.classList.contains('show')) {
+                closeModal(exitDraft);
+                e.preventDefault();
+                return;
+            }
+            const vis = ui.visibilityConfirmModal;
+            if (vis && vis.style.display !== 'none' && vis.classList.contains('show')) {
+                cancelVisibilityConfirm();
+                e.preventDefault();
+                return;
+            }
+            const pm = document.getElementById('product-modal');
+            if (pm && pm.classList.contains('show')) {
+                requestCloseProductModal();
+                e.preventDefault();
+                return;
+            }
+            const fm = document.getElementById('filter-modal');
+            if (fm && fm.classList.contains('show')) {
+                closeFiltersModal();
+                e.preventDefault();
+            }
+        });
 
         const productForm = document.getElementById('product-form');
         if (productForm) productForm.onsubmit = saveProduct;
+
+        const deleteBtn = document.getElementById('delete-product-btn');
+        if (deleteBtn) {
+            deleteBtn.onclick = function() {
+                if (!editingProductId) {
+                    notify('Ошибка: товар не загружен', 'error');
+                    return;
+                }
+                if (confirm('Вы уверены, что хотите удалить этот товар? Это действие нельзя отменить.')) {
+                    doDeleteProduct(editingProductId).then(function() {
+                        clearProductDraftStorage();
+                        forceCloseProductModal();
+                    });
+                }
+            };
+        }
 
         if (ui.productImagesInput) {
             ui.productImagesInput.addEventListener('change', async function() {
@@ -1120,8 +1538,6 @@ const Admin = (() => {
         setupResizableColumns();
     }
 
-    // ── Инициализация ─────────────────────────────────────────────────────────
-
     function initAdminPage() {
         loadStateFromStorage();
 
@@ -1139,6 +1555,8 @@ const Admin = (() => {
         ui.productVariantsContainer = document.getElementById('product-variants-container');
         ui.productAttributesContainer = document.getElementById('product-attributes-container');
         ui.productMaterialsList = document.getElementById('product-materials-list');
+
+        ui.visibilityConfirmModal = document.getElementById('visibility-confirm-modal');
 
         const sortBy = document.getElementById('sort-by');
         if (sortBy) sortBy.value = state.sortOption;

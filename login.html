@@ -3,32 +3,46 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вход — Администрирование</title>
+    <meta name="robots" content="noindex, nofollow">
+    <title>Вход · Администрирование · КПВС</title>
     <link rel="stylesheet" href="/css/style.css">
     <script src="/js/login.js" defer></script>
 </head>
 <body class="login-page">
-    <div class="login-container">
-        <div class="login-card">
-            <div class="login-logo">
-                <img src="/img/logo.png" alt="КПВС">
-            </div>
-            <h1 class="login-title">Административная панель</h1>
-            <p class="login-subtitle">Войдите для управления товарами</p>
+    <main class="login-main">
+        <a href="/welcome.html" class="login-back-link">← На сайт</a>
 
-            <form id="login-form" class="login-form" novalidate>
-                <div class="form-row">
-                    <label for="login-username">Логин</label>
-                    <input id="login-username" type="text" name="username" autocomplete="username" required placeholder="Введите логин" />
-                </div>
-                <div class="form-row">
-                    <label for="login-password">Пароль</label>
-                    <input id="login-password" type="password" name="password" autocomplete="current-password" required placeholder="Введите пароль" />
-                </div>
-                <div id="login-error" class="login-error" role="alert" aria-live="polite"></div>
-                <button type="submit" id="login-btn" class="filter-button login-btn">Войти</button>
-            </form>
+        <div class="login-container">
+            <div class="login-card">
+                <header class="login-card-header">
+                    <div class="login-logo">
+                        <img src="/img/logo.png" alt="ООО КПВС" width="160" height="48">
+                    </div>
+                    <p class="login-badge" aria-hidden="true">Служебный вход</p>
+                    <h1 class="login-title">Панель администратора</h1>
+                    <p class="login-subtitle">Управление каталогом и карточками товаров. Используйте учётные данные, выданные администратором.</p>
+                </header>
+
+                <form id="login-form" class="login-form" novalidate>
+                    <div class="form-row">
+                        <label for="login-username">Логин</label>
+                        <input id="login-username" type="text" name="username" autocomplete="username" required placeholder="Например, admin" />
+                    </div>
+                    <div class="form-row">
+                        <label for="login-password">Пароль</label>
+                        <input id="login-password" type="password" name="password" autocomplete="current-password" required placeholder="Введите пароль" />
+                    </div>
+                    <div id="login-error" class="login-error" role="alert" aria-live="polite"></div>
+                    <div class="login-submit-wrap">
+                        <button type="submit" id="login-btn" class="admin-ui-btn admin-ui-btn--primary login-btn">Войти</button>
+                    </div>
+                </form>
+
+                <footer class="login-card-footer">
+                    <p class="login-footer-note">После успешного входа вы будете перенаправлены в раздел администрирования. При утере доступа обратитесь к ответственному лицу.</p>
+                </footer>
+            </div>
         </div>
-    </div>
+    </main>
 </body>
 </html>

@@ -108,7 +108,7 @@ async function getTags() {
     return result.rows;
 }
 
-async function getProducts(gender, options = {}) {
+async function getProducts(genderParam, options = {}) {
     const {
         category,
         tag,
@@ -119,17 +119,32 @@ async function getProducts(gender, options = {}) {
         size,
         sort_by,
         sort_direction,
+        include_inactive,
+        gender: genderOpt,
         limit = 20,
         offset = 0
     } = options || {};
 
-    const conditions = ['p.is_active = TRUE'];
+    const genderFilter = (genderParam || genderOpt || '').trim();
+
+    const conditions = [];
     const values = [];
     let idx = 1;
 
-    if (gender) {
-        values.push(gender);
-        conditions.push(`p.gender = $${idx++}`);
+    if (!include_inactive) {
+        conditions.push('p.is_active = TRUE');
+    }
+
+    if (genderFilter) {
+        const g = genderFilter;
+        if (g === 'mens' || g === 'male') {
+            conditions.push(`(p.gender IN ('mens', 'male'))`);
+        } else if (g === 'womens' || g === 'female') {
+            conditions.push(`(p.gender IN ('womens', 'female'))`);
+        } else {
+            values.push(g);
+            conditions.push(`p.gender = $${idx++}`);
+        }
     }
 
     if (category) {
@@ -247,7 +262,7 @@ async function getProducts(gender, options = {}) {
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN brands b ON p.brand_id = b.id
-        WHERE ${conditions.join(' AND ')}
+        WHERE ${conditions.length ? conditions.join(' AND ') : 'TRUE'}
         ORDER BY ${sortField} ${direction}
         LIMIT $${idx} OFFSET $${idx + 1}
     `;
@@ -336,6 +351,13 @@ async function createProduct(data) {
         const slug = (data.slug && data.slug.trim()) || slugify(data.name);
         const art = data.art && data.art.trim() ? data.art.trim().toUpperCase() : null;
 
+        if (art) {
+            const existing = await client.query('SELECT id FROM products WHERE art = $1', [art]);
+            if (existing.rows.length > 0) {
+                throw new Error('Артикул уже существует');
+            }
+        }
+
         const res = await client.query(`
             INSERT INTO products (art, name, slug, description, category_id, brand_id, materials, season, gender, is_active)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
@@ -385,6 +407,13 @@ async function updateProduct(id, data) {
 
         const slug = (data.slug && data.slug.trim()) || slugify(data.name);
         const art = data.art && data.art.trim() ? data.art.trim().toUpperCase() : null;
+
+        if (art) {
+            const existing = await client.query('SELECT id FROM products WHERE art = $1 AND id != $2', [art, id]);
+            if (existing.rows.length > 0) {
+                throw new Error('Артикул уже существует');
+            }
+        }
 
         const res = await client.query(`
             UPDATE products
@@ -438,6 +467,14 @@ async function updateProduct(id, data) {
 async function deleteProduct(id) {
     const result = await pool.query('DELETE FROM products WHERE id = $1', [id]);
     return result.rowCount > 0;
+}
+
+async function updateProductActiveFlag(id, isActive) {
+    const result = await pool.query(
+        'UPDATE products SET is_active = $1 WHERE id = $2 RETURNING id, is_active',
+        [Boolean(isActive), id]
+    );
+    return result.rows[0] || null;
 }
 
 async function replaceProductImages(client, productId, images) {
@@ -540,6 +577,20 @@ async function createUser(username, password, role) {
     return result.rows[0];
 }
 
+async function ensureDefaultUsers() {
+    const defaults = [
+        { username: 'admin', password: 'admin', role: 'admin' },
+        { username: 'superadmin', password: 'superadmin', role: 'superadmin' }
+    ];
+    for (const u of defaults) {
+        const existing = await findUserByUsername(u.username);
+        if (!existing) {
+            await createUser(u.username, u.password, u.role);
+            console.log('  - Default user created:', u.username);
+        }
+    }
+}
+
 async function listUsers() {
     const result = await pool.query(
         'SELECT id, username, role, is_active, created_at, last_login FROM users ORDER BY id'
@@ -573,10 +624,12 @@ module.exports = {
     createProduct,
     updateProduct,
     deleteProduct,
+    updateProductActiveFlag,
     searchProducts,
     findUserByUsername,
     verifyUser,
     createUser,
+    ensureDefaultUsers,
     listUsers,
     setUserActive,
     changeUserPassword

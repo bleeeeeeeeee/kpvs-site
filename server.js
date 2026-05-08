@@ -19,9 +19,11 @@ const {
     createProduct,
     updateProduct,
     deleteProduct,
+    updateProductActiveFlag,
     searchProducts,
     verifyUser,
     createUser,
+    ensureDefaultUsers,
     listUsers,
     setUserActive,
     changeUserPassword
@@ -49,8 +51,6 @@ app.use(session({
         sameSite: 'lax'
     }
 }));
-
-app.use(express.static(path.join(__dirname)));
 
 app.use((req, res, next) => {
     console.log(`${req.method} ${req.originalUrl}`);
@@ -239,6 +239,7 @@ app.get('/api/admin/products', requireAuth, async (req, res) => {
         const { q, gender, category, brand, season, sort_by, sort_direction, limit = 100, offset = 0 } = req.query;
         res.json(await getProducts(null, {
             q, gender, category, brand, season, sort_by, sort_direction,
+            include_inactive: true,
             limit: Number(limit) || 100,
             offset: Number(offset) || 0
         }));
@@ -248,16 +249,75 @@ app.get('/api/admin/products', requireAuth, async (req, res) => {
     }
 });
 
+async function postAdminCatalogVisibility(req, res) {
+    try {
+        const rawId = req.body?.product_id ?? req.body?.id;
+        const id = Number(rawId);
+        if (!Number.isFinite(id)) {
+            return res.status(400).json({ error: 'Укажите product_id (число)' });
+        }
+        let active = req.body?.is_active;
+        if (typeof active === 'string') {
+            const s = active.trim().toLowerCase();
+            if (s === 'true' || s === '1') active = true;
+            else if (s === 'false' || s === '0') active = false;
+        }
+        if (typeof active !== 'boolean') {
+            return res.status(400).json({ error: 'Укажите is_active (true или false)' });
+        }
+        const row = await updateProductActiveFlag(id, active);
+        if (!row) return res.status(404).json({ error: 'Товар не найден в базе' });
+        res.json({ id: row.id, is_active: row.is_active });
+    } catch (err) {
+        console.error('POST admin catalog visibility:', err);
+        res.status(500).json({ error: 'Не удалось обновить видимость товара' });
+    }
+}
+
+app.post('/api/admin/catalog-visibility', requireAuth, postAdminCatalogVisibility);
+app.post('/api/admin/productvisibility', requireAuth, postAdminCatalogVisibility);
+
+const ALLOWED_PRODUCT_GENDERS = ['mens', 'womens', 'unisex'];
+
+/** Приводит пол к канону в самом payload (mutates), чтобы в БД были mens/womens/unisex. */
+function normalizeProductGenderInPayload(payload) {
+    if (!payload || typeof payload !== 'object') return;
+    const raw = payload.gender;
+    if (raw == null || raw === '') {
+        payload.gender = null;
+        return;
+    }
+    const s = String(raw).trim().toLowerCase();
+    if (!s) {
+        payload.gender = null;
+        return;
+    }
+    const legacy = { male: 'mens', female: 'womens' };
+    payload.gender = legacy[s] || s;
+}
+
 function validateProductPayload(payload) {
     if (!payload || typeof payload !== 'object') return ['Некорректное тело запроса'];
+    normalizeProductGenderInPayload(payload);
     const errors = [];
     const name = typeof payload.name === 'string' ? payload.name.trim() : '';
+    const art = typeof payload.art === 'string' ? payload.art.trim().toUpperCase() : '';
     if (!name) errors.push('Поле name обязательно');
-    if (payload.gender && !['male', 'female', 'unisex'].includes(payload.gender)) {
-        errors.push('Поле gender: male, female или unisex');
+    if (!art) errors.push('Поле art обязательно');
+    else if (!/^[A-Z0-9-]+$/.test(art)) {
+        errors.push('Поле art должно содержать только заглавные буквы, цифры и дефис');
+    }
+    if (payload.gender && !ALLOWED_PRODUCT_GENDERS.includes(payload.gender)) {
+        errors.push('Поле gender: mens, womens или unisex');
     }
     if (payload.season && !['зима', 'лето', 'демисезон', 'всесезонный'].includes(payload.season)) {
         errors.push('Поле season: зима, лето, демисезон или всесезонный');
+    }
+    if (payload.slug !== undefined && payload.slug && typeof payload.slug === 'string') {
+        const slug = payload.slug.trim();
+        if (!/^[a-z0-9-]+$/.test(slug)) {
+            errors.push('Slug может содержать только строчные латинские буквы, цифры и дефисы');
+        }
     }
     if (payload.images !== undefined) {
         if (!Array.isArray(payload.images)) errors.push('Поле images должно быть массивом');
@@ -297,6 +357,26 @@ app.put('/api/admin/products/:id', requireAuth, async (req, res) => {
     }
 });
 
+async function handleAdminProductActive(req, res) {
+    try {
+        const id = Number(req.params.id);
+        if (!Number.isFinite(id)) return res.status(400).json({ error: 'Некорректный id' });
+        const { is_active } = req.body || {};
+        if (typeof is_active !== 'boolean') {
+            return res.status(400).json({ error: 'Укажите is_active (true или false)' });
+        }
+        const row = await updateProductActiveFlag(id, is_active);
+        if (!row) return res.status(404).json({ error: 'Товар не найден' });
+        res.json({ id: row.id, is_active: row.is_active });
+    } catch (err) {
+        console.error(`${req.method} /api/admin/products/:id/active:`, err);
+        res.status(500).json({ error: 'Не удалось обновить видимость товара' });
+    }
+}
+
+app.patch('/api/admin/products/:id/active', requireAuth, handleAdminProductActive);
+app.post('/api/admin/products/:id/active', requireAuth, handleAdminProductActive);
+
 app.delete('/api/admin/products/:id', requireAuth, async (req, res) => {
     try {
         const deleted = await deleteProduct(Number(req.params.id));
@@ -308,11 +388,14 @@ app.delete('/api/admin/products/:id', requireAuth, async (req, res) => {
     }
 });
 
+app.use(express.static(path.join(__dirname)));
+
 app.get('/:file', (req, res) => {
     res.sendFile(path.join(__dirname, `${req.params.file}.html`));
 });
 
 connectDB()
+    .then(() => ensureDefaultUsers())
     .then(() => {
         app.listen(PORT, () => {
             console.log(`  - Server running on http://localhost:${PORT}`);
