@@ -6,6 +6,9 @@
     <title>Женская одежда · КПВС</title>
     <link rel="stylesheet" href="/css/style.css">
     <script src="/js/modal-lock.js" defer></script>
+    <script src="/js/currency.js" defer></script>
+    <script src="/js/app-settings.js" defer></script>
+    <script src="/js/account-modal.js" defer></script>
     <script src="/js/catalog.js" defer></script>
 </head>
 <body class="site-page catalog-page" data-gender="womens">
@@ -21,17 +24,19 @@
                     <button type="button" class="site-icon-btn" id="cart" title="Корзина" aria-label="Корзина">
                         <img src="/img/cart.svg" alt="">
                     </button>
+                    <a class="site-icon-btn" href="/login.html?mode=user" title="Аккаунт" aria-label="Аккаунт" data-account-action>
+                        <img src="/img/account.svg" alt="">
+                    </a>
                 </div>
             </div>
         </header>
-
-        <p class="site-subtitle">Каталог спецодежды и средств индивидуальной защиты.</p>
+        <div class="site-subtitle-spacer" aria-hidden="true"></div>
 
         <div class="catalog-controls">
             <div class="catalog-search-row">
                 <div class="catalog-search-wrap">
                     <input type="search" id="catalog-search" class="catalog-search-input" placeholder="Поиск по названию или артикулу…" autocomplete="off" />
-                    <button type="button" id="catalog-search-clear" class="catalog-search-clear" title="Очистить" aria-label="Очистить поиск" hidden>&times;</button>
+                    <button type="button" id="catalog-search-clear" class="catalog-search-clear ui-xbtn" title="Очистить" aria-label="Очистить поиск" hidden>&times;</button>
                 </div>
                 <button type="button" id="filter-button" class="admin-ui-btn admin-ui-btn--primary admin-add-product-btn">Фильтры</button>
             </div>
@@ -63,9 +68,9 @@
                 </div>
                 <div class="footer-section">
                     <h4>Контакты</h4>
-                    <p class="footer-contact">📍 ул. л-та Рябцева, 44, Брест</p>
-                    <p class="footer-contact">📞 +375 (162) 58-09-31</p>
-                    <p class="footer-contact">✉️ sbyt@kpvs.by</p>
+                    <p class="footer-contact"><img src="/img/location.svg" alt="" class="footer-icon" aria-hidden="true"> ул. л-та Рябцева, 44, Брест</p>
+                    <p class="footer-contact"><img src="/img/phone.svg" alt="" class="footer-icon" aria-hidden="true"> +375 (162) 58-09-31</p>
+                    <p class="footer-contact"><img src="/img/mail.svg" alt="" class="footer-icon" aria-hidden="true"> sbyt@kpvs.by</p>
                 </div>
                 <div class="footer-section">
                     <h4>Информация</h4>

@@ -5,24 +5,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>КПВС — Спецодежда</title>
     <link rel="stylesheet" href="/css/style.css">
+    <script src="/js/modal-lock.js" defer></script>
+    <script src="/js/currency.js" defer></script>
+    <script src="/js/app-settings.js" defer></script>
+    <script src="/js/account-modal.js" defer></script>
     <script src="/js/welcome.js" defer></script>
 </head>
-<body>
+<body class="welcome-page">
     <div class="central">
         <header id="welcome">
             <img src="/img/logo.png" alt="logo" id="welcome-logo">
         </header>
 
-        <div class="genders">
-            <div class="mens">
-                <img src="/img/mens icon.png" alt="men" id="mens-icon">
-                <span class="caption">Мужская одежда</span>
+        <div class="welcome-shell">
+            <div class="genders">
+                <div class="mens">
+                    <img src="/img/mens icon.png" alt="men" id="mens-icon">
+                    <span class="caption">Мужская одежда</span>
+                </div>
+                <div class="womens">
+                    <img src="/img/womens icon.png" alt="women" id="womens-icon">
+                    <span class="caption">Женская одежда</span>
+                </div>
             </div>
-            <div class="womens">
-                <img src="/img/womens icon.png" alt="women" id="womens-icon">
-                <span class="caption">Женская одежда</span>
+
+            <div class="welcome-actions">
+                <button type="button" class="welcome-all-btn welcome-glass welcome-glass--hover" id="all-catalog-btn">Весь каталог</button>
             </div>
         </div>
+    </div>
+
+    <div class="welcome-top-actions" aria-label="Действия">
+        <a class="site-icon-btn" href="/login.html?mode=user" title="Аккаунт" aria-label="Аккаунт" data-account-action data-account-modal-trigger>
+            <img src="/img/account.svg" alt="">
+        </a>
     </div>
     
 </body>

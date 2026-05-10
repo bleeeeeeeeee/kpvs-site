@@ -20,13 +20,13 @@
             </div>
         </header>
 
-        <p class="admin-subtitle site-subtitle">Управление каталогом товаров.</p>
+        <div class="site-subtitle-spacer" aria-hidden="true"></div>
 
         <div class="catalog-controls admin-catalog-controls">
             <div class="catalog-search-row admin-catalog-search-row admin-toolbar-row-search">
                 <div class="catalog-search-wrap">
                     <input id="search-input" type="search" class="catalog-search-input" placeholder="Поиск по артикулу, названию или описанию" autocomplete="off" />
-                    <button type="button" id="admin-search-clear" class="catalog-search-clear" title="Очистить" aria-label="Очистить поиск" hidden>&times;</button>
+                    <button type="button" id="admin-search-clear" class="catalog-search-clear ui-xbtn" title="Очистить" aria-label="Очистить поиск" hidden>&times;</button>
                 </div>
                 <button type="button" id="add-product-btn" class="admin-ui-btn admin-ui-btn--primary admin-add-product-btn">Добавить товар</button>
             </div>
@@ -40,7 +40,7 @@
                 </select>
                 <div class="admin-toolbar-sort-actions">
                     <button type="button" id="open-filters-btn" class="admin-ui-btn admin-ui-btn--outline">Фильтры</button>
-                    <button type="button" id="refresh-btn" class="admin-ui-btn admin-ui-btn--outline admin-ui-btn--icon-square" title="Обновить список" aria-label="Обновить список">
+                    <button type="button" id="refresh-btn" class="admin-ui-btn admin-ui-btn--outline" title="Обновить список" aria-label="Обновить список">
                         <img src="/img/reload.svg" alt="" class="admin-toolbar-refresh-icon" width="20" height="20" />
                     </button>
                 </div>
@@ -52,7 +52,7 @@
         <div class="admin-table-container">
             <table class="admin-table">
                 <colgroup>
-                    <col data-col="visible" style="width:100px;">
+                    <col data-col="visible" style="width:74px;">
                     <col data-col="id" style="width:52px;">
                     <col data-col="name" style="width:300px;">
                     <col data-col="description">
@@ -74,6 +74,42 @@
                 <tbody id="products-body"></tbody>
             </table>
         </div>
+
+        <section class="admin-users-panel" id="admin-users-panel" hidden>
+            <div class="catalog-controls admin-catalog-controls">
+                <div class="catalog-search-row admin-toolbar-row-search">
+                    <div>
+                        <h2 class="admin-section-title">Пользователи и администраторы</h2>
+                        <p class="admin-section-subtitle">Доступно только для superadmin. Здесь можно создавать аккаунты, менять роли, сбрасывать пароли и отключать доступ.</p>
+                    </div>
+                    <button type="button" id="add-user-btn" class="admin-ui-btn admin-ui-btn--primary admin-add-product-btn">Добавить пользователя</button>
+                </div>
+            </div>
+
+            <div class="admin-table-container">
+                <table class="admin-table admin-users-table">
+                    <colgroup>
+                        <col style="width:52px;">
+                        <col style="width:56px;">
+                        <col style="width:220px;">
+                        <col style="width:200px;">
+                        <col style="width:170px;">
+                        <col style="width:740px;">
+                    </colgroup>
+                    <thead>
+                        <tr>
+                            <th scope="col">Активен</th>
+                            <th scope="col">ID</th>
+                            <th scope="col">Логин</th>
+                            <th scope="col">Роль</th>
+                            <th scope="col">Последний вход</th>
+                            <th scope="col">Действия</th>
+                        </tr>
+                    </thead>
+                    <tbody id="users-body"></tbody>
+                </table>
+            </div>
+        </section>
     </div>
 
     <footer class="footer">
@@ -85,9 +121,9 @@
                 </div>
                 <div class="footer-section">
                     <h4>Контакты</h4>
-                    <p class="footer-contact">📍 ул. л-та Рябцева, 44, Брест</p>
-                    <p class="footer-contact">📞 +375 (162) 58-09-31</p>
-                    <p class="footer-contact">✉️ sbyt@kpvs.by</p>
+                    <p class="footer-contact"><img src="/img/location.svg" alt="" class="footer-icon" aria-hidden="true"> ул. л-та Рябцева, 44, Брест</p>
+                    <p class="footer-contact"><img src="/img/phone.svg" alt="" class="footer-icon" aria-hidden="true"> +375 (162) 58-09-31</p>
+                    <p class="footer-contact"><img src="/img/mail.svg" alt="" class="footer-icon" aria-hidden="true"> sbyt@kpvs.by</p>
                 </div>
                 <div class="footer-section">
                     <h4>Информация</h4>
@@ -106,7 +142,7 @@
         <div class="modal-content admin-modal-content">
             <div class="modal-header admin-modal-header">
                 <h2 id="filter-modal-title">Фильтры товаров</h2>
-                <button class="modal-close" type="button" aria-label="Закрыть">&times;</button>
+                <button class="modal-close ui-xbtn" type="button" aria-label="Закрыть">&times;</button>
             </div>
             <div class="modal-body admin-filter-body">
                 <div class="filter-section">
@@ -156,7 +192,7 @@
         <div class="modal-content admin-modal-content admin-modal-content--wide">
             <div class="modal-header admin-modal-header">
                 <h2 id="modal-title">Новый товар</h2>
-                <button class="modal-close" type="button" aria-label="Закрыть">&times;</button>
+                <button class="modal-close ui-xbtn" type="button" aria-label="Закрыть">&times;</button>
             </div>
             <div class="modal-body product-modal-body">
                 <form id="product-form" class="admin-form" novalidate>
@@ -301,11 +337,46 @@
         </div>
     </div>
 
+    <div class="modal admin-modal" id="user-modal" role="dialog" aria-modal="true" aria-labelledby="user-modal-title" style="display:none;">
+        <div class="modal-content admin-modal-content">
+            <div class="modal-header admin-modal-header">
+                <h2 id="user-modal-title">Новый пользователь</h2>
+                <button class="modal-close ui-xbtn" type="button" aria-label="Закрыть">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="user-form" class="admin-form" novalidate>
+                    <div class="form-row">
+                        <label for="user-username">Логин <span class="required">*</span></label>
+                        <input id="user-username" name="username" type="text" autocomplete="off" />
+                        <span class="field-error" id="err-user-username"></span>
+                    </div>
+                    <div class="form-row">
+                        <label for="user-password">Пароль <span class="required">*</span></label>
+                        <input id="user-password" name="password" type="password" autocomplete="new-password" />
+                        <span class="field-error" id="err-user-password"></span>
+                    </div>
+                    <div class="form-row">
+                        <label for="user-role">Роль</label>
+                        <select id="user-role" name="role">
+                            <option value="user">user</option>
+                            <option value="admin">admin</option>
+                            <option value="superadmin">superadmin</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer admin-modal-footer">
+                <button type="button" id="user-cancel-btn" class="admin-ui-btn admin-ui-btn--secondary">Отмена</button>
+                <button type="button" id="user-save-btn" class="admin-ui-btn admin-ui-btn--primary">Создать</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal admin-modal" id="visibility-confirm-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="visibility-confirm-title">
         <div class="modal-content admin-modal-content admin-confirm-modal">
             <div class="modal-header admin-modal-header">
                 <h2 id="visibility-confirm-title">Подтверждение</h2>
-                <button type="button" class="modal-close visibility-confirm-close" aria-label="Закрыть">&times;</button>
+                <button type="button" class="modal-close ui-xbtn visibility-confirm-close" aria-label="Закрыть">&times;</button>
             </div>
             <div class="modal-body">
                 <p id="visibility-confirm-message" class="visibility-confirm-message"></p>
@@ -321,7 +392,7 @@
         <div class="modal-content admin-modal-content admin-confirm-modal">
             <div class="modal-header admin-modal-header">
                 <h2 id="product-exit-draft-title">Закрыть форму?</h2>
-                <button type="button" class="modal-close" aria-label="Закрыть">&times;</button>
+                <button type="button" class="modal-close ui-xbtn" aria-label="Закрыть">&times;</button>
             </div>
             <div class="modal-body">
                 <p class="visibility-confirm-message">Есть несохранённые на сервере изменения. Выберите действие.</p>

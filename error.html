@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{{TITLE}} · КПВС</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body class="error-page">
+    <main class="login-main">
+        <a href="/welcome.html" class="login-back-link">← К стартовой странице</a>
+
+        <div class="login-card error-panel">
+            <div class="error-panel__brand">
+                <img src="/img/logo.png" alt="ООО КПВС" width="168" height="50">
+            </div>
+
+            <div class="error-hero">
+                <span class="error-code-wrap" aria-hidden="true">
+                    <span class="error-code">{{CODE}}</span>
+                </span>
+                <h1 class="error-title">{{TITLE}}</h1>
+                <p class="error-desc">{{DESCRIPTION}}</p>
+            </div>
+
+            <div class="error-cta">
+                <a href="/welcome.html" class="welcome-all-btn welcome-glass welcome-glass--hover error-welcome-btn">
+                    Стартовая страница
+                </a>
+            </div>
+
+            <div class="error-actions">
+                <button type="button" class="error-btn-back" id="error-go-back">Назад</button>
+            </div>
+        </div>
+    </main>
+    <script>
+        (function () {
+            var b = document.getElementById('error-go-back');
+            if (b) b.addEventListener('click', function () {
+                if (history.length > 1) history.back();
+                else window.location.href = '/welcome.html';
+            });
+        })();
+    </script>
+</body>
+</html>

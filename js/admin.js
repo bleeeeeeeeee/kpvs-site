@@ -3,17 +3,16 @@ const Admin = (() => {
         try {
             const r = await apiFetch('/api/auth/me');
             if (!r.ok) {
-                window.location.replace('/login.html');
+                window.location.replace('/login.html?mode=admin&next=%2Fadmin.html');
                 return false;
             }
             const user = await r.json();
-            const subtitle = document.querySelector('.admin-subtitle');
-            if (subtitle && user.username) {
-                subtitle.textContent = user.username + ' · ' + user.role;
-            }
+            ui.currentUser = user;
+            const usersPanel = document.getElementById('admin-users-panel');
+            if (usersPanel) usersPanel.hidden = !(user && user.role === 'superadmin');
             return true;
         } catch {
-            window.location.replace('/login.html');
+            window.location.replace('/login.html?mode=admin&next=%2Fadmin.html');
             return false;
         }
     }
@@ -22,7 +21,7 @@ const Admin = (() => {
         try {
             await apiFetch('/api/auth/logout', { method: 'POST' });
         } catch {}
-        window.location.replace('/login.html');
+        window.location.replace('/login.html?mode=admin&next=%2Fadmin.html');
     }
 
     let categories = [];
@@ -44,8 +43,12 @@ const Admin = (() => {
     const state = {
         gender: '',
         categories: [],
-        brand: '',
-        season: '',
+        brands: [],
+        seasons: [],
+        sizes: [],
+        colors: [],
+        tags: [],
+        active: '',
         sortOption: 'id_desc'
     };
 
@@ -120,7 +123,7 @@ const Admin = (() => {
                 '<strong>' + escapeHtml(kind === 'error' ? 'Ошибка' : kind === 'success' ? 'Готово' : 'Сообщение') + '</strong>' +
                 '<span>' + escapeHtml(message) + '</span>' +
             '</div>' +
-            '<button class="notification-close" type="button" aria-label="Закрыть">&times;</button>';
+            '<button class="notification-close ui-xbtn" type="button" aria-label="Закрыть">&times;</button>';
         document.body.appendChild(node);
         node.querySelector('.notification-close').onclick = function(e) { e.stopPropagation(); node.remove(); };
         node.onclick = function(e) { e.stopPropagation(); };
@@ -131,6 +134,298 @@ const Admin = (() => {
         if (!ui.productsBody || !ui.productCount) return;
         ui.productsBody.innerHTML = '<tr class="empty-row"><td colspan="7">' + escapeHtml(msg) + '</td></tr>';
         ui.productCount.textContent = formatProductCount(0);
+    }
+
+    function formatDateTime(s) {
+        if (!s) return '—';
+        try {
+            const d = new Date(s);
+            if (isNaN(d.getTime())) return '—';
+            return d.toLocaleString('ru-RU', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        } catch { return '—'; }
+    }
+
+    function renderUsersTable(list) {
+        if (!ui.usersBody) return;
+        if (!Array.isArray(list) || !list.length) {
+            ui.usersBody.innerHTML = '<tr class="empty-row"><td colspan="6">Нет пользователей</td></tr>';
+            return;
+        }
+        ui.usersBody.innerHTML = list.map(function (u) {
+            const checked = u.is_active ? 'checked' : '';
+            const isSelf = ui.currentUser && Number(ui.currentUser.id) === Number(u.id);
+            const disabledSelf = isSelf ? 'disabled' : '';
+            const role = String(u.role || '');
+            const roleOptions = ['user', 'admin', 'superadmin'].map(function (r) {
+                return '<option value="' + r + '" ' + (r === role ? 'selected' : '') + '>' + r + '</option>';
+            }).join('');
+            return (
+                '<tr data-user-id="' + u.id + '">' +
+                    '<td class="cell-tight-control">' +
+                        '<label class="checkbox-label checkbox-label--only">' +
+                            '<input type="checkbox" class="user-active-toggle" ' + checked + ' ' + disabledSelf + ' />' +
+                            '<span class="checkbox-custom" aria-hidden="true"></span>' +
+                        '</label>' +
+                    '</td>' +
+                    '<td class="cell-id">' + escapeHtml(u.id) + '</td>' +
+                    '<td><span class="admin-table-cell-primary">' + escapeHtml(u.username || '') + '</span></td>' +
+                    '<td><select class="user-role-select" ' + disabledSelf + '>' + roleOptions + '</select></td>' +
+                    '<td>' + escapeHtml(formatDateTime(u.last_login)) + '</td>' +
+                    '<td class="admin-actions-cell">' +
+                        '<div class="admin-users-actions-inner">' +
+                        '<button type="button" class="admin-ui-btn admin-ui-btn--outline admin-ui-btn--sm btn-user-copy" data-copy="' + escapeHtml(u.username || '') + '">Копировать логин</button>' +
+                        '<button type="button" class="admin-ui-btn admin-ui-btn--outline admin-ui-btn--sm btn-user-rename">Сменить логин</button>' +
+                        '<button type="button" class="admin-ui-btn admin-ui-btn--outline admin-ui-btn--sm btn-user-password">Сменить пароль</button>' +
+                        '<button type="button" class="admin-ui-btn admin-ui-btn--danger admin-ui-btn--sm btn-user-delete">Удалить</button>' +
+                        '</div>' +
+                    '</td>' +
+                '</tr>'
+            );
+        }).join('');
+    }
+
+    async function fetchUsers() {
+        if (!ui.currentUser || ui.currentUser.role !== 'superadmin') return;
+        if (!ui.usersBody) return;
+        ui.usersBody.innerHTML = '<tr class="empty-row"><td colspan="6">Загрузка…</td></tr>';
+        const r = await apiFetch('/api/admin/users');
+        if (!r.ok) throw new Error('Failed to load users');
+        const list = await r.json();
+        renderUsersTable(list);
+    }
+
+    function openUserModal() {
+        if (!ui.userModal) return;
+        if (ui.userForm) ui.userForm.reset();
+        showFieldError('err-user-username', '');
+        showFieldError('err-user-password', '');
+        if (ui.userSaveBtn) ui.userSaveBtn.textContent = 'Создать';
+        ui.userModal.style.display = 'flex';
+        if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
+        setTimeout(function () { ui.userModal.classList.add('show'); }, 10);
+    }
+
+    function closeUserModal() {
+        if (!ui.userModal) return;
+        ui.userModal.classList.remove('show');
+        ui.userModal.style.display = 'none';
+        if (window.KpvsModalOverlay) window.KpvsModalOverlay.unlock();
+    }
+
+    async function createUserFromModal() {
+        const username = String(ui.userUsername && ui.userUsername.value || '').trim();
+        const password = String(ui.userPassword && ui.userPassword.value || '');
+        const role = String(ui.userRole && ui.userRole.value || 'user');
+        let ok = true;
+        showFieldError('err-user-username', '');
+        showFieldError('err-user-password', '');
+        if (!username) { showFieldError('err-user-username', 'Укажите логин'); ok = false; }
+        if (!password || password.length < 6) { showFieldError('err-user-password', 'Пароль должен быть не менее 6 символов'); ok = false; }
+        if (!ok) return;
+        const r = await apiFetch('/api/admin/users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: username, password: password, role: role })
+        });
+        const data = await r.json().catch(function () { return null; });
+        if (!r.ok) {
+            notify((data && data.error) ? data.error : 'Не удалось создать пользователя', 'error');
+            return;
+        }
+        notify('Пользователь создан', 'success');
+        closeUserModal();
+        await fetchUsers();
+    }
+
+    async function setUserActiveUi(id, isActive) {
+        const r = await apiFetch('/api/admin/users/' + encodeURIComponent(id) + '/active', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active: Boolean(isActive) })
+        });
+        if (!r.ok) {
+            const data = await r.json().catch(function () { return null; });
+            notify((data && data.error) ? data.error : 'Не удалось обновить активность', 'error');
+            throw new Error('active');
+        }
+    }
+
+    async function setUserRoleUi(id, role) {
+        const r = await apiFetch('/api/admin/users/' + encodeURIComponent(id) + '/role', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ role: String(role || '') })
+        });
+        const data = await r.json().catch(function () { return null; });
+        if (!r.ok) {
+            notify((data && data.error) ? data.error : 'Не удалось обновить роль', 'error');
+            throw new Error('role');
+        }
+    }
+
+    async function changeUsernameUi(id) {
+        const v = prompt('Новый логин (латиница/цифры/._-):');
+        if (!v) return;
+        const r = await apiFetch('/api/admin/users/' + encodeURIComponent(id) + '/username', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: String(v) })
+        });
+        const data = await r.json().catch(function () { return null; });
+        if (!r.ok) {
+            notify((data && data.error) ? data.error : 'Не удалось сменить логин', 'error');
+            return;
+        }
+        notify('Логин обновлён', 'success');
+        await fetchUsers();
+    }
+
+    async function resetUserPasswordUi(id) {
+        const pwd = prompt('Новый пароль (минимум 6 символов):');
+        if (!pwd) return;
+        const r = await apiFetch('/api/admin/users/' + encodeURIComponent(id) + '/password', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: String(pwd) })
+        });
+        const data = await r.json().catch(function () { return null; });
+        if (!r.ok) {
+            notify((data && data.error) ? data.error : 'Не удалось сменить пароль', 'error');
+            return;
+        }
+        notify('Пароль обновлён', 'success');
+    }
+
+    async function deleteUserUi(id) {
+        const r = await apiFetch('/api/admin/users/' + encodeURIComponent(id), { method: 'DELETE' });
+        const data = await r.json().catch(function () { return null; });
+        if (!r.ok) {
+            notify((data && data.error) ? data.error : 'Не удалось удалить пользователя', 'error');
+            return;
+        }
+        notify('Пользователь удалён', 'success');
+        await fetchUsers();
+    }
+
+    function copyToClipboard(text) {
+        const t = String(text || '');
+        if (!t) return Promise.reject(new Error('empty'));
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            return navigator.clipboard.writeText(t);
+        }
+        return new Promise(function (resolve, reject) {
+            try {
+                const ta = document.createElement('textarea');
+                ta.value = t;
+                ta.setAttribute('readonly', 'readonly');
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                ta.style.top = '0';
+                document.body.appendChild(ta);
+                ta.select();
+                const ok = document.execCommand('copy');
+                ta.remove();
+                if (!ok) return reject(new Error('copy failed'));
+                resolve();
+            } catch (e) { reject(e); }
+        });
+    }
+
+    function bindUsersEvents() {
+        if (ui.addUserBtn) {
+            ui.addUserBtn.addEventListener('click', function () {
+                if (!ui.currentUser || ui.currentUser.role !== 'superadmin') return;
+                openUserModal();
+            });
+        }
+
+        if (ui.userModal) {
+            ui.userModal.querySelectorAll('.modal-close.ui-xbtn').forEach(function (btn) {
+                btn.addEventListener('click', closeUserModal);
+            });
+            const cancelBtn = document.getElementById('user-cancel-btn');
+            if (cancelBtn) cancelBtn.addEventListener('click', closeUserModal);
+            ui.userModal.addEventListener('click', function (e) {
+                if (e.target === ui.userModal) closeUserModal();
+            });
+        }
+
+        if (ui.userSaveBtn) {
+            ui.userSaveBtn.addEventListener('click', function () {
+                if (!ui.currentUser || ui.currentUser.role !== 'superadmin') return;
+                createUserFromModal();
+            });
+        }
+
+        if (ui.usersBody) {
+            ui.usersBody.addEventListener('change', function (e) {
+                const row = e.target.closest && e.target.closest('tr[data-user-id]');
+                if (!row) return;
+                const id = Number(row.getAttribute('data-user-id'));
+                if (e.target.classList.contains('user-active-toggle')) {
+                    setUserActiveUi(id, e.target.checked).catch(function () {
+                        e.target.checked = !e.target.checked;
+                    });
+                }
+                if (e.target.classList.contains('user-role-select')) {
+                    setUserRoleUi(id, e.target.value)
+                        .then(function () { notify('Роль обновлена', 'success'); })
+                        .catch(function () { fetchUsers().catch(function () {}); });
+                }
+            });
+            ui.usersBody.addEventListener('click', function (e) {
+                const copyBtn = e.target.closest && e.target.closest('.btn-user-copy');
+                if (copyBtn) {
+                    const v = copyBtn.getAttribute('data-copy') || '';
+                    copyToClipboard(v)
+                        .then(function () { notify('Логин скопирован', 'success'); })
+                        .catch(function () { notify('Не удалось скопировать', 'error'); });
+                    return;
+                }
+                const renameBtn = e.target.closest && e.target.closest('.btn-user-rename');
+                const btn = e.target.closest && e.target.closest('.btn-user-password');
+                const delBtn = e.target.closest && e.target.closest('.btn-user-delete');
+                const row = (renameBtn || btn || delBtn) ? (renameBtn || btn || delBtn).closest('tr[data-user-id]') : null;
+                if (!row) return;
+                const id = Number(row.getAttribute('data-user-id'));
+                if (renameBtn) {
+                    changeUsernameUi(id);
+                    return;
+                }
+                if (btn) {
+                    resetUserPasswordUi(id);
+                    return;
+                }
+                if (delBtn) {
+                    const titleEl = document.getElementById('visibility-confirm-title');
+                    const msgEl = document.getElementById('visibility-confirm-message');
+                    if (titleEl) titleEl.textContent = 'Удалить пользователя?';
+                    if (msgEl) msgEl.textContent = 'Пользователь будет удалён без возможности восстановления. Продолжить?';
+                    const okBtn = document.getElementById('visibility-confirm-ok');
+                    const cancelBtn = document.getElementById('visibility-confirm-cancel');
+                    if (okBtn) okBtn.disabled = false;
+
+                    visibilityConfirmPending = { kind: 'delete-user', id: id };
+                    openModal(ui.visibilityConfirmModal);
+                    const onCancel = function() {
+                        if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
+                        if (okBtn) okBtn.removeEventListener('click', onOk);
+                        visibilityConfirmPending = null;
+                        closeModal(ui.visibilityConfirmModal);
+                    };
+                    const onOk = function() {
+                        if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
+                        if (okBtn) okBtn.removeEventListener('click', onOk);
+                        const pending = visibilityConfirmPending;
+                        visibilityConfirmPending = null;
+                        closeModal(ui.visibilityConfirmModal);
+                        if (pending && pending.kind === 'delete-user') deleteUserUi(pending.id);
+                    };
+                    if (cancelBtn) cancelBtn.addEventListener('click', onCancel);
+                    if (okBtn) okBtn.addEventListener('click', onOk);
+                }
+            });
+        }
     }
 
     function showFieldError(id, msg) {
@@ -269,6 +564,12 @@ const Admin = (() => {
             if (saved) Object.assign(state, JSON.parse(saved));
             if (state.gender === 'male') state.gender = 'mens';
             if (state.gender === 'female') state.gender = 'womens';
+            if (!Array.isArray(state.categories)) state.categories = [];
+            if (!Array.isArray(state.brands)) state.brands = [];
+            if (!Array.isArray(state.seasons)) state.seasons = [];
+            if (!Array.isArray(state.sizes)) state.sizes = [];
+            if (!Array.isArray(state.colors)) state.colors = [];
+            if (!Array.isArray(state.tags)) state.tags = [];
         } catch {}
     }
 
@@ -289,9 +590,13 @@ const Admin = (() => {
             const searchInput = document.getElementById('search-input');
             if (searchInput && searchInput.value.trim()) params.set('q', searchInput.value.trim());
             if (state.gender) params.set('gender', state.gender);
-            state.categories.forEach(function(id) { params.append('category', id); });
-            if (state.brand) params.set('brand', state.brand);
-            if (state.season) params.set('season', state.season);
+            if (state.active) params.set('active', state.active);
+            state.categories.forEach(function(slug) { params.append('category', slug); });
+            state.brands.forEach(function(slug) { params.append('brand', slug); });
+            state.seasons.forEach(function(s) { params.append('season', s); });
+            state.sizes.forEach(function(id) { params.append('size_id', id); });
+            state.colors.forEach(function(id) { params.append('color_id', id); });
+            state.tags.forEach(function(slug) { params.append('tag', slug); });
             const sv = getSortValues();
             params.set('sort_by', sv.sortBy);
             params.set('sort_direction', sv.sortDir);
@@ -375,7 +680,7 @@ const Admin = (() => {
                 '<div class="open-page-popup">' +
                     '<div class="open-page-popup-header">' +
                         '<span>Открыть товар</span>' +
-                        '<button type="button" class="open-page-popup-close">&times;</button>' +
+                        '<button type="button" class="open-page-popup-close" aria-label="Закрыть">&times;</button>' +
                     '</div>' +
                     '<p class="open-page-popup-hint">Товар унисекс. Выберите раздел или страницу товара:</p>' +
                     '<div class="open-page-popup-btns">' +
@@ -394,31 +699,198 @@ const Admin = (() => {
     }
 
     function openFiltersModal() {
-        const modal = document.getElementById('filter-modal');
-        if (!modal) return;
-        const genderSel = document.getElementById('filter-gender-modal');
-        const brandSel = document.getElementById('filter-brand-modal');
-        const seasonSel = document.getElementById('filter-season-modal');
-        if (genderSel) genderSel.value = state.gender || '';
-        if (brandSel) {
-            brandSel.innerHTML = '<option value="">Все бренды</option>';
-            brands.forEach(function(b) {
-                const opt = document.createElement('option');
-                opt.value = b.slug;
-                opt.textContent = b.name;
-                if (b.slug === state.brand) opt.selected = true;
-                brandSel.appendChild(opt);
-            });
+        const existing = document.getElementById('admin-filter-modal');
+        if (existing) window.kpvsDismissTopModal(existing);
+
+        const catHtml = categories.length
+            ? categories.map(function(c) {
+                const value = c.slug || String(c.id);
+                const checked = state.categories.indexOf(value) !== -1 ? 'checked' : '';
+                const padding = c.depth ? 'style="padding-left:' + (12 + c.depth * 12) + 'px;"' : '';
+                return '<label class="filter-option"><input type="checkbox" name="category" value="' + escapeHtml(value) + '" ' + checked + '><span ' + padding + '>' + escapeHtml(c.name) + '</span></label>';
+            }).join('')
+            : '<p class="filter-empty-hint">Категории не загружены</p>';
+
+        const brandHtml = brands.length
+            ? brands.map(function(b) {
+                const val = b.slug || String(b.id);
+                const checked = state.brands.indexOf(val) !== -1 ? 'checked' : '';
+                return '<label class="filter-option"><input type="checkbox" name="brand" value="' + escapeHtml(val) + '" ' + checked + '><span>' + escapeHtml(b.name) + '</span></label>';
+            }).join('')
+            : '<p class="filter-empty-hint">Бренды не загружены</p>';
+
+        const seasons = ['зима', 'лето', 'демисезон', 'всесезонный'];
+        const seasonHtml = seasons.map(function(s) {
+            const checked = state.seasons.indexOf(s) !== -1 ? 'checked' : '';
+            const label = s ? (s.charAt(0).toUpperCase() + s.slice(1)) : s;
+            return '<label class="filter-option"><input type="checkbox" name="season" value="' + escapeHtml(s) + '" ' + checked + '><span>' + escapeHtml(label) + '</span></label>';
+        }).join('');
+
+        const sizeHtml = availableSizes.length
+            ? availableSizes.map(function(s) {
+                const val = String(s.id);
+                const checked = state.sizes.indexOf(val) !== -1 ? 'checked' : '';
+                return '<label class="filter-option"><input type="checkbox" name="size_id" value="' + escapeHtml(val) + '" ' + checked + '><span>' + escapeHtml(s.value) + ' (' + escapeHtml(s.size_type) + ')</span></label>';
+            }).join('')
+            : '<p class="filter-empty-hint">Размеры не загружены</p>';
+
+        const colorHtml = availableColors.length
+            ? availableColors.map(function(c) {
+                const val = String(c.id);
+                const checked = state.colors.indexOf(val) !== -1 ? 'checked' : '';
+                return '<label class="filter-option"><input type="checkbox" name="color_id" value="' + escapeHtml(val) + '" ' + checked + '><span>' + escapeHtml(c.name) + '</span></label>';
+            }).join('')
+            : '<p class="filter-empty-hint">Цвета не загружены</p>';
+
+        const tagHtml = availableTags.length
+            ? availableTags.map(function(t) {
+                const val = t.slug || String(t.id);
+                const checked = state.tags.indexOf(val) !== -1 ? 'checked' : '';
+                return '<label class="filter-option"><input type="checkbox" name="tag" value="' + escapeHtml(val) + '" ' + checked + '><span>' + escapeHtml(t.name) + '</span></label>';
+            }).join('')
+            : '<p class="filter-empty-hint">Теги не загружены</p>';
+
+        const genderOptions = [
+            { value: '', label: 'Любой' },
+            { value: 'mens', label: 'Мужской' },
+            { value: 'womens', label: 'Женский' },
+            { value: 'unisex', label: 'Унисекс' }
+        ];
+        const genderHtml = genderOptions.map(function(g) {
+            const checked = (state.gender || '') === g.value ? 'checked' : '';
+            return '<label class="filter-option"><input type="radio" name="gender" value="' + escapeHtml(g.value) + '" ' + checked + '><span>' + escapeHtml(g.label) + '</span></label>';
+        }).join('');
+
+        const activeOptions = [
+            { value: '', label: 'Все' },
+            { value: 'active', label: 'Видимые' },
+            { value: 'inactive', label: 'Скрытые' }
+        ];
+        const activeHtml = activeOptions.map(function(a) {
+            const checked = (state.active || '') === a.value ? 'checked' : '';
+            return '<label class="filter-option"><input type="radio" name="active" value="' + escapeHtml(a.value) + '" ' + checked + '><span>' + escapeHtml(a.label) + '</span></label>';
+        }).join('');
+
+        const group = function(key, label, body) {
+            return '<div class="filter-group" data-group="' + key + '">' +
+                '<button type="button" class="filter-group-title filter-group-toggle" aria-expanded="false">' +
+                    '<span class="filter-group-label">' + escapeHtml(label) + '</span>' +
+                    '<span class="filter-group-right">' +
+                        '<span class="filter-group-count" aria-hidden="true"></span>' +
+                        '<span class="filter-group-caret" aria-hidden="true">▾</span>' +
+                    '</span>' +
+                '</button>' +
+                '<div class="filter-group-body" hidden><div class="filter-options">' + body + '</div></div>' +
+            '</div>';
+        };
+
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'admin-filter-modal';
+        modal.innerHTML =
+            '<div class="modal-content filter-modal-content">' +
+                '<div class="modal-header">' +
+                    '<h2>Фильтры</h2>' +
+                    '<button class="modal-close" type="button" aria-label="Закрыть">&times;</button>' +
+                '</div>' +
+                '<div class="modal-body">' +
+                    group('gender', 'Пол', genderHtml) +
+                    group('active', 'Видимость', activeHtml) +
+                    group('category', 'Категория', catHtml) +
+                    group('brand', 'Бренд', brandHtml) +
+                    group('season', 'Сезон', seasonHtml) +
+                    group('size', 'Размер', sizeHtml) +
+                    group('color', 'Цвет', colorHtml) +
+                    group('tag', 'Теги', tagHtml) +
+                '</div>' +
+                '<div class="modal-footer catalog-filter-modal-footer">' +
+                    '<button type="button" class="admin-ui-btn admin-ui-btn--danger catalog-filter-clear-btn">Сбросить</button>' +
+                    '<button type="button" class="admin-ui-btn admin-ui-btn--primary catalog-filter-apply-btn">Применить</button>' +
+                '</div>' +
+            '</div>';
+
+        document.body.appendChild(modal);
+        if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
+        setTimeout(function() { modal.classList.add('show'); }, 10);
+
+        function close() { window.kpvsDismissTopModal(modal); }
+        const closeBtn = modal.querySelector('.modal-close');
+        if (closeBtn) closeBtn.addEventListener('click', close);
+        modal.addEventListener('click', function(e) { if (e.target === modal) close(); });
+
+        function setGroupOpen(groupEl, open) {
+            const body = groupEl.querySelector('.filter-group-body');
+            const btn = groupEl.querySelector('.filter-group-toggle');
+            if (!body || !btn) return;
+            groupEl.classList.toggle('is-open', open);
+            body.hidden = !open;
+            btn.setAttribute('aria-expanded', open ? 'true' : 'false');
         }
-        if (seasonSel) seasonSel.value = state.season || '';
-        if (ui.filterCategoryDropdown) {
-            const set = new Set(state.categories.map(String));
-            ui.filterCategoryDropdown.querySelectorAll('input[type="checkbox"]').forEach(function(cb) {
-                cb.checked = set.has(cb.value);
-            });
+
+        function updateGroupCount(groupEl) {
+            const countEl = groupEl.querySelector('.filter-group-count');
+            if (!countEl) return;
+            const checked = groupEl.querySelectorAll('input[type="checkbox"]:checked').length;
+            if (checked > 0) {
+                countEl.textContent = String(checked);
+                countEl.style.display = 'inline-flex';
+            } else {
+                countEl.textContent = '';
+                countEl.style.display = 'none';
+            }
         }
-        updateFilterCategoryLabel();
-        openModal(modal);
+
+        modal.querySelectorAll('.filter-group-toggle').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                const groupEl = btn.closest('.filter-group');
+                if (!groupEl) return;
+                const willOpen = !groupEl.classList.contains('is-open');
+                modal.querySelectorAll('.filter-group.is-open').forEach(function(openGroup) {
+                    if (openGroup !== groupEl) setGroupOpen(openGroup, false);
+                });
+                setGroupOpen(groupEl, willOpen);
+            });
+        });
+
+        modal.querySelectorAll('.filter-group').forEach(function(groupEl) {
+            setGroupOpen(groupEl, false);
+            updateGroupCount(groupEl);
+            groupEl.querySelectorAll('input[type="checkbox"]').forEach(function(inp) {
+                inp.addEventListener('change', function() { updateGroupCount(groupEl); });
+            });
+        });
+
+        const applyBtn = modal.querySelector('.catalog-filter-apply-btn');
+        if (applyBtn) applyBtn.addEventListener('click', function() {
+            const genderSel = modal.querySelector('input[name="gender"]:checked');
+            const activeSel = modal.querySelector('input[name="active"]:checked');
+            state.gender = genderSel ? genderSel.value : '';
+            state.active = activeSel ? activeSel.value : '';
+            state.categories = Array.from(modal.querySelectorAll('input[name="category"]:checked')).map(function(i) { return i.value; });
+            state.brands = Array.from(modal.querySelectorAll('input[name="brand"]:checked')).map(function(i) { return i.value; });
+            state.seasons = Array.from(modal.querySelectorAll('input[name="season"]:checked')).map(function(i) { return i.value; });
+            state.sizes = Array.from(modal.querySelectorAll('input[name="size_id"]:checked')).map(function(i) { return i.value; });
+            state.colors = Array.from(modal.querySelectorAll('input[name="color_id"]:checked')).map(function(i) { return i.value; });
+            state.tags = Array.from(modal.querySelectorAll('input[name="tag"]:checked')).map(function(i) { return i.value; });
+            saveStateToStorage();
+            close();
+            fetchProducts();
+        });
+
+        const clearBtn = modal.querySelector('.catalog-filter-clear-btn');
+        if (clearBtn) clearBtn.addEventListener('click', function() {
+            state.gender = '';
+            state.active = '';
+            state.categories = [];
+            state.brands = [];
+            state.seasons = [];
+            state.sizes = [];
+            state.colors = [];
+            state.tags = [];
+            saveStateToStorage();
+            close();
+            fetchProducts();
+        });
     }
 
     function closeFiltersModal() {
@@ -430,8 +902,8 @@ const Admin = (() => {
         const brandSel = document.getElementById('filter-brand-modal');
         const seasonSel = document.getElementById('filter-season-modal');
         state.gender = genderSel ? genderSel.value : '';
-        state.brand = brandSel ? brandSel.value : '';
-        state.season = seasonSel ? seasonSel.value : '';
+        state.brands = brandSel && brandSel.value ? [brandSel.value] : [];
+        state.seasons = seasonSel && seasonSel.value ? [seasonSel.value] : [];
         state.categories = ui.filterCategoryDropdown ? getCheckedValues(ui.filterCategoryDropdown) : [];
         saveStateToStorage();
         closeFiltersModal();
@@ -440,8 +912,12 @@ const Admin = (() => {
 
     function clearFilters() {
         state.gender = '';
-        state.brand = '';
-        state.season = '';
+        state.brands = [];
+        state.seasons = [];
+        state.sizes = [];
+        state.colors = [];
+        state.tags = [];
+        state.active = '';
         state.categories = [];
         saveStateToStorage();
         closeFiltersModal();
@@ -612,45 +1088,55 @@ const Admin = (() => {
     }
 
     function setupResizableColumns() {
-        const table = document.querySelector('.admin-table');
-        if (!table || table._resizable) return;
-        table._resizable = true;
-        const cols = Array.from(table.querySelectorAll('colgroup col'));
-        const ths = Array.from(table.querySelectorAll('thead th'));
-        if (!cols.length || ths.length !== cols.length) return;
-        const minWidths = [100, 52, 240, 200, 128, 84, 112];
+        const tables = Array.from(document.querySelectorAll('table.admin-table'));
+        if (!tables.length) return;
 
-        for (let i = 0; i < ths.length; i++) {
-            const w = Math.round(ths[i].getBoundingClientRect().width);
-            if (!cols[i].style.width) cols[i].style.width = Math.max(minWidths[i] || 80, w) + 'px';
+        function setupFor(table, minWidths) {
+            if (!table || table._resizable) return;
+            table._resizable = true;
+            const cols = Array.from(table.querySelectorAll('colgroup col'));
+            const ths = Array.from(table.querySelectorAll('thead th'));
+            if (!cols.length || ths.length !== cols.length) return;
+
+            for (let i = 0; i < ths.length; i++) {
+                const w = Math.round(ths[i].getBoundingClientRect().width);
+                if (!cols[i].style.width) cols[i].style.width = Math.max(minWidths[i] || 80, w) + 'px';
+            }
+
+            ths.forEach(function(th, i) {
+                if (i === ths.length - 1) return;
+                const handle = document.createElement('span');
+                handle.className = 'admin-col-resizer';
+                th.appendChild(handle);
+                handle.addEventListener('pointerdown', function(e) {
+                    e.preventDefault();
+                    try { handle.setPointerCapture(e.pointerId); } catch {}
+                    const startX = e.clientX;
+                    const startW = parseInt(cols[i].style.width, 10) || Math.round(th.getBoundingClientRect().width);
+                    const onMove = function(ev) {
+                        const delta = Math.round(ev.clientX - startX);
+                        const minW = minWidths[i] || 80;
+                        const w1 = Math.max(minW, startW + delta);
+                        cols[i].style.width = w1 + 'px';
+                    };
+                    const onUp = function() {
+                        document.removeEventListener('pointermove', onMove);
+                        document.removeEventListener('pointerup', onUp);
+                    };
+                    document.addEventListener('pointermove', onMove);
+                    document.addEventListener('pointerup', onUp);
+                });
+            });
         }
 
-        ths.forEach(function(th, i) {
-            if (i === ths.length - 1) return;
-            const handle = document.createElement('span');
-            handle.className = 'admin-col-resizer';
-            th.appendChild(handle);
-            handle.addEventListener('pointerdown', function(e) {
-                e.preventDefault();
-                try { handle.setPointerCapture(e.pointerId); } catch {}
-                const startX = e.clientX;
-                const startW = parseInt(cols[i].style.width, 10) || Math.round(th.getBoundingClientRect().width);
-                const nextStartW = parseInt(cols[i + 1].style.width, 10) || Math.round(ths[i + 1].getBoundingClientRect().width);
-                const onMove = function(ev) {
-                    const delta = Math.round(ev.clientX - startX);
-                    const w1 = Math.max(minWidths[i] || 80, startW + delta);
-                    const w2 = Math.max(minWidths[i + 1] || 80, nextStartW - delta);
-
-                    cols[i].style.width = w1 + 'px';
-                    cols[i + 1].style.width = w2 + 'px';
-                };
-                const onUp = function() {
-                    document.removeEventListener('pointermove', onMove);
-                    document.removeEventListener('pointerup', onUp);
-                };
-                document.addEventListener('pointermove', onMove);
-                document.addEventListener('pointerup', onUp);
-            });
+        tables.forEach(function(table) {
+            if (table.classList.contains('admin-users-table')) {
+                // wider "role" column to avoid ellipsis
+                setupFor(table, [60, 70, 200, 170, 160, 200]);
+            } else {
+                // products table (default)
+                setupFor(table, [56, 52, 240, 200, 128, 84, 112]);
+            }
         });
     }
 
@@ -709,7 +1195,7 @@ const Admin = (() => {
                     '<input type="number" class="mat-percent" placeholder="" value="' + escapeHtml(String(mat.percent || '')) + '" min="1" max="100" step="1" />' +
                     '<span class="mat-percent-sign">%</span>' +
                 '</div>' +
-                '<button type="button" class="btn-mat-remove" data-index="' + i + '" title="Удалить">×</button>';
+            '<button type="button" class="btn-mat-remove" data-index="' + i + '" title="Удалить">×</button>';
             container.appendChild(div);
         });
 
@@ -1543,6 +2029,14 @@ const Admin = (() => {
 
         ui.productsBody = document.getElementById('products-body');
         ui.productCount = document.getElementById('product-count');
+        ui.usersBody = document.getElementById('users-body');
+        ui.addUserBtn = document.getElementById('add-user-btn');
+        ui.userModal = document.getElementById('user-modal');
+        ui.userForm = document.getElementById('user-form');
+        ui.userSaveBtn = document.getElementById('user-save-btn');
+        ui.userUsername = document.getElementById('user-username');
+        ui.userPassword = document.getElementById('user-password');
+        ui.userRole = document.getElementById('user-role');
         ui.filterCategoryMultiselect = document.getElementById('filter-category-multiselect');
         ui.filterCategoryDropdown = document.getElementById('filter-category-dropdown');
         ui.filterCategoryLabel = document.getElementById('filter-category-label');
@@ -1566,6 +2060,8 @@ const Admin = (() => {
 
         checkAuth().then(function(ok) {
             if (!ok) return;
+            bindUsersEvents();
+            fetchUsers().catch(function () {});
             Promise.all([fetchCategories(), fetchBrands(), fetchSizes(), fetchColors(), fetchTags()])
                 .then(function() {
                     populateFilterCategoryDropdown();

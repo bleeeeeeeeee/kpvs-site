@@ -301,15 +301,19 @@ function inquirePriceFromCart() {
 }
 
 function openFavoritesModal() {
+    const existing = document.getElementById('kpvs-favorites-modal');
+    if (existing) window.kpvsDismissTopModal(existing);
+
     const favorites = getFavorites();
     const ids = favorites.map(i => i.id);
     const modal = document.createElement('div');
     modal.className = 'modal';
+    modal.id = 'kpvs-favorites-modal';
 
     if (!ids.length) {
         modal.innerHTML = `
             <div class="modal-content modal-content--cart-favorites">
-                <div class="modal-header"><h2>Избранное</h2><button type="button" class="modal-close" onclick="kpvsDismissTopModal(this)">&times;</button></div>
+                <div class="modal-header"><h2>Избранное</h2><button type="button" class="modal-close ui-xbtn" onclick="kpvsDismissTopModal(this)" aria-label="Закрыть">&times;</button></div>
                 <div class="modal-body"><p class="empty-message">У вас пока нет товаров в избранном</p></div>
             </div>`;
         document.body.appendChild(modal);
@@ -322,7 +326,7 @@ function openFavoritesModal() {
     getProductsByIds(ids).then(products => {
         modal.innerHTML = `
             <div class="modal-content modal-content--cart-favorites">
-                <div class="modal-header"><h2>Избранное</h2><button type="button" class="modal-close" onclick="kpvsDismissTopModal(this)">&times;</button></div>
+                <div class="modal-header"><h2>Избранное</h2><button type="button" class="modal-close ui-xbtn" onclick="kpvsDismissTopModal(this)" aria-label="Закрыть">&times;</button></div>
                 <div class="modal-body">
                     <div class="modal-items">
                         ${products.filter(p => p && p.id).map(p => {
@@ -369,15 +373,19 @@ function openFavoritesModal() {
 }
 
 function openCartModal() {
+    const existing = document.getElementById('kpvs-cart-modal');
+    if (existing) window.kpvsDismissTopModal(existing);
+
     const cart = getCart();
     const ids = cart.map(i => i.id);
     const modal = document.createElement('div');
     modal.className = 'modal';
+    modal.id = 'kpvs-cart-modal';
 
     if (!ids.length) {
         modal.innerHTML = `
             <div class="modal-content modal-content--cart-favorites">
-                <div class="modal-header"><h2>Корзина</h2><button type="button" class="modal-close" onclick="kpvsDismissTopModal(this)">&times;</button></div>
+                <div class="modal-header"><h2>Корзина</h2><button type="button" class="modal-close ui-xbtn" onclick="kpvsDismissTopModal(this)" aria-label="Закрыть">&times;</button></div>
                 <div class="modal-body"><p class="empty-message">Корзина пуста</p></div>
             </div>`;
         document.body.appendChild(modal);
@@ -390,7 +398,7 @@ function openCartModal() {
     getProductsByIds(ids).then(products => {
         modal.innerHTML = `
             <div class="modal-content modal-content--cart-favorites">
-                <div class="modal-header"><h2>Корзина</h2><button type="button" class="modal-close" onclick="kpvsDismissTopModal(this)">&times;</button></div>
+                <div class="modal-header"><h2>Корзина</h2><button type="button" class="modal-close ui-xbtn" onclick="kpvsDismissTopModal(this)" aria-label="Закрыть">&times;</button></div>
                 <div class="modal-body">
                     <div class="modal-items">
                         ${products.filter(p => p && p.id).map(p => {
@@ -437,6 +445,32 @@ function openMap() {
 
 document.addEventListener('DOMContentLoaded', () => {
     loadProduct();
+
+    try {
+        const token = localStorage.getItem('kpvs.user.jwt');
+        const el = document.querySelector('[data-account-action]');
+        if (el) {
+            const next = encodeURIComponent(window.location.pathname + window.location.search);
+            el.setAttribute('href', '/login.html?mode=user&next=' + next);
+            if (!token) {
+                el.className = 'admin-ui-btn admin-ui-btn--primary site-account-login-btn';
+                el.removeAttribute('title');
+                el.setAttribute('aria-label', 'Войти');
+                el.textContent = 'Войти';
+            } else {
+                fetch('/api/user/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+                    .then(r => {
+                        if (r.ok) return;
+                        try { localStorage.removeItem('kpvs.user.jwt'); } catch {}
+                        el.className = 'admin-ui-btn admin-ui-btn--primary site-account-login-btn';
+                        el.removeAttribute('title');
+                        el.setAttribute('aria-label', 'Войти');
+                        el.textContent = 'Войти';
+                    })
+                    .catch(() => {});
+            }
+        }
+    } catch {}
 
     const logo = document.querySelector('.section #logo');
     if (logo && !logo.closest('a')) {

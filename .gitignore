@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+server.log
+npm-debug.log
+yarn-debug.log
+yarn-error.log
+.env
+.env.*
+.cursor/
+img/.DS_Store
+img/compressed/.DS_Store

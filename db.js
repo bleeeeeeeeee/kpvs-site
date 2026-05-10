@@ -42,6 +42,52 @@ async function connectDB() {
     }
 }
 
+async function ensureUserAuthSchema() {
+    const client = await pool.connect();
+    try {
+        await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT`);
+        await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oauth_provider TEXT`);
+        await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oauth_id TEXT`);
+        await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_set BOOLEAN`);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_email_uq ON users (email) WHERE email IS NOT NULL`);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_oauth_uq ON users (oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL AND oauth_id IS NOT NULL`);
+
+        // Allow storefront users to exist alongside admin users.
+        // Existing DBs may have chk_user_role allowing only admin/superadmin.
+        await client.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_user_role`);
+        await client.query(
+            `ALTER TABLE users
+             ADD CONSTRAINT chk_user_role
+             CHECK ((role)::text = ANY ((ARRAY['admin'::character varying, 'superadmin'::character varying, 'user'::character varying])::text[]))`
+        );
+
+        // Initialize password_set for existing rows (NULL -> derived).
+        await client.query(
+            `UPDATE users
+             SET password_set = CASE
+                 WHEN oauth_provider IS NOT NULL THEN FALSE
+                 ELSE TRUE
+             END
+             WHERE password_set IS NULL`
+        );
+
+        await client.query(
+            `CREATE TABLE IF NOT EXISTS password_resets (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                token_hash TEXT NOT NULL,
+                expires_at TIMESTAMPTZ NOT NULL,
+                used_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )`
+        );
+        await client.query(`CREATE INDEX IF NOT EXISTS password_resets_token_idx ON password_resets (token_hash)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets (user_id)`);
+    } finally {
+        client.release();
+    }
+}
+
 async function getCategories() {
     const result = await pool.query(`
         WITH RECURSIVE cat_tree AS (
@@ -117,6 +163,9 @@ async function getProducts(genderParam, options = {}) {
         season,
         color,
         size,
+        size_id,
+        color_id,
+        active,
         sort_by,
         sort_direction,
         include_inactive,
@@ -131,8 +180,11 @@ async function getProducts(genderParam, options = {}) {
     const values = [];
     let idx = 1;
 
-    if (!include_inactive) {
-        conditions.push('p.is_active = TRUE');
+    if (!include_inactive) conditions.push('p.is_active = TRUE');
+    if (include_inactive && active) {
+        const a = String(active).trim().toLowerCase();
+        if (a === 'active') conditions.push('p.is_active = TRUE');
+        else if (a === 'inactive') conditions.push('p.is_active = FALSE');
     }
 
     if (genderFilter) {
@@ -166,22 +218,44 @@ async function getProducts(genderParam, options = {}) {
     }
 
     if (brand) {
-        values.push(brand);
-        conditions.push(`p.brand_id = (SELECT id FROM brands WHERE slug = $${idx++})`);
+        const brands = Array.isArray(brand) ? brand : String(brand).split(',').map(s => s.trim()).filter(Boolean);
+        if (brands.length === 1) {
+            values.push(brands[0]);
+            conditions.push(`p.brand_id = (SELECT id FROM brands WHERE slug = $${idx++})`);
+        } else if (brands.length > 1) {
+            values.push(brands);
+            conditions.push(`p.brand_id IN (SELECT id FROM brands WHERE slug = ANY($${idx++}))`);
+        }
     }
 
     if (season) {
-        values.push(season);
-        conditions.push(`p.season = $${idx++}`);
+        const seasons = Array.isArray(season) ? season : String(season).split(',').map(s => s.trim()).filter(Boolean);
+        if (seasons.length === 1) {
+            values.push(seasons[0]);
+            conditions.push(`p.season = $${idx++}`);
+        } else if (seasons.length > 1) {
+            values.push(seasons);
+            conditions.push(`p.season = ANY($${idx++})`);
+        }
     }
 
     if (tag) {
-        values.push(tag);
-        conditions.push(`EXISTS(
-            SELECT 1 FROM product_tags pt
-            JOIN tags t ON pt.tag_id = t.id
-            WHERE pt.product_id = p.id AND t.slug = $${idx++}
-        )`);
+        const tags = Array.isArray(tag) ? tag : String(tag).split(',').map(s => s.trim()).filter(Boolean);
+        if (tags.length === 1) {
+            values.push(tags[0]);
+            conditions.push(`EXISTS(
+                SELECT 1 FROM product_tags pt
+                JOIN tags t ON pt.tag_id = t.id
+                WHERE pt.product_id = p.id AND t.slug = $${idx++}
+            )`);
+        } else if (tags.length > 1) {
+            values.push(tags);
+            conditions.push(`EXISTS(
+                SELECT 1 FROM product_tags pt
+                JOIN tags t ON pt.tag_id = t.id
+                WHERE pt.product_id = p.id AND t.slug = ANY($${idx++})
+            )`);
+        }
     }
 
     if (color) {
@@ -200,6 +274,30 @@ async function getProducts(genderParam, options = {}) {
             JOIN sizes s ON pv.size_id = s.id
             WHERE pv.product_id = p.id AND pv.is_active = TRUE AND s.value = $${idx++}
         )`);
+    }
+
+    if (color_id) {
+        const ids = Array.isArray(color_id) ? color_id : String(color_id).split(',').map(s => s.trim()).filter(Boolean);
+        const nums = ids.map(x => Number(x)).filter(n => Number.isFinite(n));
+        if (nums.length) {
+            values.push(nums);
+            conditions.push(`EXISTS(
+                SELECT 1 FROM product_variants pv
+                WHERE pv.product_id = p.id AND pv.is_active = TRUE AND pv.color_id = ANY($${idx++})
+            )`);
+        }
+    }
+
+    if (size_id) {
+        const ids = Array.isArray(size_id) ? size_id : String(size_id).split(',').map(s => s.trim()).filter(Boolean);
+        const nums = ids.map(x => Number(x)).filter(n => Number.isFinite(n));
+        if (nums.length) {
+            values.push(nums);
+            conditions.push(`EXISTS(
+                SELECT 1 FROM product_variants pv
+                WHERE pv.product_id = p.id AND pv.is_active = TRUE AND pv.size_id = ANY($${idx++})
+            )`);
+        }
     }
 
     if (q) {
@@ -556,6 +654,30 @@ async function findUserByUsername(username) {
     return result.rows[0] || null;
 }
 
+async function findUserById(id) {
+    const result = await pool.query(
+        'SELECT id, username, password_hash, role, is_active, email, oauth_provider, oauth_id, password_set FROM users WHERE id = $1 LIMIT 1',
+        [id]
+    );
+    return result.rows[0] || null;
+}
+
+async function findUserByEmail(email) {
+    const result = await pool.query(
+        'SELECT id, username, password_hash, role, is_active, email, oauth_provider, oauth_id FROM users WHERE email = $1 LIMIT 1',
+        [email]
+    );
+    return result.rows[0] || null;
+}
+
+async function findUserByOAuth(provider, oauthId) {
+    const result = await pool.query(
+        'SELECT id, username, password_hash, role, is_active, email, oauth_provider, oauth_id FROM users WHERE oauth_provider = $1 AND oauth_id = $2 LIMIT 1',
+        [provider, oauthId]
+    );
+    return result.rows[0] || null;
+}
+
 async function verifyUser(username, password) {
     const user = await findUserByUsername(username);
     if (!user || !user.is_active) return null;
@@ -565,16 +687,70 @@ async function verifyUser(username, password) {
     return { id: user.id, username: user.username, role: user.role };
 }
 
-async function createUser(username, password, role) {
+async function verifyUserByLogin(login, password) {
+    const s = String(login || '').trim();
+    if (!s) return null;
+    let user = await findUserByUsername(s);
+    if (!user) {
+        const e = s.toLowerCase();
+        const byEmail = await findUserByEmail(e);
+        // allow login via email only for active accounts
+        user = byEmail || null;
+    }
+    if (!user || !user.is_active) return null;
+    const ok = await bcrypt.compare(password, user.password_hash);
+    if (!ok) return null;
+    await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id]);
+    return { id: user.id, username: user.username, role: user.role };
+}
+
+async function createUser(username, password, role, options) {
     role = role || 'admin';
+    options = options || {};
+    const email = options.email ? String(options.email).trim().toLowerCase() : null;
+    const oauth_provider = options.oauth_provider ? String(options.oauth_provider) : null;
+    const oauth_id = options.oauth_id ? String(options.oauth_id) : null;
+    const password_set = typeof options.password_set === 'boolean' ? options.password_set : true;
     const hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
-        `INSERT INTO users (username, password_hash, role)
-         VALUES ($1, $2, $3)
-         RETURNING id, username, role, is_active, created_at`,
-        [username, hash, role]
+        `INSERT INTO users (username, password_hash, role, email, oauth_provider, oauth_id, password_set)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, username, role, is_active, created_at, email, oauth_provider, oauth_id, password_set`,
+        [username, hash, role, email, oauth_provider, oauth_id, password_set]
     );
     return result.rows[0];
+}
+
+async function upsertOAuthUser(provider, oauthId, email) {
+    provider = String(provider || '').trim();
+    oauthId = String(oauthId || '').trim();
+    email = email ? String(email).trim().toLowerCase() : null;
+    if (!provider || !oauthId) return null;
+
+    const byOauth = await findUserByOAuth(provider, oauthId);
+    // If an OAuth-linked account exists but is deactivated, do NOT allow "re-creating" it via OAuth login.
+    // Deactivation must hard-block access.
+    if (byOauth && !byOauth.is_active) return null;
+    if (byOauth && byOauth.is_active) {
+        await pool.query('UPDATE users SET last_login = NOW(), email = COALESCE(email, $1) WHERE id = $2', [email, byOauth.id]);
+        return { id: byOauth.id, username: byOauth.username, role: byOauth.role };
+    }
+
+    if (email) {
+        const byEmail = await findUserByEmail(email);
+        // If an email-matched account exists but is deactivated, do NOT link OAuth to it and do NOT create a new one.
+        if (byEmail && !byEmail.is_active) return null;
+        if (byEmail && byEmail.is_active) {
+            await pool.query('UPDATE users SET oauth_provider = $1, oauth_id = $2, last_login = NOW() WHERE id = $3', [provider, oauthId, byEmail.id]);
+            return { id: byEmail.id, username: byEmail.username, role: byEmail.role };
+        }
+    }
+
+    const uname = provider + '_' + oauthId;
+    const password = oauthId + ':' + Date.now();
+    const created = await createUser(uname, password, 'user', { email: email, oauth_provider: provider, oauth_id: oauthId, password_set: false });
+    await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [created.id]);
+    return { id: created.id, username: created.username, role: created.role };
 }
 
 async function ensureDefaultUsers() {
@@ -608,12 +784,106 @@ async function setUserActive(id, isActive) {
 
 async function changeUserPassword(id, newPassword) {
     const hash = await bcrypt.hash(newPassword, 12);
-    await pool.query('UPDATE users SET password_hash = $1 WHERE id = $2', [hash, id]);
+    const r = await pool.query('UPDATE users SET password_hash = $1, password_set = TRUE WHERE id = $2', [hash, id]);
+    return (r && typeof r.rowCount === 'number') ? r.rowCount : 0;
+}
+
+async function changeUserPasswordWithOld(id, oldPassword, newPassword) {
+    const user = await findUserById(id);
+    if (!user || !user.is_active) return { ok: false, error: 'not_found' };
+    const okOld = await bcrypt.compare(String(oldPassword || ''), user.password_hash);
+    if (!okOld) return { ok: false, error: 'wrong_old' };
+    const hash = await bcrypt.hash(String(newPassword || ''), 12);
+    await pool.query('UPDATE users SET password_hash = $1, password_set = TRUE WHERE id = $2', [hash, id]);
+    return { ok: true };
+}
+
+async function setInitialPasswordForOAuthUser(id, newPassword) {
+    const user = await findUserById(id);
+    if (!user || !user.is_active) return { ok: false, error: 'not_found' };
+    if (String(user.role || '') !== 'user') return { ok: false, error: 'forbidden' };
+    if (user.password_set) return { ok: false, error: 'already_set' };
+    const hash = await bcrypt.hash(String(newPassword || ''), 12);
+    await pool.query('UPDATE users SET password_hash = $1, password_set = TRUE WHERE id = $2', [hash, id]);
+    return { ok: true };
+}
+
+async function createPasswordResetForEmail(email) {
+    const e = String(email || '').trim().toLowerCase();
+    if (!e) return null;
+    const user = await findUserByEmail(e);
+    if (!user || !user.is_active) return null;
+    if (String(user.role || '') !== 'user') return null;
+    return user;
+}
+
+async function insertPasswordResetToken(userId, tokenHash, expiresAt) {
+    await pool.query(
+        'INSERT INTO password_resets (user_id, token_hash, expires_at) VALUES ($1, $2, $3)',
+        [userId, tokenHash, expiresAt]
+    );
+}
+
+async function consumePasswordResetToken(tokenHash, newPassword) {
+    const r = await pool.query(
+        `SELECT pr.id, pr.user_id, pr.expires_at, pr.used_at, u.is_active, u.role
+         FROM password_resets pr
+         JOIN users u ON u.id = pr.user_id
+         WHERE pr.token_hash = $1
+         ORDER BY pr.id DESC
+         LIMIT 1`,
+        [tokenHash]
+    );
+    const row = r.rows[0] || null;
+    if (!row) return { ok: false, error: 'invalid' };
+    if (row.used_at) return { ok: false, error: 'used' };
+    if (!row.is_active) return { ok: false, error: 'inactive' };
+    if (String(row.role || '') !== 'user') return { ok: false, error: 'forbidden' };
+    const exp = new Date(row.expires_at);
+    if (isNaN(exp.getTime()) || exp.getTime() < Date.now()) return { ok: false, error: 'expired' };
+    const hash = await bcrypt.hash(String(newPassword || ''), 12);
+    await pool.query('UPDATE users SET password_hash = $1, password_set = TRUE WHERE id = $2', [hash, row.user_id]);
+    await pool.query('UPDATE password_resets SET used_at = NOW() WHERE id = $1', [row.id]);
+    return { ok: true, user_id: row.user_id };
+}
+
+async function setUserRole(id, role) {
+    role = String(role || '').trim();
+    if (!['admin', 'superadmin', 'user'].includes(role)) throw new Error('Некорректная роль');
+    const result = await pool.query(
+        'UPDATE users SET role = $1 WHERE id = $2 RETURNING id, username, role, is_active, created_at, last_login, email, oauth_provider, oauth_id',
+        [role, id]
+    );
+    return result.rows[0] || null;
+}
+
+async function changeUsername(id, newUsername) {
+    const u = String(newUsername || '').trim();
+    if (!u) throw new Error('Укажите логин');
+    if (u.length < 3) throw new Error('Логин должен быть не короче 3 символов');
+    if (u.length > 48) throw new Error('Логин слишком длинный');
+    // Allow unicode letters/digits plus dot/dash/underscore. Keeps login UX predictable, but supports Cyrillic.
+    if (!/^[\p{L}\p{N}._-]+$/u.test(u)) throw new Error('Логин может содержать только буквы, цифры, точку, дефис и подчёркивание');
+
+    const result = await pool.query(
+        'UPDATE users SET username = $1 WHERE id = $2 RETURNING id, username, role, is_active, created_at, last_login, email, oauth_provider, oauth_id',
+        [u, id]
+    );
+    return result.rows[0] || null;
+}
+
+async function deleteUserById(id) {
+    const result = await pool.query(
+        'DELETE FROM users WHERE id = $1 RETURNING id, username, role',
+        [id]
+    );
+    return result.rows[0] || null;
 }
 
 module.exports = {
     pool,
     connectDB,
+    ensureUserAuthSchema,
     getCategories,
     getBrands,
     getSizes,
@@ -627,10 +897,23 @@ module.exports = {
     updateProductActiveFlag,
     searchProducts,
     findUserByUsername,
+    findUserById,
+    findUserByEmail,
+    findUserByOAuth,
     verifyUser,
+    verifyUserByLogin,
     createUser,
+    upsertOAuthUser,
     ensureDefaultUsers,
     listUsers,
     setUserActive,
-    changeUserPassword
+    changeUserPassword,
+    changeUserPasswordWithOld,
+    setInitialPasswordForOAuthUser,
+    createPasswordResetForEmail,
+    insertPasswordResetToken,
+    consumePasswordResetToken,
+    changeUsername,
+    setUserRole,
+    deleteUserById
 };
