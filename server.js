@@ -9,6 +9,7 @@ const session = require('express-session');
 const PgSession = require('connect-pg-simple')(session);
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const https = require('https');
 let nodemailer = null;
 try { nodemailer = require('nodemailer'); } catch {}
 const passport = require('passport');
@@ -33,6 +34,7 @@ const {
     verifyUserByLogin,
     createUser,
     findUserByUsername,
+    findUserByEmail,
     findUserById,
     ensureUserAuthSchema,
     upsertOAuthUser,
@@ -42,12 +44,14 @@ const {
     changeUserPassword,
     changeUserPasswordWithOld,
     setInitialPasswordForOAuthUser,
-    createPasswordResetForEmail,
     insertPasswordResetToken,
     consumePasswordResetToken,
     changeUsername,
     setUserRole
     ,deleteUserById
+    ,insertEmailVerificationCode
+    ,getLatestEmailVerification
+    ,consumeEmailVerificationCode
 } = require('./db');
 
 const app = express();
@@ -84,9 +88,18 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
     passport.use(new GoogleStrategy({
         clientID: GOOGLE_CLIENT_ID,
         clientSecret: GOOGLE_CLIENT_SECRET,
-        callbackURL: GOOGLE_CALLBACK_URL
-    }, (accessToken, refreshToken, profile, done) => {
-        done(null, { provider: 'google', id: profile && profile.id ? String(profile.id) : '' });
+        callbackURL: GOOGLE_CALLBACK_URL,
+        // Рекомендуемый OIDC userinfo (passport по умолчанию — oauth2/v3/userinfo).
+        userProfileURL: 'https://openidconnect.googleapis.com/v1/userinfo'
+    }, (accessToken, refreshToken, params, profile, done) => {
+        // ВАЖНО: arity === 5 — иначе passport-oauth2 передаёт (accessToken, refreshToken, profile, done)
+        // и второй аргумент станет «profile», accessToken потеряется, userinfo/id_token не сработают.
+        if (!profile || !profile.id) return done(new Error('google_profile_incomplete'));
+        done(null, {
+            profile,
+            accessToken: accessToken || '',
+            tokenParams: params && typeof params === 'object' ? params : {}
+        });
     }));
 }
 
@@ -191,16 +204,23 @@ app.get('/api/auth/me', (req, res) => {
 
 app.post('/api/user/auth/register', async (req, res) => {
     try {
-        const { username, email, password } = req.body || {};
+        const { username, email, password, email_code } = req.body || {};
         const u = String(username || '').trim();
-        const e = String(email || '').trim().toLowerCase();
+        const e = normalizeEmail(email);
         const p = String(password || '');
         if (!u) return res.status(400).json({ error: 'Укажите логин' });
-        if (!e || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) return res.status(400).json({ error: 'Укажите корректный email' });
+        if (!isValidEmail(e)) return res.status(400).json({ error: 'Укажите корректный email' });
         if (!p || p.length < 6) return res.status(400).json({ error: 'Пароль должен быть не менее 6 символов' });
-        const user = await createUser(u, p, 'user', { email: e });
+        const code = String(email_code || '').trim();
+        if (!/^\d{6}$/.test(code)) return res.status(400).json({ error: 'Подтвердите email: введите 6-значный код из письма' });
+        const codeHash = emailCodeHash(e, 'register', code);
+        const v = await consumeEmailVerificationCode(e, 'register', codeHash);
+        if (!v.ok) return res.status(400).json({ error: 'Код недействителен или истёк. Запросите новый.' });
+
+        const user = await createUser(u, p, 'user', { email: e, email_verified: true });
         res.status(201).json({ id: user.id, username: user.username, role: 'user' });
     } catch (err) {
+        if (err && err.code === '23505') return res.status(409).json({ error: 'Логин или email уже занят' });
         res.status(400).json({ error: err.message || 'Не удалось зарегистрироваться' });
     }
 });
@@ -212,7 +232,43 @@ app.post('/api/user/auth/login', async (req, res) => {
         const p = String(password || '');
         if (!u || !p) return res.status(400).json({ error: 'Укажите логин и пароль' });
         const user = await verifyUserByLogin(u, p);
-        if (!user) return res.status(401).json({ error: 'Неверный логин или пароль' });
+        if (!user) {
+            const asEmail = normalizeEmail(u);
+            if (isValidEmail(asEmail)) {
+                const [byEmail, byUsername] = await Promise.all([
+                    findUserByEmail(asEmail),
+                    findUserByUsername(u)
+                ]);
+                if (byEmail && byEmail.is_active && String(byEmail.role || '') === 'user') {
+                    const hasOauth = !!(byEmail.oauth_provider && String(byEmail.oauth_provider).trim());
+                    const pwdSet = byEmail.password_set === true || byEmail.password_set === 1;
+                    if (hasOauth && !pwdSet) {
+                        res.set('X-Login-Code', 'oauth_password_not_set');
+                        return res.status(401).json({
+                            error: 'Этот email привязан к входу через Google. Войдите через Google или задайте пароль в разделе «Аккаунт» после входа.',
+                            code: 'oauth_password_not_set'
+                        });
+                    }
+                }
+                if (!byEmail && !byUsername) {
+                    res.set('X-Login-Code', 'email_not_registered');
+                    return res.status(401).json({
+                        error: 'Такого пользователя в системе нет. Нажмите «Зарегистрироваться» на странице входа.',
+                        code: 'email_not_registered'
+                    });
+                }
+            } else {
+                const byUsernameOnly = await findUserByUsername(u);
+                if (!byUsernameOnly) {
+                    res.set('X-Login-Code', 'username_not_registered');
+                    return res.status(401).json({
+                        error: 'Такого пользователя в системе нет. Нажмите «Зарегистрироваться» на странице входа.',
+                        code: 'username_not_registered'
+                    });
+                }
+            }
+            return res.status(401).json({ error: 'Неверный логин или пароль' });
+        }
         if (user.role !== 'user') return res.status(403).json({ error: 'Используйте режим «Админ»' });
         res.json({ token: createJwtToken(user), user: { id: user.id, username: user.username, role: user.role } });
     } catch {
@@ -229,7 +285,7 @@ app.get('/api/user/auth/me', requireUserJwt, async (req, res) => {
             id: Number(row.id),
             username: row.username,
             role: row.role,
-            email: row.email || null,
+            email: emailForProfile(row),
             oauth_provider: row.oauth_provider || null,
             password_set: !!row.password_set
         });
@@ -255,7 +311,17 @@ app.patch('/api/user/auth/username', requireUserJwt, async (req, res) => {
         const user = await changeUsername(id, String(username || ''));
         if (!user) return res.status(404).json({ error: 'User not found' });
         const token = createJwtToken({ id: user.id, username: user.username, role: user.role });
-        res.json({ ok: true, token: token, user: { id: user.id, username: user.username, role: user.role } });
+        res.json({
+            ok: true,
+            token: token,
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role,
+                email: emailForProfile(user),
+                password_set: !!user.password_set
+            }
+        });
     } catch (err) {
         if (err && err.code === '23505') return res.status(409).json({ error: 'Логин уже занят' });
         res.status(400).json({ error: (err && err.message) ? err.message : 'Failed to change username' });
@@ -299,6 +365,196 @@ function sha256Hex(s) {
     return crypto.createHash('sha256').update(String(s)).digest('hex');
 }
 
+function normalizeEmail(s) {
+    if (s == null || s === undefined) return '';
+    if (typeof Buffer !== 'undefined' && Buffer.isBuffer(s)) {
+        try { s = s.toString('utf8'); } catch { return ''; }
+    }
+    return String(s).trim().toLowerCase();
+}
+
+function isValidEmail(e) {
+    return !!e && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
+}
+
+/** Email из id_token (Google OIDC). iss/aud проверяем; email_verified — только явный false отклоняем. */
+function extractEmailFromGoogleIdToken(idToken, clientId) {
+    if (!idToken || typeof idToken !== 'string') return null;
+    const cid = String(clientId || '').trim();
+    if (!cid) return null;
+    try {
+        const decoded = jwt.decode(idToken, { complete: true });
+        const payload = decoded && decoded.payload && typeof decoded.payload === 'object' ? decoded.payload : null;
+        if (!payload) return null;
+        const iss = String(payload.iss || '');
+        const okIss = iss === 'https://accounts.google.com' || iss === 'accounts.google.com';
+        if (!okIss) return null;
+        const aud = payload.aud;
+        const okAud = aud === cid || (Array.isArray(aud) && aud.indexOf(cid) !== -1);
+        if (!okAud) return null;
+        if (payload.email_verified === false || payload.email_verified === 'false') return null;
+        const e = normalizeEmail(payload.email);
+        return isValidEmail(e) ? e : null;
+    } catch {
+        return null;
+    }
+}
+
+/** Email из ответа Google (passport-google-oauth20): разные формы профиля. */
+function extractGoogleProfileEmail(profile) {
+    if (!profile) return null;
+    const seen = new Set();
+    const push = (raw) => {
+        if (raw == null) return null;
+        const s = String(raw).trim().toLowerCase();
+        if (!s || !isValidEmail(s) || seen.has(s)) return null;
+        seen.add(s);
+        return s;
+    };
+    const ordered = [];
+    const add = (raw) => {
+        const v = push(raw);
+        if (v) ordered.push(v);
+    };
+    if (profile.emails && Array.isArray(profile.emails)) {
+        const arr = profile.emails.slice();
+        arr.sort((a, b) => {
+            const av = a && typeof a === 'object' && a.verified ? 1 : 0;
+            const bv = b && typeof b === 'object' && b.verified ? 1 : 0;
+            return bv - av;
+        });
+        for (let i = 0; i < arr.length; i++) {
+            const e = arr[i];
+            if (e && typeof e === 'object' && e.value) add(e.value);
+            else if (typeof e === 'string') add(e);
+        }
+    }
+    if (typeof profile.email === 'string') add(profile.email);
+    const j = profile._json || {};
+    add(j.email);
+    add(j.email_address);
+    if (typeof profile._raw === 'string') {
+        try {
+            const raw = JSON.parse(profile._raw);
+            if (raw && typeof raw === 'object') {
+                add(raw.email);
+                if (Array.isArray(raw.emails)) {
+                    for (let i = 0; i < raw.emails.length; i++) {
+                        const ex = raw.emails[i];
+                        if (ex && typeof ex === 'object' && ex.value) add(ex.value);
+                    }
+                }
+            }
+        } catch {}
+    }
+    return ordered.length ? ordered[0] : null;
+}
+
+/** Запасной путь: userinfo по access token (Bearer). */
+function fetchGoogleUserinfoEmail(accessToken) {
+    return new Promise((resolve) => {
+        const tok = String(accessToken || '').trim();
+        if (!tok) return resolve(null);
+        const attempts = [
+            { hostname: 'openidconnect.googleapis.com', path: '/v1/userinfo' },
+            { hostname: 'www.googleapis.com', path: '/oauth2/v2/userinfo' },
+            { hostname: 'www.googleapis.com', path: '/oauth2/v3/userinfo' }
+        ];
+        let i = 0;
+        const next = () => {
+            if (i >= attempts.length) return resolve(null);
+            const { hostname, path } = attempts[i++];
+            const req = https.request(
+                {
+                    hostname,
+                    path,
+                    method: 'GET',
+                    headers: {
+                        Authorization: 'Bearer ' + tok,
+                        Accept: 'application/json',
+                        'User-Agent': 'kpvs-site-oauth/1.0'
+                    },
+                    timeout: 15000
+                },
+                (res) => {
+                    let body = '';
+                    res.setEncoding('utf8');
+                    res.on('data', (chunk) => { body += chunk; });
+                    res.on('end', () => {
+                        if (res.statusCode !== 200) {
+                            console.error('[oauth-google] userinfo HTTP', hostname + path, res.statusCode, body.slice(0, 200));
+                            return next();
+                        }
+                        try {
+                            const j = JSON.parse(body);
+                            const e = j && j.email != null ? normalizeEmail(j.email) : '';
+                            if (isValidEmail(e)) return resolve(e);
+                        } catch (ex) {
+                            console.error('[oauth-google] userinfo JSON parse', ex && ex.message);
+                        }
+                        next();
+                    });
+                }
+            );
+            req.on('error', (e) => {
+                console.error('[oauth-google] userinfo request error', e && e.message);
+                next();
+            });
+            req.on('timeout', () => {
+                try { req.destroy(); } catch {}
+                next();
+            });
+            req.end();
+        };
+        next();
+    });
+}
+
+async function resolveGoogleLoginEmail(ctx) {
+    const profile = ctx && ctx.profile;
+    const accessToken = ctx && ctx.accessToken;
+    const tokenParams = ctx && ctx.tokenParams && typeof ctx.tokenParams === 'object' ? ctx.tokenParams : {};
+    const idTok = tokenParams.id_token || tokenParams.idToken;
+    let email = extractEmailFromGoogleIdToken(idTok, GOOGLE_CLIENT_ID);
+    if (email) return email;
+    email = extractGoogleProfileEmail(profile);
+    if (email) return email;
+    if (accessToken) email = await fetchGoogleUserinfoEmail(accessToken);
+    return email || null;
+}
+
+/** Email для профиля API: колонка `email`, иначе при пустом — логин, если он выглядит как email (старые записи). */
+function emailForProfile(row) {
+    if (!row) return null;
+    const stored = row.email != null ? normalizeEmail(row.email) : '';
+    if (isValidEmail(stored)) return stored;
+    const fromLogin = row.username != null ? normalizeEmail(row.username) : '';
+    if (isValidEmail(fromLogin)) return fromLogin;
+    return null;
+}
+
+/** Список пользователей в админке: не терять «сырой» email из БД, если строгая проверка не прошла. */
+function buildAdminUserListEmail(u) {
+    if (!u) return null;
+    const listed = u.list_email != null ? String(u.list_email).trim() : '';
+    const db = u.email_db != null ? String(u.email_db).trim() : '';
+    const p = emailForProfile({ username: u.username, email: listed || db || null });
+    if (p) return p;
+    if (listed) return normalizeEmail(listed) || listed;
+    if (db) return normalizeEmail(db) || db;
+    return null;
+}
+
+function makeSixDigitCode() {
+    const n = crypto.randomInt(0, 1000000);
+    return String(n).padStart(6, '0');
+}
+
+function emailCodeHash(email, purpose, code) {
+    const pepper = process.env.EMAIL_CODE_PEPPER || JWT_SECRET;
+    return sha256Hex([normalizeEmail(email), String(purpose || ''), String(code || ''), pepper].join('|'));
+}
+
 async function trySendResetEmail(toEmail, link) {
     const host = process.env.SMTP_HOST || '';
     const user = process.env.SMTP_USER || '';
@@ -321,33 +577,129 @@ async function trySendResetEmail(toEmail, link) {
     return true;
 }
 
+async function trySendEmailVerificationCode(toEmail, code) {
+    const host = process.env.SMTP_HOST || '';
+    const user = process.env.SMTP_USER || '';
+    const pass = process.env.SMTP_PASS || '';
+    const from = process.env.SMTP_FROM || user || '';
+    const port = Number(process.env.SMTP_PORT || 587);
+    if (!nodemailer || !host || !user || !pass || !from) return false;
+    const transporter = nodemailer.createTransport({
+        host,
+        port,
+        secure: port === 465,
+        auth: { user, pass }
+    });
+    await transporter.sendMail({
+        from,
+        to: toEmail,
+        subject: 'Код подтверждения email · КПВС',
+        text: `Ваш код подтверждения: ${code}\n\nКод действует 10 минут.\nЕсли вы не запрашивали подтверждение — просто игнорируйте это письмо.`,
+    });
+    return true;
+}
+
+app.post('/api/user/auth/email-code', async (req, res) => {
+    try {
+        const { email, purpose } = req.body || {};
+        const e = normalizeEmail(email);
+        const p = String(purpose || '').trim() || 'register';
+        if (!isValidEmail(e)) return res.status(400).json({ error: 'Укажите корректный email' });
+        if (!['register'].includes(p)) return res.status(400).json({ error: 'Некорректный запрос' });
+
+        const already = await pool.query('SELECT id FROM users WHERE email = $1 LIMIT 1', [e]);
+        if (already.rows && already.rows.length) {
+            return res.status(409).json({
+                error: 'Этот email уже занят (в том числе если входили через Google). Войдите через Google или задайте пароль в аккаунте.'
+            });
+        }
+
+        const latest = await getLatestEmailVerification(e, p);
+        if (latest && latest.created_at) {
+            const created = new Date(latest.created_at);
+            if (!isNaN(created.getTime()) && created.getTime() > Date.now() - 60 * 1000) {
+                return res.status(429).json({ error: 'Слишком часто. Попробуйте через минуту' });
+            }
+        }
+
+        const code = makeSixDigitCode();
+        const codeHash = emailCodeHash(e, p, code);
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+        await insertEmailVerificationCode(e, p, codeHash, expiresAt);
+
+        try {
+            const sent = await trySendEmailVerificationCode(e, code);
+            if (!sent) console.log('[email-verify] email disabled. code=', code, 'email=', e);
+        } catch (mailErr) {
+            console.error('[email-verify] send failed:', mailErr);
+            console.log('[email-verify] fallback code=', code, 'email=', e);
+        }
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('POST /api/user/auth/email-code:', err);
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
+
 app.post('/api/user/auth/recover', async (req, res) => {
     try {
         const { email } = req.body || {};
-        const e = String(email || '').trim().toLowerCase();
-        // Always return ok to avoid account enumeration.
-        const user = await createPasswordResetForEmail(e);
-        if (!user) return res.json({ ok: true });
+        const e = normalizeEmail(String(email || ''));
+        if (!isValidEmail(e)) {
+            return res.status(400).json({ error: 'Укажите корректный email', code: 'recover_invalid_email' });
+        }
+        const row = await findUserByEmail(e);
+        if (!row) {
+            return res.status(404).json({
+                error: 'Пользователя с таким email в системе нет.',
+                code: 'recover_email_unknown'
+            });
+        }
+        if (!row.is_active) {
+            return res.status(403).json({
+                error: 'Этот аккаунт отключён. Восстановление пароля по почте недоступно.',
+                code: 'recover_inactive'
+            });
+        }
+        if (String(row.role || '') !== 'user') {
+            return res.status(400).json({
+                error: 'Для этого типа учётной записи восстановление через сайт недоступно.',
+                code: 'recover_role'
+            });
+        }
 
         const rawToken = crypto.randomBytes(32).toString('hex');
         const tokenHash = sha256Hex(rawToken);
         const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1h
-        await insertPasswordResetToken(Number(user.id), tokenHash, expiresAt);
+        await insertPasswordResetToken(Number(row.id), tokenHash, expiresAt);
 
         const base = process.env.APP_BASE_URL || `http://localhost:${PORT}`;
-        const link = base.replace(/\/+$/,'') + '/login.html?mode=user&reset=' + encodeURIComponent(rawToken);
+        const link = base.replace(/\/+$/, '') + '/login.html?mode=user&reset=' + encodeURIComponent(rawToken);
 
         try {
             const sent = await trySendResetEmail(e, link);
-            if (!sent) console.log('[password-recover] email disabled. link=', link);
+            if (!sent) {
+                console.log('[password-recover] SMTP не настроен, ссылка для разработки:', link);
+                return res.status(503).json({
+                    error: 'Отправка письма сейчас недоступна (не настроена почта на сервере). Обратитесь к администратору.',
+                    code: 'recover_mail_disabled'
+                });
+            }
         } catch (mailErr) {
             console.error('[password-recover] send failed:', mailErr);
             console.log('[password-recover] fallback link=', link);
+            return res.status(500).json({
+                error: 'Не удалось отправить письмо. Попробуйте позже.',
+                code: 'recover_send_failed'
+            });
         }
-        res.json({ ok: true });
+        res.json({
+            ok: true,
+            message: 'На указанный email отправлено письмо со ссылкой для сброса пароля.'
+        });
     } catch (err) {
         console.error('POST /api/user/auth/recover:', err);
-        res.json({ ok: true });
+        res.status(500).json({ error: 'Ошибка сервера' });
     }
 });
 
@@ -375,23 +727,44 @@ app.get('/api/user/oauth/google/start', (req, res, next) => {
     // Ensure oauth_next is persisted before redirect to Google.
     req.session.save(() => {
         console.log('OAuth Google start. next=', nextUrl);
-        passport.authenticate('google', { scope: ['profile', 'email'], session: false })(req, res, next);
+        passport.authenticate('google', {
+            scope: [
+                'openid',
+                'https://www.googleapis.com/auth/userinfo.email',
+                'https://www.googleapis.com/auth/userinfo.profile'
+            ],
+            session: false
+        })(req, res, next);
     });
 });
 
 app.get('/api/user/oauth/google/callback', (req, res, next) => {
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return res.redirect('/login.html?mode=user&oauth_error=not_configured');
-    passport.authenticate('google', { session: false }, async (err, profile) => {
+    passport.authenticate('google', { session: false }, async (err, oauthCtx) => {
         try {
             if (err) {
                 console.error('OAuth Google callback error:', err);
                 return res.redirect('/login.html?mode=user&oauth_error=callback');
             }
+            const profile = oauthCtx && oauthCtx.profile;
+            const accessToken = oauthCtx && oauthCtx.accessToken;
+            const tokenParams = oauthCtx && oauthCtx.tokenParams;
             if (!profile || !profile.id) {
-                console.error('OAuth Google callback missing profile:', profile);
+                console.error('OAuth Google callback missing profile:', oauthCtx);
                 return res.redirect('/login.html?mode=user&oauth_error=profile');
             }
-            const email = profile.emails && profile.emails[0] && profile.emails[0].value ? String(profile.emails[0].value) : null;
+            const email = await resolveGoogleLoginEmail({ profile, accessToken, tokenParams });
+            if (!email) {
+                const hasIdToken = !!(tokenParams && (tokenParams.id_token || tokenParams.idToken));
+                console.error('OAuth Google callback: no verified email', {
+                    sub: profile.id,
+                    hasIdToken,
+                    hasAccessToken: !!String(accessToken || '').trim(),
+                    hasEmailsArray: !!(profile.emails && profile.emails.length),
+                    jsonEmail: profile._json && profile._json.email
+                });
+                return res.redirect('/login.html?mode=user&oauth_error=no_email');
+            }
             const user = await upsertOAuthUser('google', String(profile.id), email);
             if (!user) {
                 console.error('OAuth Google upsertOAuthUser returned null');
@@ -416,7 +789,19 @@ app.get('/api/user/oauth/google/callback', (req, res, next) => {
 app.get('/api/admin/users', requireAuth, async (req, res) => {
     try {
         if (req.session.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
-        res.json(await listUsers());
+        const rows = await listUsers();
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
+        res.set('Pragma', 'no-cache');
+        const payload = rows.map((u) => ({
+            id: u.id != null ? Number(u.id) : u.id,
+            username: u.username != null ? String(u.username) : '',
+            email: buildAdminUserListEmail(u),
+            role: u.role != null ? String(u.role) : '',
+            is_active: Boolean(u.is_active),
+            created_at: u.created_at,
+            last_login: u.last_login
+        }));
+        res.json(payload);
     } catch (err) {
         console.error('GET /api/admin/users:', err);
         res.status(500).json({ error: 'Failed to load users' });
@@ -426,11 +811,21 @@ app.get('/api/admin/users', requireAuth, async (req, res) => {
 app.post('/api/admin/users', requireAuth, async (req, res) => {
     try {
         if (req.session.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
-        const { username, password, role } = req.body || {};
+        const { username, password, role, email } = req.body || {};
         if (!username || !password) return res.status(400).json({ error: 'Укажите логин и пароль' });
-        const user = await createUser(String(username).trim(), String(password), role || 'admin');
+        const r = String(role || 'admin').trim();
+        if (r === 'user') {
+            const e = normalizeEmail(String(email || ''));
+            if (!isValidEmail(e)) return res.status(400).json({ error: 'Для роли «user» укажите корректный email' });
+            const dupE = await findUserByEmail(e);
+            if (dupE) return res.status(409).json({ error: 'Email уже занят' });
+            const user = await createUser(String(username).trim(), String(password), r, { email: e, email_verified: true });
+            return res.status(201).json(user);
+        }
+        const user = await createUser(String(username).trim(), String(password), r);
         res.status(201).json(user);
     } catch (err) {
+        if (err && err.code === '23505') return res.status(409).json({ error: 'Логин или email уже занят' });
         console.error('POST /api/admin/users:', err);
         res.status(400).json({ error: err.message || 'Failed to create user' });
     }

@@ -89,18 +89,20 @@
             <div class="admin-table-container">
                 <table class="admin-table admin-users-table">
                     <colgroup>
-                        <col style="width:52px;">
-                        <col style="width:56px;">
-                        <col style="width:220px;">
-                        <col style="width:200px;">
-                        <col style="width:170px;">
-                        <col style="width:740px;">
+                        <col data-col="u-active" style="width:52px;">
+                        <col data-col="u-id" style="width:56px;">
+                        <col data-col="u-login" style="width:160px;">
+                        <col data-col="u-email" style="width:180px;">
+                        <col data-col="u-role" style="width:156px;">
+                        <col data-col="u-last" style="width:172px;">
+                        <col data-col="u-actions" style="width:440px;">
                     </colgroup>
                     <thead>
                         <tr>
                             <th scope="col">Активен</th>
                             <th scope="col">ID</th>
                             <th scope="col">Логин</th>
+                            <th scope="col" class="admin-users-th-email">Email</th>
                             <th scope="col">Роль</th>
                             <th scope="col">Последний вход</th>
                             <th scope="col">Действия</th>
@@ -123,7 +125,8 @@
                     <h4>Контакты</h4>
                     <p class="footer-contact"><img src="/img/location.svg" alt="" class="footer-icon" aria-hidden="true"> ул. л-та Рябцева, 44, Брест</p>
                     <p class="footer-contact"><img src="/img/phone.svg" alt="" class="footer-icon" aria-hidden="true"> +375 (162) 58-09-31</p>
-                    <p class="footer-contact"><img src="/img/mail.svg" alt="" class="footer-icon" aria-hidden="true"> sbyt@kpvs.by</p>
+                    <p class="footer-contact"><img src="/img/mail.svg" alt="" class="footer-icon" aria-hidden="true"> <a href="mailto:kpvssales@gmail.com">kpvssales@gmail.com</a></p>
+                    <p class="footer-contact"><img src="/img/setting.svg" alt="" class="footer-icon" aria-hidden="true"> <a href="mailto:kpvssupport@gmail.com">kpvssupport@gmail.com</a></p>
                 </div>
                 <div class="footer-section">
                     <h4>Информация</h4>
@@ -346,9 +349,14 @@
             <div class="modal-body">
                 <form id="user-form" class="admin-form" novalidate>
                     <div class="form-row">
-                        <label for="user-username">Логин <span class="required">*</span></label>
+                        <label for="user-username">Логин (без @) <span class="required">*</span></label>
                         <input id="user-username" name="username" type="text" autocomplete="off" />
                         <span class="field-error" id="err-user-username"></span>
+                    </div>
+                    <div class="form-row" id="user-email-row">
+                        <label for="user-email">Email <span class="required">*</span></label>
+                        <input id="user-email" name="email" type="email" autocomplete="off" />
+                        <span class="field-error" id="err-user-email"></span>
                     </div>
                     <div class="form-row">
                         <label for="user-password">Пароль <span class="required">*</span></label>

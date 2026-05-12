@@ -37,6 +37,11 @@
                         <label for="login-email">Email</label>
                         <input id="login-email" type="email" name="email" autocomplete="email" placeholder="name@example.com" />
                     </div>
+                    <div class="form-row" id="row-email-code" hidden>
+                        <label for="login-email-code">Код из письма</label>
+                        <input id="login-email-code" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="6 цифр" maxlength="6" />
+                        <button type="button" class="login-switch-link" id="resend-email-code" hidden>Отправить код ещё раз</button>
+                    </div>
                     <div class="form-row" id="row-password">
                         <label for="login-password">Пароль</label>
                         <div class="login-password-wrap">
@@ -56,6 +61,10 @@
                         </div>
                     </div>
                     <div id="login-error" class="login-error" role="alert" aria-live="polite"></div>
+                    <div id="login-register-suggest" class="login-register-suggest" hidden>
+                        <p id="login-register-suggest-msg" class="login-register-suggest__msg"></p>
+                        <button type="button" class="admin-ui-btn admin-ui-btn--outline login-register-suggest__btn" id="login-go-register-btn">Зарегистрироваться</button>
+                    </div>
                     <div class="login-submit-wrap">
                         <button type="submit" id="login-btn" class="admin-ui-btn admin-ui-btn--primary login-btn">Войти</button>
                     </div>

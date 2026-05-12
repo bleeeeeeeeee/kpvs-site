@@ -9,6 +9,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const title = document.getElementById('login-title');
     const note = document.getElementById('login-footer-note');
     const rowEmail = document.getElementById('row-email');
+    const rowEmailCode = document.getElementById('row-email-code');
     const rowPassword2 = document.getElementById('row-password2');
     const toggleRegister = document.getElementById('toggle-register');
     const toggleLogin = document.getElementById('toggle-login');
@@ -23,8 +24,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const pwdToggle = document.getElementById('login-password-toggle');
     const pwd2Toggle = document.getElementById('login-password2-toggle');
     const usernameLabel = document.getElementById('login-username-label');
+    const emailCodeInput = document.getElementById('login-email-code');
+    const resendEmailCodeBtn = document.getElementById('resend-email-code');
+    const registerSuggestEl = document.getElementById('login-register-suggest');
+    const registerSuggestMsg = document.getElementById('login-register-suggest-msg');
+    const registerGoBtn = document.getElementById('login-go-register-btn');
 
     if (!form || !btn || !modeInput || !tabAdmin || !tabUser || !badge || !title || !note) return;
+
+    let pendingLoginToRegister = null;
 
     /* Скрыт пароль → «глаз» (visible); текст виден → перечёркнутый глаз (invisible) */
     var LOGIN_ICON_PASSWORD_HIDDEN = '/img/visible.svg';
@@ -118,24 +126,156 @@ document.addEventListener('DOMContentLoaded', async () => {
     const params = new URLSearchParams(window.location.search);
     const nextRaw = params.get('next') || '';
     const tokenFromUrl = params.get('token') || '';
-    const oauthError = (params.get('oauth_error') || '') === '1';
+    const oauthErrorCode = String(params.get('oauth_error') || '').trim();
     const resetToken = params.get('reset') || '';
 
     const forcedMode = (params.get('mode') || '').toLowerCase() === 'admin' ? 'admin' : 'user';
     const mode = forcedMode;
     let isRegister = (params.get('register') || '').toLowerCase() === '1';
     let isRecover = (params.get('recover') || '').toLowerCase() === '1';
+    let registerAwaitingCode = false;
 
     function setTabSelected(tab, selected) {
         tab.setAttribute('aria-selected', selected ? 'true' : 'false');
     }
 
     function safeNextPath(value) {
-        const s = String(value || '');
-        return s.startsWith('/') ? s : '';
+        const s = String(value || '').trim();
+        if (!s.startsWith('/')) return '';
+        const q = s.indexOf('?');
+        const pathOnly = q === -1 ? s : s.slice(0, q);
+        if (pathOnly !== '/login.html') return s;
+        try {
+            const sp = q === -1 ? '' : s.slice(q + 1);
+            const qs = new URLSearchParams(sp);
+            // Одноразовые/чувствительные query на login — не использовать как next/referrer:
+            // после сброса пароля referrer = …&reset=… → иначе успешный вход снова кидает на форму сброса (цикл).
+            if (qs.get('reset') || qs.get('token')) return '';
+            return s;
+        } catch {
+            return '';
+        }
     }
 
     const next = safeNextPath(nextRaw);
+
+    const PREFILL_SS_KEY = 'kpvs.registerFromLogin';
+
+    function looksLikeLoginEmail(s) {
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s || '').trim().toLowerCase());
+    }
+
+    /** Локальная часть email как черновик логина (правила как в БД: буквы, цифры, . _ -). */
+    function suggestUsernameFromLoginEmail(email) {
+        const s = String(email || '').trim().toLowerCase();
+        const m = s.match(/^([^@]+)@/);
+        if (!m) return '';
+        let local = m[1].replace(/[^\p{L}\p{N}._-]/gu, '');
+        local = local.replace(/^\.+|\.+$/g, '');
+        if (local.length < 3) return '';
+        return local.slice(0, 48);
+    }
+
+    function applyRegisterPrefillObject(o) {
+        if (!o) return;
+        const emailEl = document.getElementById('login-email');
+        if (o.clearEmail && emailEl) emailEl.value = '';
+        else if (o.email && emailEl) emailEl.value = String(o.email).trim().toLowerCase();
+        if (identityInput) {
+            if (o.suggestedUsername) identityInput.value = o.suggestedUsername;
+            else if (o.usernameText && !looksLikeLoginEmail(o.usernameText)) identityInput.value = String(o.usernameText).trim();
+            else if (o.usernameText && looksLikeLoginEmail(o.usernameText)) identityInput.value = '';
+        }
+        if (o.password) {
+            if (pwdInput) pwdInput.value = o.password;
+            if (pwd2Input) pwd2Input.value = o.passwordPrimaryOnly ? '' : o.password;
+        }
+        if (o.hint) showInfo(o.hint);
+    }
+
+    function hideRegisterSuggestPanel() {
+        if (registerSuggestEl) registerSuggestEl.hidden = true;
+    }
+
+    function showUnknownUserRegisterOffer(kind, identity, password) {
+        pendingLoginToRegister = { kind, identity, password };
+        if (errorEl) {
+            errorEl.textContent = '';
+            errorEl.style.display = 'none';
+            errorEl.classList.remove('login-error--info');
+        }
+        if (registerSuggestMsg) {
+            registerSuggestMsg.textContent =
+                kind === 'email'
+                    ? 'Пользователя с таким email в системе нет.'
+                    : 'Пользователя с таким логином в системе нет.';
+        }
+        if (registerSuggestEl) registerSuggestEl.hidden = false;
+    }
+
+    function applyPendingLoginToRegister() {
+        const pack = pendingLoginToRegister;
+        pendingLoginToRegister = null;
+        hideRegisterSuggestPanel();
+        if (!pack) return;
+        registerAwaitingCode = false;
+        let o;
+        if (pack.kind === 'email') {
+            const em = String(pack.identity || '').trim().toLowerCase();
+            o = {
+                email: em,
+                suggestedUsername: suggestUsernameFromLoginEmail(em),
+                usernameText: pack.identity,
+                password: pack.password,
+                passwordPrimaryOnly: true,
+                hint: 'Поля заполнены с экрана входа: проверьте логин и email, затем нажмите «Зарегистрироваться», чтобы получить код на почту.'
+            };
+        } else {
+            o = {
+                clearEmail: true,
+                usernameText: String(pack.identity || '').trim(),
+                password: pack.password,
+                passwordPrimaryOnly: true,
+                hint: 'Логин и пароль перенесены с экрана входа. Укажите email и повторите пароль во втором поле, затем нажмите «Зарегистрироваться».'
+            };
+        }
+        try {
+            if (emailCodeInput) emailCodeInput.value = '';
+        } catch (_) {}
+        setMode('register');
+        applyRegisterPrefillObject(o);
+        try {
+            if (pack.kind === 'email') {
+                if (identityInput && String(identityInput.value || '').trim()) identityInput.focus();
+                else document.getElementById('login-email')?.focus();
+            } else {
+                document.getElementById('login-email')?.focus();
+            }
+        } catch (_) {}
+    }
+
+    if (registerGoBtn) {
+        registerGoBtn.addEventListener('click', () => {
+            applyPendingLoginToRegister();
+        });
+    }
+
+    function consumeRegisterPrefill() {
+        if (mode !== 'user' || !isRegister) return;
+        if ((params.get('prefill') || '').toLowerCase() !== '1') return;
+        try {
+            const raw = sessionStorage.getItem(PREFILL_SS_KEY);
+            if (!raw) return;
+            const o = JSON.parse(raw);
+            sessionStorage.removeItem(PREFILL_SS_KEY);
+            applyRegisterPrefillObject(o);
+        } catch (_) {}
+        try {
+            const qs = new URLSearchParams(window.location.search);
+            qs.delete('prefill');
+            window.history.replaceState({}, '', window.location.pathname + '?' + qs.toString());
+        } catch (_) {}
+    }
 
     function guessReferrerPath() {
         try {
@@ -155,6 +295,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (mode !== 'user') return;
         isRegister = view === 'register';
         isRecover = view === 'recover';
+        if (!isRegister) registerAwaitingCode = false;
         clearError();
         setTabSelected(tabAdmin, !isRegister);
         setTabSelected(tabUser, isRegister);
@@ -194,9 +335,11 @@ document.addEventListener('DOMContentLoaded', async () => {
             title.textContent = resetToken ? 'Восстановление пароля' : (isRecover ? 'Восстановление пароля' : (isRegister ? 'Регистрация' : 'Вход пользователя'));
             note.textContent = resetToken
                 ? 'Придумайте новый пароль для аккаунта. После сохранения вы сможете войти обычным способом.'
-                : (isRecover ? 'Введите email. Если он зарегистрирован, мы отправим ссылку для восстановления.' : 'Войдите в аккаунт, чтобы использовать функции пользователя.');
+                : (isRecover ? 'Введите email, с которым вы регистрировались. Если аккаунта с таким адресом нет или почта на сервере недоступна, вы сразу увидите сообщение об этом.' : (isRegister ? 'Укажите логин, email и пароль. На почту придёт код подтверждения.' : 'Введите логин или email. Если такого пользователя нет, появится предложение зарегистрироваться.'));
             btn.textContent = resetToken ? 'Сохранить новый пароль' : (isRecover ? 'Отправить ссылку' : (isRegister ? 'Зарегистрироваться' : 'Войти'));
             if (rowEmail) rowEmail.hidden = !isRegister;
+            if (rowEmailCode) rowEmailCode.hidden = !(isRegister && registerAwaitingCode);
+            if (resendEmailCodeBtn) resendEmailCodeBtn.hidden = !(isRegister && registerAwaitingCode);
             if (oauthGoogleBtn) oauthGoogleBtn.hidden = false;
             if (toggleRecover) toggleRecover.hidden = !!(isRegister || resetToken || isRecover);
             if (toggleRecoverBack) toggleRecoverBack.hidden = !(isRecover && !resetToken);
@@ -232,6 +375,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (resetToken) setMode('login');
         else if (isRecover) setMode('recover');
         else setMode(isRegister ? 'register' : 'login');
+        if (mode === 'user' && isRegister && (params.get('prefill') || '').toLowerCase() === '1') {
+            consumeRegisterPrefill();
+        }
     }
 
     if (toggleRegister) {
@@ -299,16 +445,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         syncRegisterUi();
     }
 
-    if (oauthError) {
+    if (oauthErrorCode) {
         const msgByCode = {
             not_configured: 'Вход через Google не настроен на сервере (нет GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET).',
             callback: 'Google вернул ошибку при входе. Проверьте логи сервера.',
             profile: 'Google не вернул профиль пользователя. Проверьте логи сервера.',
             user: 'Не удалось создать/обновить пользователя после входа через Google. Проверьте логи сервера.',
+            no_email: 'Google не передал адрес email (или доступ к email отключён). Разрешите доступ к email для приложения или войдите логином и паролем.',
             exception: 'Ошибка сервера при обработке входа через Google. Проверьте логи сервера.',
             '1': 'Не удалось войти через Google. Проверьте логи сервера.',
         };
-        showError(msgByCode[oauthError] || 'Не удалось войти через Google. Попробуйте ещё раз или используйте логин/пароль.');
+        showError(msgByCode[oauthErrorCode] || 'Не удалось войти через Google. Попробуйте ещё раз или используйте логин/пароль.');
         try {
             const qs = new URLSearchParams(window.location.search);
             qs.delete('oauth_error');
@@ -344,6 +491,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const email = (document.getElementById('login-email')?.value || '').trim();
         const password2 = pwd2Input?.value || '';
         const recoverEmail = username;
+        const emailCode = (emailCodeInput?.value || '').trim();
 
         if (mode === 'user' && resetToken) {
             if (!password || password.length < 6) { showError('Пароль должен быть не менее 6 символов'); return; }
@@ -356,18 +504,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
 
         if (mode === 'user' && isRegister) {
+            if (username.includes('@')) { showError('Логин не может содержать символ @ — укажите логин отдельно от email'); return; }
             if (!email) { showError('Введите email'); return; }
             if (password.length < 6) { showError('Пароль должен быть не менее 6 символов'); return; }
             if (password !== password2) { showError('Пароли не совпадают'); return; }
+            if (registerAwaitingCode) {
+                if (!/^\d{6}$/.test(emailCode)) { showError('Введите 6-значный код из письма'); return; }
+            }
         }
 
         btn.disabled = true;
-        const prevText = btn.textContent;
+        let prevText = btn.textContent;
         let loadingLabel = 'Вход…';
         if (mode === 'admin') loadingLabel = 'Вход…';
         else if (mode === 'user' && resetToken) loadingLabel = 'Сохраняем…';
         else if (mode === 'user' && isRecover) loadingLabel = 'Отправляем…';
-        else if (mode === 'user' && isRegister) loadingLabel = 'Создаю аккаунт…';
+        else if (mode === 'user' && isRegister) loadingLabel = registerAwaitingCode ? 'Проверяю код…' : 'Отправляю код…';
         btn.textContent = loadingLabel;
 
         const setRecoverBusy = function (busy) {
@@ -376,6 +528,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (toggleRecover) toggleRecover.disabled = !!busy;
         };
         if (mode === 'user' && isRecover) setRecoverBusy(true);
+
+        async function readResponseJson(res) {
+            const text = await res.text();
+            if (!text) return {};
+            try {
+                return JSON.parse(text);
+            } catch {
+                return {};
+            }
+        }
 
         try {
             if (mode === 'admin') {
@@ -399,8 +561,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: recoverEmail })
                 });
-                await res.json().catch(() => ({}));
-                showInfo('Если такой email зарегистрирован, мы отправим письмо со ссылкой для восстановления.');
+                const data = await readResponseJson(res);
+                if (!res.ok) {
+                    showError(data.error || 'Не удалось отправить ссылку для восстановления');
+                    return;
+                }
+                showInfo(data.message || 'На указанный email отправлено письмо со ссылкой для сброса пароля.');
                 return;
             }
 
@@ -421,15 +587,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
 
             if (isRegister) {
-                const res = await fetch('/api/user/auth/register', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, email, password })
-                });
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok) {
-                    showError(data.error || 'Не удалось зарегистрироваться');
+                if (!registerAwaitingCode) {
+                    const res = await fetch('/api/user/auth/email-code', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: email, purpose: 'register' })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        showError(data.error || 'Не удалось отправить код');
+                        return;
+                    }
+                    registerAwaitingCode = true;
+                    syncRegisterUi();
+                    showInfo('Мы отправили код на email. Введите 6 цифр из письма.');
+                    try { if (emailCodeInput) emailCodeInput.focus(); } catch {}
                     return;
+                } else {
+                    const res = await fetch('/api/user/auth/register', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ username, email, password, email_code: emailCode })
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) {
+                        showError(data.error || 'Не удалось зарегистрироваться');
+                        return;
+                    }
                 }
             }
 
@@ -438,9 +622,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ username, password })
             });
-            const data = await res.json().catch(() => ({}));
+            const data = await readResponseJson(res);
+            const loginCode = (data && data.code) || (res.headers && res.headers.get && res.headers.get('x-login-code')) || '';
+            const errText = String((data && data.error) || '');
+            const unknownUser =
+                loginCode === 'email_not_registered' ||
+                loginCode === 'username_not_registered' ||
+                (res.status === 401 &&
+                    looksLikeLoginEmail(username) &&
+                    (errText.indexOf('Такого email') !== -1 || errText.indexOf('Такого пользователя') !== -1));
             if (!res.ok) {
-                showError(data.error || 'Неверный логин или пароль');
+                if (unknownUser) {
+                    const kind =
+                        loginCode === 'username_not_registered' ? 'username' : looksLikeLoginEmail(username) ? 'email' : 'username';
+                    showUnknownUserRegisterOffer(kind, username, password);
+                    return;
+                }
+                showError((data && data.error) || 'Неверный логин или пароль');
                 return;
             }
             if (!data.token) { showError('Не удалось получить токен'); return; }
@@ -455,7 +653,35 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
+    if (resendEmailCodeBtn) {
+        resendEmailCodeBtn.addEventListener('click', async () => {
+            clearError();
+            const email = (document.getElementById('login-email')?.value || '').trim();
+            if (!email) { showError('Введите email'); return; }
+            resendEmailCodeBtn.disabled = true;
+            try {
+                const res = await fetch('/api/user/auth/email-code', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: email, purpose: 'register' })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    showError(data.error || 'Не удалось отправить код');
+                    return;
+                }
+                showInfo('Код отправлен повторно. Проверьте почту.');
+            } catch {
+                showError('Ошибка соединения с сервером');
+            } finally {
+                resendEmailCodeBtn.disabled = false;
+            }
+        });
+    }
+
     function showError(msg) {
+        hideRegisterSuggestPanel();
+        pendingLoginToRegister = null;
         if (errorEl) {
             errorEl.classList.remove('login-error--info');
             errorEl.textContent = msg;
@@ -464,6 +690,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     function showInfo(msg) {
+        hideRegisterSuggestPanel();
+        pendingLoginToRegister = null;
         if (errorEl) {
             errorEl.classList.add('login-error--info');
             errorEl.textContent = msg;
@@ -477,5 +705,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             errorEl.style.display = 'none';
             errorEl.classList.remove('login-error--info');
         }
+        hideRegisterSuggestPanel();
+        pendingLoginToRegister = null;
     }
 });

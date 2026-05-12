@@ -7,14 +7,109 @@ function genderDisplayLabel(g) {
     return '';
 }
 
+function catalogHrefForGender(g) {
+    const x = String(g || '').toLowerCase();
+    if (x === 'mens' || x === 'male') return '/mens.html';
+    if (x === 'womens' || x === 'female') return '/womens.html';
+    if (x === 'unisex') return '/all.html';
+    return '/all.html';
+}
+
+/** Вертикаль «Назад»: верх обёртки = верх основного фото (после layout / load картинки). */
+let productBackAlignState = null;
+
+function teardownProductBackAlign() {
+    if (productBackAlignState) {
+        if (productBackAlignState.ro) productBackAlignState.ro.disconnect();
+        if (productBackAlignState.onResize) {
+            window.removeEventListener('resize', productBackAlignState.onResize);
+        }
+        productBackAlignState = null;
+    }
+    const shell = document.getElementById('product-details');
+    if (shell) shell.style.removeProperty('--product-back-top');
+}
+
+function requestProductBackAlign() {
+    if (productBackAlignState && typeof productBackAlignState.schedule === 'function') {
+        productBackAlignState.schedule();
+    }
+}
+
+function setupProductBackAlign() {
+    teardownProductBackAlign();
+    const shell = document.getElementById('product-details');
+    const img = shell && shell.querySelector('.product-image');
+    if (!shell || !img) return;
+
+    const wrap = shell.querySelector('.product-back-wrap');
+    const backBtn = document.getElementById('product-back-btn');
+    const backImg = backBtn && backBtn.querySelector('img');
+
+    let raf = 0;
+    const apply = () => {
+        const shellRect = shell.getBoundingClientRect();
+        const prodTopRel = img.getBoundingClientRect().top - shellRect.top;
+        let y = prodTopRel;
+        if (wrap && backImg) {
+            const delta = backImg.getBoundingClientRect().top - wrap.getBoundingClientRect().top;
+            y = prodTopRel - delta;
+        }
+        shell.style.setProperty('--product-back-top', Math.max(0, y) + 'px');
+    };
+    const schedule = () => {
+        if (raf) cancelAnimationFrame(raf);
+        raf = requestAnimationFrame(() => {
+            raf = 0;
+            apply();
+        });
+    };
+
+    schedule();
+    if (!img.complete) img.addEventListener('load', schedule, { once: true });
+
+    const mainEl = document.getElementById('product-details-main');
+    let ro = null;
+    if (mainEl && typeof ResizeObserver !== 'undefined') {
+        ro = new ResizeObserver(schedule);
+        ro.observe(mainEl);
+    }
+    const onResize = () => schedule();
+    window.addEventListener('resize', onResize);
+    productBackAlignState = { ro: ro, onResize: onResize, schedule: schedule };
+}
+
+/** Кнопка «назад»: при переходе из каталога — history.back(), иначе ссылка на раздел по полу товара */
+function wireProductBackButton(product) {
+    const el = document.getElementById('product-back-btn');
+    if (!el) return;
+    el.setAttribute('href', catalogHrefForGender(product && product.gender));
+    el.onclick = function (ev) {
+        const ref = document.referrer || '';
+        try {
+            const sameSite = ref.indexOf(window.location.origin) === 0;
+            const fromListing = /\/(mens|womens|all)\.html/i.test(ref) || /\/welcome\.html/i.test(ref);
+            if (sameSite && fromListing && window.history.length > 1) {
+                ev.preventDefault();
+                window.history.back();
+            }
+        } catch (_) {}
+    };
+}
+
 async function loadProduct() {
     const urlParams = new URLSearchParams(window.location.search);
     const slug = urlParams.get('slug');
     const productId = urlParams.get('id');
     const identifier = slug || productId;
 
+    const productMainEl = document.getElementById('product-details-main');
+    if (!productMainEl) return;
+
+    teardownProductBackAlign();
+
     if (!identifier) {
-        document.getElementById('product-details').innerHTML = '<p class="catalog-empty">Товар не найден. Укажите корректную ссылку или откройте <a href="/mens.html">каталог</a>.</p>';
+        productMainEl.innerHTML = '<p class="catalog-empty">Товар не найден. Укажите корректную ссылку или откройте <a href="/mens.html">каталог</a>.</p>';
         return;
     }
 
@@ -24,7 +119,7 @@ async function loadProduct() {
 
         const product = await res.json();
         if (!product || !product.id) {
-            document.getElementById('product-details').innerHTML = '<p class="catalog-empty">Товар не найден.</p>';
+            productMainEl.innerHTML = '<p class="catalog-empty">Товар не найден.</p>';
             return;
         }
 
@@ -67,7 +162,7 @@ async function loadProduct() {
             ? '<p class="product-materials">Состав: ' + product.materials + '</p>'
             : '';
 
-        document.getElementById('product-details').innerHTML = `
+        productMainEl.innerHTML = `
             <div class="product-page">
                 <div class="product-image-block">
                     <div class="product-image-wrapper">
@@ -109,18 +204,21 @@ async function loadProduct() {
         `;
 
         document.title = (product.name || 'Товар').replace(/</g, '') + ' · КПВС';
+        wireProductBackButton(product);
+        setupProductBackAlign();
 
         if (images.length > 1) {
             document.querySelectorAll('.product-gallery-item').forEach(thumb => {
                 thumb.addEventListener('click', () => {
                     const mainImg = document.querySelector('.product-image');
                     if (mainImg && thumb.dataset.src) mainImg.src = thumb.dataset.src;
+                    requestProductBackAlign();
                 });
             });
         }
     } catch (err) {
         console.error('Error loading product:', err);
-        document.getElementById('product-details').innerHTML = '<p class="catalog-empty">Ошибка загрузки товара. Попробуйте обновить страницу.</p>';
+        if (productMainEl) productMainEl.innerHTML = '<p class="catalog-empty">Ошибка загрузки товара. Попробуйте обновить страницу.</p>';
     }
 }
 
@@ -286,7 +384,7 @@ function getCart() {
 function inquirePrice(productName, productId) {
     const subject = encodeURIComponent('Запрос цены на ' + productName);
     const body = encodeURIComponent('Здравствуйте! Прошу предоставить информацию о цене на:\n\nНазвание: ' + productName + '\nID товара: ' + (productId || 'н/д') + '\n\nСпасибо!');
-    window.location.href = 'mailto:sbyt@kpvs.by?subject=' + subject + '&body=' + body;
+    window.location.href = 'mailto:kpvssales@gmail.com?subject=' + subject + '&body=' + body;
 }
 
 function inquirePriceFromCart() {
@@ -296,7 +394,7 @@ function inquirePriceFromCart() {
         const list = products.map(p => '- ' + p.name + ' (ID: ' + p.id + ')').join('\n');
         const subject = encodeURIComponent('Запрос цены на товары из корзины');
         const body = encodeURIComponent('Здравствуйте! Прошу предоставить информацию о ценах на следующие товары:\n\n' + list + '\n\nСпасибо!');
-        window.location.href = 'mailto:sbyt@kpvs.by?subject=' + subject + '&body=' + body;
+        window.location.href = 'mailto:kpvssales@gmail.com?subject=' + subject + '&body=' + body;
     });
 }
 
@@ -489,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (contact.textContent.includes('+375')) {
             contact.addEventListener('click', () => { window.location.href = 'tel:+375162580931'; });
         } else if (contact.textContent.includes('@')) {
-            contact.addEventListener('click', () => { window.location.href = 'mailto:sbyt@kpvs.by'; });
+            contact.addEventListener('click', () => { window.location.href = 'mailto:kpvssales@gmail.com'; });
         }
     });
 });

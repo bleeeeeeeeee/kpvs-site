@@ -571,8 +571,47 @@ html.modal-open body .notification * {
 }
 
 .modal-content.modal-content--oauth-pwd {
-    max-width: 440px;
-    width: min(440px, calc(100vw - 2rem));
+    max-width: 480px;
+    width: min(480px, calc(100vw - 2rem));
+}
+
+/* Форма «Задайте пароль»: сетка вместо space-between — поля в одной колонке, подписи ровно */
+.oauth-password-modal label.account-setting.account-setting--password {
+    display: grid;
+    grid-template-columns: minmax(9.25rem, 36%) minmax(0, 1fr);
+    align-items: center;
+    column-gap: 0.85rem;
+    width: 100%;
+    box-sizing: border-box;
+    cursor: default;
+    user-select: none;
+    justify-content: stretch;
+}
+
+.oauth-password-modal label.account-setting--password .account-setting-label {
+    line-height: 1.3;
+    align-self: center;
+}
+
+.oauth-password-modal label.account-setting--password .account-input {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+}
+
+.oauth-password-modal label.account-setting--password + label.account-setting--password {
+    margin-top: 0.75rem;
+}
+
+@media (max-width: 400px) {
+    .oauth-password-modal label.account-setting.account-setting--password {
+        grid-template-columns: 1fr;
+        row-gap: 0.35rem;
+        align-items: stretch;
+    }
+    .oauth-password-modal label.account-setting--password .account-setting-label {
+        align-self: start;
+    }
 }
 
 .oauth-password-modal .oauth-pwd-intro {
@@ -590,15 +629,33 @@ html.modal-open body .notification * {
 
 .oauth-password-modal .oauth-pwd-actions {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    align-items: stretch;
     gap: 0.65rem;
     margin-top: 1rem;
 }
 
-.oauth-password-modal .oauth-pwd-actions .admin-ui-btn {
-    flex: 1;
-    min-width: 8rem;
-    justify-content: center;
+.oauth-password-modal .oauth-pwd-actions > .admin-ui-btn {
+    min-height: 2.75rem;
+    height: auto;
+    padding: 0.82rem 1.1rem;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.2;
+    align-self: stretch;
+    box-sizing: border-box;
+}
+
+.oauth-password-modal .oauth-pwd-actions #oauth-pwd-save {
+    flex: 2 1 0;
+    min-width: 0;
+    width: auto;
+}
+
+.oauth-password-modal .oauth-pwd-actions #oauth-pwd-dismiss {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
 }
 
 .modal-header {
@@ -704,7 +761,7 @@ html.modal-open body .notification * {
 
 .account-top {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     gap: 0.9rem;
     padding: 0.95rem 1rem;
     border: 1px solid var(--border-color);
@@ -736,7 +793,40 @@ html.modal-open body .notification * {
 .account-meta {
     display: flex;
     flex-direction: column;
+    flex: 1;
     min-width: 0;
+    gap: 0.35rem;
+}
+
+/* Логин + email вместе по высоте как .account-avatar (3rem) */
+.account-identity-stack {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: stretch;
+    box-sizing: border-box;
+    height: 3rem;
+    min-height: 3rem;
+    max-height: 3rem;
+    min-width: 0;
+    gap: 0.08rem;
+}
+
+.account-identity-stack:has(.account-rename-wrap--editing) {
+    height: auto;
+    max-height: none;
+    min-height: 3rem;
+}
+
+/* Высота строки логина + почты = 3rem у аватара — компактная кнопка карандаша */
+.account-identity-stack .account-rename-pencil-btn.account-rename-icon-btn {
+    width: 1.75rem;
+    height: 1.75rem;
+}
+
+.account-identity-stack .account-rename-pencil-btn .account-rename-ico {
+    width: 16px;
+    height: 16px;
 }
 
 .account-name-row {
@@ -744,45 +834,164 @@ html.modal-open body .notification * {
     align-items: center;
     gap: 0.35rem;
     min-width: 0;
+    width: 100%;
+    min-height: 0;
+    flex: 0 1 auto;
+    box-sizing: border-box;
+}
+
+.account-identity-block {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.account-disclosure-toggle,
+.account-security-open-btn {
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: center;
+}
+
+/* Выровнять с кнопками «Сохранить / Отмена» в панели пароля (у outline был height 2.5rem) */
+.account-settings--security > #account-password-toggle.admin-ui-btn {
+    min-height: 2.75rem;
+    height: auto;
+    padding: 0.82rem 1.1rem;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.account-disclosure-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.account-disclosure-panel[hidden] {
+    display: none !important;
+}
+
+.account-field-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+    min-width: 0;
+}
+
+.account-field-label {
+    font-size: 0.88rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+}
+
+.account-input--full {
+    width: 100%;
+    max-width: none;
+}
+
+.account-disclosure-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+}
+
+.account-disclosure-actions .account-disclosure-action {
+    width: 100%;
+    justify-content: center;
+    box-sizing: border-box;
 }
 
 .account-rename-wrap {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
+    gap: 0.2rem;
     min-width: 0;
     flex: 1;
 }
 
-.account-rename-input {
-    width: min(240px, 100%);
-    padding: 0.45rem 0.6rem;
-    border: 1px solid var(--border-color);
-    border-radius: 0.6rem;
-    background: var(--bg-primary);
-    color: var(--text-primary);
-    font-size: 0.95rem;
-    line-height: 1.2;
+.account-rename-wrap--editing {
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.account-rename-editor {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1 1 auto;
+    min-width: 0;
+    width: 100%;
     box-sizing: border-box;
 }
 
-.account-rename-save,
-.account-rename-cancel {
-    appearance: none;
-    -webkit-appearance: none;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-    color: var(--secondary-color);
-    font-weight: 700;
-    font-size: 0.9rem;
-    padding: 0.25rem 0.35rem;
-    border-radius: 0.5rem;
+.account-rename-decisions {
+    display: inline-flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 0.28rem;
+    flex: 0 0 auto;
+}
+
+.account-rename-editor[hidden] {
+    display: none !important;
+}
+
+.account-login-pencil-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.22rem;
+    /* Не растягиваем на всю строку — карандаш остаётся у ника; длинный ник режется в пределах блока */
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.account-login-pencil-group[hidden] {
+    display: none !important;
+}
+
+/* Логин на всю доступную ширину строки; многоточие только если реально не помещается */
+.account-login-pencil-group > .account-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
 }
-.account-rename-cancel { color: var(--text-secondary); }
-.account-rename-save:hover,
-.account-rename-cancel:hover { text-decoration: underline; text-underline-offset: 0.2rem; }
+
+/* Поле смены логина: перебить min(320px) у .account-input — строка «поле | ✓ ✗» на всю ширину meta */
+.account-rename-editor .account-input.account-rename-input {
+    flex: 1 1 0%;
+    min-width: 0;
+    width: auto;
+    max-width: none;
+    padding: 0.3rem 0.55rem;
+    font-size: 0.875rem;
+    line-height: 1.25;
+    border-radius: 0.55rem;
+}
+
+.account-rename-ico--decision {
+    width: 18px;
+    height: 18px;
+}
+
+/* agree.svg: галочка заполняет viewBox плотнее; disagree.svg — поля вокруг креста в 512² — чуть крупнее ✓ для той же визуальной массы */
+#account-rename-agree .account-rename-ico--decision {
+    width: 23px;
+    height: 23px;
+}
 
 .account-name {
     flex: 1;
@@ -795,6 +1004,16 @@ html.modal-open body .notification * {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.account-rename-pencil-btn.account-rename-icon-btn {
+    width: 2.45rem;
+    height: 2.45rem;
+}
+
+.account-rename-pencil-btn .account-rename-ico {
+    width: 22px;
+    height: 22px;
 }
 
 .account-rename-icon-btn {
@@ -860,6 +1079,30 @@ html.modal-open body .notification * {
     color: var(--text-secondary);
     line-height: 1.35;
     font-weight: 400;
+}
+
+.account-email {
+    margin-top: 0;
+    font-size: 0.82rem;
+    color: var(--text-primary);
+    line-height: 1.2;
+    font-weight: 500;
+    word-break: break-word;
+    min-height: 0;
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    box-sizing: border-box;
+}
+
+.account-identity-stack .account-name {
+    line-height: 1.15;
+    font-size: 1rem;
+}
+
+.account-email[hidden] {
+    display: none !important;
 }
 
 .account-status {
@@ -945,13 +1188,49 @@ html.modal-open body .notification * {
     box-sizing: border-box;
 }
 
+.account-password-panel .account-input {
+    width: 100%;
+    max-width: none;
+}
+
 .account-security-actions {
     display: flex;
-    justify-content: flex-end;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.65rem;
+    width: 100%;
+    box-sizing: border-box;
 }
-.account-security-btn {
-    min-height: 2.5rem;
+
+.account-security-actions > .admin-ui-btn {
+    min-height: 2.75rem;
+    height: auto;
+    padding: 0.82rem 1.1rem;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.2;
+    align-self: stretch;
+    box-sizing: border-box;
+}
+
+.account-security-actions #account-password-save {
+    flex: 2 1 0;
+    min-width: 0;
+    width: auto;
     border-radius: 0.75rem;
+}
+
+.account-security-actions #account-password-cancel {
+    flex: 1 1 0;
+    min-width: 0;
+    width: auto;
+    border-radius: 0.75rem;
+}
+
+.account-security-btn {
+    border-radius: 0.75rem;
+    box-sizing: border-box;
 }
 
 .account-setting {
@@ -1017,11 +1296,17 @@ html.modal-open body .notification * {
     min-width: 0;
 }
 
-.account-setting-toggle {
+/* Единый вид чекбоксов (как «Запоминать фильтры и поиск» в аккаунте) */
+.account-setting-toggle,
+.filter-option input[type="checkbox"],
+.product-tags-dropdown input.tag-checkbox,
+.admin-multiselect-option input[type="checkbox"] {
     width: 1.25rem;
     height: 1.25rem;
     accent-color: var(--secondary-color);
     flex: 0 0 auto;
+    flex-shrink: 0;
+    cursor: pointer;
 }
 
 .account-select {
@@ -1044,7 +1329,6 @@ html.modal-open body .notification * {
 .filter-modal-description { margin: 0 0 1rem 0; color: var(--text-secondary); line-height: 1.5; }
 .filter-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
 .filter-option { display: flex; align-items: center; gap: 0.75rem; padding: 0.85rem 1rem; border: 1px solid var(--border-color); border-radius: 0.75rem; background: #f6f8f6; cursor: pointer; transition: border-color 0.2s ease, background 0.2s ease; }
-.filter-option input { width: 1rem; height: 1rem; accent-color: var(--secondary-color); }
 .filter-option span { font-size: 0.95rem; color: var(--text-primary); }
 .filter-option:hover { border-color: var(--accent-color); background: #f0f3ef; }
 .modal-footer {
@@ -1289,29 +1573,31 @@ html.modal-open body .notification * {
     text-decoration: none;
 }
 
+/* Шапка: только SVG, без «плитки» (фон/рамка) — зона нажатия сохраняем */
 .site-header-actions .site-icon-btn {
     min-width: 44px;
     min-height: 44px;
-    /* Make padding "visible" like a real UI control */
-    background: rgba(36, 53, 42, 0.045);
-    border: 1px solid rgba(36, 53, 42, 0.1);
+    padding: 0.25rem;
+    border: none;
+    border-radius: 0;
+    background: transparent;
     box-shadow: none;
 }
 
 .site-header-actions .site-icon-btn img {
-    width: 1.55rem;
-    height: 1.55rem;
+    width: 1.95rem;
+    height: 1.95rem;
 }
 
 .site-header-actions .site-icon-btn:hover {
-    background: rgba(36, 53, 42, 0.075);
-    border-color: rgba(59, 82, 35, 0.3);
-    opacity: 1;
+    background: transparent;
+    border: none;
+    opacity: 0.92;
 }
 
 [data-theme="dark"] .site-header-actions .site-icon-btn {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.12);
+    background: transparent;
+    border: none;
     box-shadow: none;
 }
 
@@ -1320,8 +1606,9 @@ html.modal-open body .notification * {
 }
 
 [data-theme="dark"] .site-header-actions .site-icon-btn:hover {
-    background: rgba(255, 255, 255, 0.09);
-    border-color: rgba(255, 255, 255, 0.18);
+    background: transparent;
+    border: none;
+    opacity: 0.92;
 }
 
 .site-icon-btn:hover {
@@ -1358,6 +1645,72 @@ html.modal-open body .notification * {
     height: auto;
     padding-left: 0;
     padding-right: 0;
+}
+
+/* product.html: «Назад» — слева с логотипом; вертикаль: --product-back-top из JS по верху .product-image */
+.product-page-header #product-details.product-page-shell {
+    position: relative;
+}
+
+.product-page-header #product-details .product-back-wrap {
+    position: absolute;
+    left: 0;
+    top: var(--product-back-top, 2rem);
+    z-index: 3;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    line-height: 0;
+    margin: 0;
+    pointer-events: none;
+}
+
+.product-page-header #product-details .product-back-wrap .site-back-nav-btn {
+    pointer-events: auto;
+}
+
+.product-page-header .site-back-nav-btn.site-icon-btn {
+    flex-shrink: 0;
+    justify-content: flex-start;
+    align-items: flex-start;
+    min-width: 2.75rem;
+    min-height: 2.75rem;
+    padding: 0 0.4rem 0.4rem 0;
+    margin: 0;
+    opacity: 0.48;
+    border-radius: 0;
+    background: transparent !important;
+    box-shadow: none !important;
+    transition: opacity 0.15s ease;
+}
+
+.product-page-header .site-back-nav-btn.site-icon-btn:hover {
+    opacity: 0.78;
+    background: transparent !important;
+    transform: none;
+}
+
+.product-page-header .site-back-nav-btn.site-icon-btn:active {
+    opacity: 0.65;
+    background: transparent !important;
+    transform: none;
+}
+
+.product-page-header .site-back-nav-btn.site-icon-btn:focus-visible {
+    opacity: 0.9;
+    outline: 2px solid rgba(182, 197, 63, 0.55);
+    outline-offset: 3px;
+    box-shadow: none;
+}
+
+.product-page-header .site-back-nav-btn__img {
+    display: block;
+    object-fit: contain;
+}
+
+[data-theme="dark"] .product-page-header .site-back-nav-btn__img {
+    filter: invert(1);
+    opacity: 0.82;
 }
 
 .site-page .site-logo-link {
@@ -1444,6 +1797,36 @@ html.modal-open body .notification * {
     object-fit: contain;
     display: block;
     pointer-events: none;
+}
+
+/* «Назад» на product: не наследовать 1.95rem от .site-icon-btn; размер ближе к иконкам шапки */
+.product-page-header #product-details .site-back-nav-btn.site-icon-btn .site-back-nav-btn__img {
+    width: auto;
+    height: clamp(1.35rem, 3.6vw, 1.75rem);
+    max-width: 3rem;
+    max-height: 2.25rem;
+    object-fit: contain;
+}
+
+.site-page .site-header-actions .site-icon-btn {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0.25rem;
+    border-radius: 0;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none;
+}
+
+.site-page .site-header-actions .site-icon-btn:hover {
+    background: transparent !important;
+    border: none !important;
+}
+
+[data-theme="dark"] .site-page .site-header-actions .site-icon-btn,
+[data-theme="dark"] .site-page .site-header-actions .site-icon-btn:hover {
+    background: transparent !important;
+    border: none !important;
 }
 
 .site-account-login-btn {
@@ -1713,11 +2096,6 @@ html.modal-open body .notification * {
 .admin-users-table td:first-child .checkbox-label.checkbox-label--only {
     width: 100%;
     justify-content: center;
-}
-
-.checkbox-label.checkbox-label--only .checkbox-custom {
-    margin: 0;
-    position: relative;
 }
 
 /* Superadmin users panel header: button on the right */
@@ -2050,27 +2428,104 @@ html.modal-open body .notification * {
     align-items: center;
     justify-content: flex-start;
     gap: 0.45rem;
+    min-width: 0;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
 }
 
-/* Пользователи (superadmin): сумма colgroup; последняя колонка — по ширине ряда кнопок, без лишнего «поля» справа */
+.admin-page .admin-users-table .admin-users-actions-inner .admin-ui-btn {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+/* Таблица пользователей — как товары: table-layout из .admin-table (fixed), ширины колонок в colgroup в px + ресайзер */
 .admin-page .admin-users-table {
-    min-width: 1398px;
+    table-layout: fixed;
+    width: 100%;
+    min-width: 1220px;
 }
+
+.admin-page .admin-users-table thead > tr > th,
+.admin-page .admin-users-table tbody > tr > td {
+    white-space: nowrap;
+}
+
+.admin-page .admin-users-table tbody tr.empty-row td {
+    white-space: normal;
+}
+
+.admin-page .admin-users-panel .admin-table-container {
+    max-width: 100%;
+    background-color: var(--bg-secondary);
+    background-clip: border-box;
+}
+
+.admin-page .admin-users-table td:nth-child(5) {
+    overflow: visible;
+    text-overflow: clip;
+}
+.admin-page .admin-users-table td:nth-child(5) select.user-role-select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
 .admin-page .admin-users-table td.admin-actions-cell {
-    min-width: 700px;
-    padding-right: 0.7rem;
+    vertical-align: middle;
 }
+
 .admin-page .admin-users-table thead th:last-child {
     text-align: left;
     overflow: visible;
-    padding-right: 0.7rem;
+    padding-right: 0.75rem;
+}
+
+/* Логин — одна строка с многоточием при нехватке места */
+.admin-page .admin-users-table td.cell-user-login {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 0;
+}
+
+/* Email — одна строка + ellipsis (как остальные колонки админ-таблицы), полный адрес в title (JS) */
+.admin-page .admin-users-table th.admin-users-th-email,
+.admin-page .admin-users-table td.cell-user-email {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: left;
+    font-variant-numeric: normal;
+    color: var(--text-secondary);
+    font-weight: var(--admin-table-fw);
+    line-height: 1.35;
+}
+.admin-page .admin-users-table th.admin-users-th-email {
+    color: inherit;
+    font-weight: var(--admin-table-fw-head);
+}
+
+/* Дата последнего входа — одна строка, многоточие только если совсем тесно */
+.admin-page .admin-users-table td.cell-user-last-login {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Убрать зебру на <tr> у таблицы пользователей (она только на <td>), иначе перебивает общий .admin-table tbody tr:nth-child(odd) */
+.admin-page .admin-users-table tbody tr,
+.admin-page .admin-users-table tbody tr:nth-child(odd),
+.admin-page .admin-users-table tbody tr:nth-child(even) {
+    background-image: none !important;
+    background-color: transparent !important;
+    cursor: pointer;
 }
 
 /* Фон зебры/hover на ячейках — полная заливка при любой высоте строки */
-.admin-page .admin-users-table tbody tr {
-    background-image: none !important;
-    background-color: transparent;
-}
 .admin-page .admin-users-table tbody tr:nth-child(odd) td {
     background-color: rgba(182, 197, 63, 0.045);
 }
@@ -2638,7 +3093,6 @@ html.modal-open body .notification * {
     user-select: none;
 }
 .admin-multiselect-option:hover { background: rgba(182, 197, 63, 0.10); }
-.admin-multiselect-option input { width: 1rem; height: 1rem; accent-color: var(--secondary-color); }
 .admin-multiselect-option span { font-size: 0.95rem; }
 
 .admin-materials-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0; }
@@ -2709,6 +3163,14 @@ html.modal-open body .notification * {
     line-height: inherit;
 }
 .footer-contact:hover { color: var(--light-accent); }
+
+.footer-contact a {
+    color: inherit;
+    text-decoration: none;
+}
+.footer-contact a:hover {
+    text-decoration: underline;
+}
 
 .footer-icon {
     width: 1.05rem;
@@ -2885,37 +3347,23 @@ html.modal-open body .notification * {
     color: var(--text-primary);
 }
 .checkbox-label input[type="checkbox"] {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-    pointer-events: none;
-}
-.checkbox-custom {
-    width: 18px;
-    height: 18px;
-    border: 2px solid var(--border-color);
-    border-radius: 4px;
-    background: var(--bg-primary);
-    display: grid;
-    place-items: center;
+    position: static;
+    opacity: 1;
+    width: 1.25rem;
+    height: 1.25rem;
+    margin: 0;
     flex-shrink: 0;
-    transition: border-color 0.15s, background 0.15s;
+    accent-color: var(--secondary-color);
+    cursor: pointer;
+    pointer-events: auto;
 }
-.checkbox-label input[type="checkbox"]:checked + .checkbox-custom {
-    background: var(--secondary-color);
-    border-color: var(--secondary-color);
+.checkbox-label .checkbox-custom {
+    display: none !important;
 }
-.checkbox-label input[type="checkbox"]:checked + .checkbox-custom::after {
-    content: '';
-    width: 5px;
-    height: 9px;
-    border: 2px solid white;
-    border-top: none;
-    border-left: none;
-    transform: rotate(45deg);
+/* Зарезервировано под разметку с .checkbox-custom вне label (сейчас скрыт внутри .checkbox-label) */
+.checkbox-custom {
+    display: none;
 }
-.checkbox-label:hover .checkbox-custom { border-color: var(--accent-color); }
 
 .admin-variants-list { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.25rem; }
 .admin-variant-row {
@@ -3544,6 +3992,35 @@ html.modal-open body .notification * {
     border-color: rgba(59, 82, 35, 0.22);
 }
 
+/* Атрибут hidden задаёт display:none, но общий display:flex его перебивает — явно скрываем. */
+.login-register-suggest[hidden] {
+    display: none !important;
+}
+
+.login-register-suggest:not([hidden]) {
+    margin: 0.85rem 0 0;
+    padding: 0.75rem 0.85rem;
+    border-radius: 0.55rem;
+    border: 1px solid rgba(59, 82, 35, 0.22);
+    background: rgba(182, 197, 63, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    align-items: stretch;
+}
+
+.login-register-suggest__msg {
+    margin: 0;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: #3b5223;
+}
+
+.login-register-suggest__btn {
+    width: 100%;
+}
+
 .login-submit-wrap {
     margin-top: 1.35rem;
 }
@@ -3975,12 +4452,6 @@ html.modal-open body .notification * {
 .filter-option:hover {
     background: rgba(182, 197, 63, 0.10);
     border-color: rgba(182, 197, 63, 0.35);
-}
-
-.filter-option input[type="checkbox"] {
-    cursor: pointer;
-    width: 1.1rem;
-    height: 1.1rem;
 }
 
 .filter-option span {

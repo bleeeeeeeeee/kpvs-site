@@ -46,11 +46,13 @@ async function ensureUserAuthSchema() {
     const client = await pool.connect();
     try {
         await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT`);
+        await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN`);
         await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oauth_provider TEXT`);
         await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oauth_id TEXT`);
         await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS password_set BOOLEAN`);
         await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_email_uq ON users (email) WHERE email IS NOT NULL`);
         await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_oauth_uq ON users (oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL AND oauth_id IS NOT NULL`);
+        await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_username_uq ON users (username)`);
 
         // Allow storefront users to exist alongside admin users.
         // Existing DBs may have chk_user_role allowing only admin/superadmin.
@@ -71,6 +73,18 @@ async function ensureUserAuthSchema() {
              WHERE password_set IS NULL`
         );
 
+        // Email verification: legacy rows treat existing emails as verified.
+        await client.query(
+            `UPDATE users
+             SET email_verified = TRUE
+             WHERE email IS NOT NULL AND email_verified IS NULL`
+        );
+        await client.query(
+            `UPDATE users
+             SET email_verified = TRUE
+             WHERE oauth_provider IS NOT NULL AND email IS NOT NULL`
+        );
+
         await client.query(
             `CREATE TABLE IF NOT EXISTS password_resets (
                 id SERIAL PRIMARY KEY,
@@ -83,6 +97,20 @@ async function ensureUserAuthSchema() {
         );
         await client.query(`CREATE INDEX IF NOT EXISTS password_resets_token_idx ON password_resets (token_hash)`);
         await client.query(`CREATE INDEX IF NOT EXISTS password_resets_user_idx ON password_resets (user_id)`);
+
+        await client.query(
+            `CREATE TABLE IF NOT EXISTS email_verifications (
+                id SERIAL PRIMARY KEY,
+                email TEXT NOT NULL,
+                purpose TEXT NOT NULL,
+                code_hash TEXT NOT NULL,
+                expires_at TIMESTAMPTZ NOT NULL,
+                used_at TIMESTAMPTZ,
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )`
+        );
+        await client.query(`CREATE INDEX IF NOT EXISTS email_verifications_lookup_idx ON email_verifications (email, purpose, created_at DESC)`);
+        await client.query(`CREATE INDEX IF NOT EXISTS email_verifications_code_idx ON email_verifications (code_hash)`);
     } finally {
         client.release();
     }
@@ -664,7 +692,7 @@ async function findUserById(id) {
 
 async function findUserByEmail(email) {
     const result = await pool.query(
-        'SELECT id, username, password_hash, role, is_active, email, oauth_provider, oauth_id FROM users WHERE email = $1 LIMIT 1',
+        'SELECT id, username, password_hash, role, is_active, email, email_verified, oauth_provider, oauth_id, password_set FROM users WHERE email = $1 LIMIT 1',
         [email]
     );
     return result.rows[0] || null;
@@ -687,15 +715,25 @@ async function verifyUser(username, password) {
     return { id: user.id, username: user.username, role: user.role };
 }
 
+function loginInputLooksLikeEmail(login) {
+    const e = String(login || '').trim().toLowerCase();
+    return !!e && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
+}
+
 async function verifyUserByLogin(login, password) {
     const s = String(login || '').trim();
     if (!s) return null;
-    let user = await findUserByUsername(s);
+    const eLower = s.toLowerCase();
+    let user = null;
+    // Сначала email: совпадение с OAuth/аккаунтом по почте, а не с логином, случайно совпадающим с видом email.
+    if (loginInputLooksLikeEmail(s)) {
+        user = await findUserByEmail(eLower);
+    }
     if (!user) {
-        const e = s.toLowerCase();
-        const byEmail = await findUserByEmail(e);
-        // allow login via email only for active accounts
-        user = byEmail || null;
+        user = await findUserByUsername(s);
+    }
+    if (!user && !loginInputLooksLikeEmail(s)) {
+        user = await findUserByEmail(eLower);
     }
     if (!user || !user.is_active) return null;
     const ok = await bcrypt.compare(password, user.password_hash);
@@ -704,21 +742,72 @@ async function verifyUserByLogin(login, password) {
     return { id: user.id, username: user.username, role: user.role };
 }
 
+function assertValidUsername(username) {
+    const u = String(username || '').trim();
+    if (!u) throw new Error('Укажите логин');
+    if (u.includes('@')) throw new Error('Логин не может содержать символ @');
+    if (u.length < 3) throw new Error('Логин должен быть не короче 3 символов');
+    if (u.length > 48) throw new Error('Логин слишком длинный');
+    if (!/^[\p{L}\p{N}._-]+$/u.test(u)) throw new Error('Логин может содержать только буквы, цифры, точку, дефис и подчёркивание');
+}
+
 async function createUser(username, password, role, options) {
     role = role || 'admin';
     options = options || {};
+    assertValidUsername(username);
+    const uname = String(username || '').trim();
+    const taken = await findUserByUsername(uname);
+    if (taken) throw new Error('Логин уже занят');
     const email = options.email ? String(options.email).trim().toLowerCase() : null;
+    const email_verified = typeof options.email_verified === 'boolean' ? options.email_verified : null;
     const oauth_provider = options.oauth_provider ? String(options.oauth_provider) : null;
     const oauth_id = options.oauth_id ? String(options.oauth_id) : null;
     const password_set = typeof options.password_set === 'boolean' ? options.password_set : true;
     const hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
-        `INSERT INTO users (username, password_hash, role, email, oauth_provider, oauth_id, password_set)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
-         RETURNING id, username, role, is_active, created_at, email, oauth_provider, oauth_id, password_set`,
-        [username, hash, role, email, oauth_provider, oauth_id, password_set]
+        `INSERT INTO users (username, password_hash, role, email, email_verified, oauth_provider, oauth_id, password_set)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         RETURNING id, username, role, is_active, created_at, email, email_verified, oauth_provider, oauth_id, password_set`,
+        [uname, hash, role, email, email_verified, oauth_provider, oauth_id, password_set]
     );
     return result.rows[0];
+}
+
+async function insertEmailVerificationCode(email, purpose, codeHash, expiresAt) {
+    await pool.query(
+        'INSERT INTO email_verifications (email, purpose, code_hash, expires_at) VALUES ($1, $2, $3, $4)',
+        [String(email).trim().toLowerCase(), String(purpose).trim(), String(codeHash), expiresAt]
+    );
+}
+
+async function getLatestEmailVerification(email, purpose) {
+    const r = await pool.query(
+        `SELECT id, email, purpose, code_hash, expires_at, used_at, created_at
+         FROM email_verifications
+         WHERE email = $1 AND purpose = $2
+         ORDER BY id DESC
+         LIMIT 1`,
+        [String(email).trim().toLowerCase(), String(purpose).trim()]
+    );
+    return r.rows[0] || null;
+}
+
+async function consumeEmailVerificationCode(email, purpose, codeHash) {
+    const r = await pool.query(
+        `SELECT id, expires_at, used_at
+         FROM email_verifications
+         WHERE email = $1 AND purpose = $2 AND code_hash = $3
+         ORDER BY id DESC
+         LIMIT 1`,
+        [String(email).trim().toLowerCase(), String(purpose).trim(), String(codeHash)]
+    );
+    const row = r.rows[0] || null;
+    if (!row) return { ok: false, error: 'invalid' };
+    if (row.used_at) return { ok: false, error: 'used' };
+    const exp = new Date(row.expires_at);
+    if (isNaN(exp.getTime()) || exp.getTime() < Date.now()) return { ok: false, error: 'expired' };
+    await pool.query('UPDATE email_verifications SET used_at = NOW() WHERE id = $1', [row.id]);
+    return { ok: true };
 }
 
 async function upsertOAuthUser(provider, oauthId, email) {
@@ -732,7 +821,26 @@ async function upsertOAuthUser(provider, oauthId, email) {
     // Deactivation must hard-block access.
     if (byOauth && !byOauth.is_active) return null;
     if (byOauth && byOauth.is_active) {
-        await pool.query('UPDATE users SET last_login = NOW(), email = COALESCE(email, $1) WHERE id = $2', [email, byOauth.id]);
+        if (email) {
+            const r = await pool.query(
+                `UPDATE users
+                 SET last_login = NOW(), email = $1::text, email_verified = TRUE
+                 WHERE id = $2
+                   AND NOT EXISTS (
+                     SELECT 1 FROM users u2
+                     WHERE u2.email IS NOT NULL
+                       AND LOWER(TRIM(u2.email::text)) = LOWER(TRIM($1::text))
+                       AND u2.id <> $2
+                   )`,
+                [email, byOauth.id]
+            );
+            if (!r.rowCount) {
+                await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [byOauth.id]);
+                console.warn('[oauth] skip email update: already used by another user', { userId: byOauth.id, email });
+            }
+        } else {
+            await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [byOauth.id]);
+        }
         return { id: byOauth.id, username: byOauth.username, role: byOauth.role };
     }
 
@@ -741,14 +849,25 @@ async function upsertOAuthUser(provider, oauthId, email) {
         // If an email-matched account exists but is deactivated, do NOT link OAuth to it and do NOT create a new one.
         if (byEmail && !byEmail.is_active) return null;
         if (byEmail && byEmail.is_active) {
-            await pool.query('UPDATE users SET oauth_provider = $1, oauth_id = $2, last_login = NOW() WHERE id = $3', [provider, oauthId, byEmail.id]);
+            await pool.query(
+                'UPDATE users SET oauth_provider = $1, oauth_id = $2, last_login = NOW(), email = $4::text, email_verified = TRUE WHERE id = $3',
+                [provider, oauthId, byEmail.id, email]
+            );
             return { id: byEmail.id, username: byEmail.username, role: byEmail.role };
         }
     }
 
+    if (!email) return null;
+
     const uname = provider + '_' + oauthId;
     const password = oauthId + ':' + Date.now();
-    const created = await createUser(uname, password, 'user', { email: email, oauth_provider: provider, oauth_id: oauthId, password_set: false });
+    const created = await createUser(uname, password, 'user', {
+        email: email,
+        email_verified: email ? true : null,
+        oauth_provider: provider,
+        oauth_id: oauthId,
+        password_set: false
+    });
     await pool.query('UPDATE users SET last_login = NOW() WHERE id = $1', [created.id]);
     return { id: created.id, username: created.username, role: created.role };
 }
@@ -769,7 +888,22 @@ async function ensureDefaultUsers() {
 
 async function listUsers() {
     const result = await pool.query(
-        'SELECT id, username, role, is_active, created_at, last_login FROM users ORDER BY id'
+        `SELECT id, username,
+            NULLIF(trim(COALESCE(email::text, '')), '') AS email_db,
+            (
+                CASE
+                    WHEN NULLIF(trim(COALESCE(email::text, '')), '') IS NOT NULL THEN trim(email::text)
+                    WHEN trim(COALESCE(username::text, '')) LIKE '%@%'
+                        AND length(trim(COALESCE(username::text, '')))
+                            - length(replace(trim(COALESCE(username::text, '')), '@', '')) = 1
+                        AND split_part(lower(trim(COALESCE(username::text, ''))), '@', 2) LIKE '%.%'
+                    THEN lower(trim(COALESCE(username::text, '')))
+                    ELSE NULL
+                END
+            )::text AS list_email,
+            role, is_active, created_at, last_login
+         FROM users
+         ORDER BY id`
     );
     return result.rows;
 }
@@ -806,15 +940,6 @@ async function setInitialPasswordForOAuthUser(id, newPassword) {
     const hash = await bcrypt.hash(String(newPassword || ''), 12);
     await pool.query('UPDATE users SET password_hash = $1, password_set = TRUE WHERE id = $2', [hash, id]);
     return { ok: true };
-}
-
-async function createPasswordResetForEmail(email) {
-    const e = String(email || '').trim().toLowerCase();
-    if (!e) return null;
-    const user = await findUserByEmail(e);
-    if (!user || !user.is_active) return null;
-    if (String(user.role || '') !== 'user') return null;
-    return user;
 }
 
 async function insertPasswordResetToken(userId, tokenHash, expiresAt) {
@@ -858,15 +983,13 @@ async function setUserRole(id, role) {
 }
 
 async function changeUsername(id, newUsername) {
+    assertValidUsername(newUsername);
     const u = String(newUsername || '').trim();
-    if (!u) throw new Error('Укажите логин');
-    if (u.length < 3) throw new Error('Логин должен быть не короче 3 символов');
-    if (u.length > 48) throw new Error('Логин слишком длинный');
-    // Allow unicode letters/digits plus dot/dash/underscore. Keeps login UX predictable, but supports Cyrillic.
-    if (!/^[\p{L}\p{N}._-]+$/u.test(u)) throw new Error('Логин может содержать только буквы, цифры, точку, дефис и подчёркивание');
+    const other = await findUserByUsername(u);
+    if (other && Number(other.id) !== Number(id)) throw new Error('Логин уже занят');
 
     const result = await pool.query(
-        'UPDATE users SET username = $1 WHERE id = $2 RETURNING id, username, role, is_active, created_at, last_login, email, oauth_provider, oauth_id',
+        'UPDATE users SET username = $1 WHERE id = $2 RETURNING id, username, role, is_active, created_at, last_login, email, oauth_provider, oauth_id, password_set',
         [u, id]
     );
     return result.rows[0] || null;
@@ -910,10 +1033,12 @@ module.exports = {
     changeUserPassword,
     changeUserPasswordWithOld,
     setInitialPasswordForOAuthUser,
-    createPasswordResetForEmail,
     insertPasswordResetToken,
     consumePasswordResetToken,
     changeUsername,
     setUserRole,
-    deleteUserById
+    deleteUserById,
+    insertEmailVerificationCode,
+    getLatestEmailVerification,
+    consumeEmailVerificationCode
 };

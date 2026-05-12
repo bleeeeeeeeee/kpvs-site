@@ -145,10 +145,22 @@ const Admin = (() => {
         } catch { return '—'; }
     }
 
+    function pickUserListEmail(u) {
+        if (!u) return '';
+        var col = u.email != null ? String(u.email).trim() : '';
+        if (col) return col;
+        var login = u.username != null ? String(u.username).trim() : '';
+        if (login.indexOf('@') === -1) return '';
+        if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(login)) return login;
+        var at = login.indexOf('@');
+        if (at > 0 && login.indexOf('.', at + 1) !== -1) return login;
+        return '';
+    }
+
     function renderUsersTable(list) {
         if (!ui.usersBody) return;
         if (!Array.isArray(list) || !list.length) {
-            ui.usersBody.innerHTML = '<tr class="empty-row"><td colspan="6">Нет пользователей</td></tr>';
+            ui.usersBody.innerHTML = '<tr class="empty-row"><td colspan="7">Нет пользователей</td></tr>';
             return;
         }
         ui.usersBody.innerHTML = list.map(function (u) {
@@ -156,6 +168,9 @@ const Admin = (() => {
             const isSelf = ui.currentUser && Number(ui.currentUser.id) === Number(u.id);
             const disabledSelf = isSelf ? 'disabled' : '';
             const role = String(u.role || '');
+            const emailRaw = pickUserListEmail(u);
+            const emailDisplay = emailRaw || '—';
+            const emailTitle = emailRaw ? (' title="' + escapeHtml(emailRaw) + '"') : '';
             const roleOptions = ['user', 'admin', 'superadmin'].map(function (r) {
                 return '<option value="' + r + '" ' + (r === role ? 'selected' : '') + '>' + r + '</option>';
             }).join('');
@@ -168,9 +183,10 @@ const Admin = (() => {
                         '</label>' +
                     '</td>' +
                     '<td class="cell-id">' + escapeHtml(u.id) + '</td>' +
-                    '<td><span class="admin-table-cell-primary">' + escapeHtml(u.username || '') + '</span></td>' +
+                    '<td class="cell-user-login"><span class="admin-table-cell-primary">' + escapeHtml(u.username || '') + '</span></td>' +
+                    '<td class="cell-user-email"' + emailTitle + '>' + escapeHtml(emailDisplay) + '</td>' +
                     '<td><select class="user-role-select" ' + disabledSelf + '>' + roleOptions + '</select></td>' +
-                    '<td>' + escapeHtml(formatDateTime(u.last_login)) + '</td>' +
+                    '<td class="cell-user-last-login">' + escapeHtml(formatDateTime(u.last_login)) + '</td>' +
                     '<td class="admin-actions-cell">' +
                         '<div class="admin-users-actions-inner">' +
                         '<button type="button" class="admin-ui-btn admin-ui-btn--outline admin-ui-btn--sm btn-user-copy" data-copy="' + escapeHtml(u.username || '') + '">Копировать логин</button>' +
@@ -187,18 +203,37 @@ const Admin = (() => {
     async function fetchUsers() {
         if (!ui.currentUser || ui.currentUser.role !== 'superadmin') return;
         if (!ui.usersBody) return;
-        ui.usersBody.innerHTML = '<tr class="empty-row"><td colspan="6">Загрузка…</td></tr>';
+        ui.usersBody.innerHTML = '<tr class="empty-row"><td colspan="7">Загрузка…</td></tr>';
         const r = await apiFetch('/api/admin/users');
         if (!r.ok) throw new Error('Failed to load users');
-        const list = await r.json();
+        const data = await r.json().catch(function () { return null; });
+        const list = Array.isArray(data)
+            ? data.map(function (row) {
+                if (!row || typeof row !== 'object') return row;
+                if (row.email == null && row.Email != null) row.email = row.Email;
+                return row;
+            })
+            : [];
         renderUsersTable(list);
+        setupResizableColumns();
+    }
+
+    function syncUserCreateEmailRow() {
+        if (!ui.userRole || !ui.userEmail) return;
+        var isUser = String(ui.userRole.value || '') === 'user';
+        var row = document.getElementById('user-email-row');
+        ui.userEmail.required = isUser;
+        if (row) row.hidden = !isUser;
+        if (!isUser) ui.userEmail.value = '';
     }
 
     function openUserModal() {
         if (!ui.userModal) return;
         if (ui.userForm) ui.userForm.reset();
         showFieldError('err-user-username', '');
+        showFieldError('err-user-email', '');
         showFieldError('err-user-password', '');
+        syncUserCreateEmailRow();
         if (ui.userSaveBtn) ui.userSaveBtn.textContent = 'Создать';
         ui.userModal.style.display = 'flex';
         if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
@@ -212,20 +247,31 @@ const Admin = (() => {
         if (window.KpvsModalOverlay) window.KpvsModalOverlay.unlock();
     }
 
+    function isValidEmailStr(s) {
+        var t = String(s || '').trim();
+        return !!t && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(t);
+    }
+
     async function createUserFromModal() {
         const username = String(ui.userUsername && ui.userUsername.value || '').trim();
         const password = String(ui.userPassword && ui.userPassword.value || '');
         const role = String(ui.userRole && ui.userRole.value || 'user');
+        const email = String(ui.userEmail && ui.userEmail.value || '').trim();
         let ok = true;
         showFieldError('err-user-username', '');
+        showFieldError('err-user-email', '');
         showFieldError('err-user-password', '');
         if (!username) { showFieldError('err-user-username', 'Укажите логин'); ok = false; }
+        else if (username.indexOf('@') !== -1) { showFieldError('err-user-username', 'Логин не может содержать @'); ok = false; }
+        if (role === 'user' && !isValidEmailStr(email)) { showFieldError('err-user-email', 'Укажите корректный email'); ok = false; }
         if (!password || password.length < 6) { showFieldError('err-user-password', 'Пароль должен быть не менее 6 символов'); ok = false; }
         if (!ok) return;
+        const payload = { username: username, password: password, role: role };
+        if (role === 'user') payload.email = email;
         const r = await apiFetch('/api/admin/users', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username: username, password: password, role: role })
+            body: JSON.stringify(payload)
         });
         const data = await r.json().catch(function () { return null; });
         if (!r.ok) {
@@ -402,27 +448,10 @@ const Admin = (() => {
                     if (titleEl) titleEl.textContent = 'Удалить пользователя?';
                     if (msgEl) msgEl.textContent = 'Пользователь будет удалён без возможности восстановления. Продолжить?';
                     const okBtn = document.getElementById('visibility-confirm-ok');
-                    const cancelBtn = document.getElementById('visibility-confirm-cancel');
                     if (okBtn) okBtn.disabled = false;
 
                     visibilityConfirmPending = { kind: 'delete-user', id: id };
                     openModal(ui.visibilityConfirmModal);
-                    const onCancel = function() {
-                        if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
-                        if (okBtn) okBtn.removeEventListener('click', onOk);
-                        visibilityConfirmPending = null;
-                        closeModal(ui.visibilityConfirmModal);
-                    };
-                    const onOk = function() {
-                        if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
-                        if (okBtn) okBtn.removeEventListener('click', onOk);
-                        const pending = visibilityConfirmPending;
-                        visibilityConfirmPending = null;
-                        closeModal(ui.visibilityConfirmModal);
-                        if (pending && pending.kind === 'delete-user') deleteUserUi(pending.id);
-                    };
-                    if (cancelBtn) cancelBtn.addEventListener('click', onCancel);
-                    if (okBtn) okBtn.addEventListener('click', onOk);
                 }
             });
         }
@@ -944,7 +973,7 @@ const Admin = (() => {
             ? 'Товар станет виден покупателям в каталоге и в поиске. Продолжить?'
             : 'Товар будет скрыт из каталога и поиска (страница по прямой ссылке может открываться). Продолжить?';
 
-        visibilityConfirmPending = { id: id, nextVisible: nextVisible, triggerBtn: triggerBtn };
+        visibilityConfirmPending = { kind: 'product-visibility', id: id, nextVisible: nextVisible, triggerBtn: triggerBtn };
         const titleEl = document.getElementById('visibility-confirm-title');
         const msgEl = document.getElementById('visibility-confirm-message');
         if (titleEl) titleEl.textContent = title;
@@ -954,13 +983,23 @@ const Admin = (() => {
         openModal(ui.visibilityConfirmModal);
     }
 
-    async function applyProductCatalogVisibilityFromConfirm() {
+    async function applyVisibilityConfirmFromConfirm() {
         const pending = visibilityConfirmPending;
         if (!pending) return;
         visibilityConfirmPending = null;
 
         const okBtn = document.getElementById('visibility-confirm-ok');
         if (okBtn) okBtn.disabled = true;
+
+        if (pending.kind === 'delete-user') {
+            closeModal(ui.visibilityConfirmModal);
+            try {
+                await deleteUserUi(pending.id);
+            } finally {
+                if (okBtn) okBtn.disabled = false;
+            }
+            return;
+        }
 
         const id = pending.id;
         const nextVisible = pending.nextVisible;
@@ -1092,11 +1131,23 @@ const Admin = (() => {
         if (!tables.length) return;
 
         function setupFor(table, minWidths) {
-            if (!table || table._resizable) return;
-            table._resizable = true;
+            if (!table) return;
+            table.querySelectorAll('thead th .admin-col-resizer').forEach(function (el) {
+                el.remove();
+            });
             const cols = Array.from(table.querySelectorAll('colgroup col'));
             const ths = Array.from(table.querySelectorAll('thead th'));
             if (!cols.length || ths.length !== cols.length) return;
+
+            function readColWidths() {
+                return cols.map(function (c, j) {
+                    let w = parseInt(c.style.width, 10);
+                    if (isNaN(w) || w <= 0) {
+                        w = Math.round(ths[j].getBoundingClientRect().width);
+                    }
+                    return w;
+                });
+            }
 
             for (let i = 0; i < ths.length; i++) {
                 const w = Math.round(ths[i].getBoundingClientRect().width);
@@ -1112,12 +1163,17 @@ const Admin = (() => {
                     e.preventDefault();
                     try { handle.setPointerCapture(e.pointerId); } catch {}
                     const startX = e.clientX;
-                    const startW = parseInt(cols[i].style.width, 10) || Math.round(th.getBoundingClientRect().width);
+                    const startPair = readColWidths();
+                    const mi = minWidths[i] || 80;
+                    const mi1 = minWidths[i + 1] || 80;
+                    const S = startPair[i] + startPair[i + 1];
                     const onMove = function(ev) {
                         const delta = Math.round(ev.clientX - startX);
-                        const minW = minWidths[i] || 80;
-                        const w1 = Math.max(minW, startW + delta);
+                        const rawW1 = startPair[i] + delta;
+                        const w1 = Math.max(mi, Math.min(rawW1, S - mi1));
+                        const w2 = S - w1;
                         cols[i].style.width = w1 + 'px';
+                        cols[i + 1].style.width = w2 + 'px';
                     };
                     const onUp = function() {
                         document.removeEventListener('pointermove', onMove);
@@ -1127,12 +1183,12 @@ const Admin = (() => {
                     document.addEventListener('pointerup', onUp);
                 });
             });
+            table._resizable = true;
         }
 
         tables.forEach(function(table) {
             if (table.classList.contains('admin-users-table')) {
-                // wider "role" column to avoid ellipsis
-                setupFor(table, [60, 70, 200, 170, 160, 200]);
+                setupFor(table, [48, 52, 120, 72, 112, 160, 360]);
             } else {
                 // products table (default)
                 setupFor(table, [56, 52, 240, 200, 128, 84, 112]);
@@ -1797,7 +1853,10 @@ const Admin = (() => {
         const addImageUrlBtn = document.getElementById('add-image-url-btn');
 
         if (addBtn) addBtn.onclick = function() { openProductModal(null); };
-        if (refreshBtn) refreshBtn.onclick = function() { fetchProducts(); };
+        if (refreshBtn) refreshBtn.onclick = function() {
+            fetchProducts();
+            fetchUsers().catch(function () {});
+        };
         if (searchInput) {
             searchInput.oninput = function() {
                 syncAdminSearchClear();
@@ -1925,7 +1984,7 @@ const Admin = (() => {
             const vCancel = document.getElementById('visibility-confirm-cancel');
             if (vCancel) vCancel.onclick = cancelVisibilityConfirm;
             const vOk = document.getElementById('visibility-confirm-ok');
-            if (vOk) vOk.onclick = function() { applyProductCatalogVisibilityFromConfirm(); };
+            if (vOk) vOk.onclick = function() { applyVisibilityConfirmFromConfirm(); };
             visibilityModal.addEventListener('click', function(e) {
                 if (e.target === visibilityModal) cancelVisibilityConfirm();
             });
@@ -2035,8 +2094,10 @@ const Admin = (() => {
         ui.userForm = document.getElementById('user-form');
         ui.userSaveBtn = document.getElementById('user-save-btn');
         ui.userUsername = document.getElementById('user-username');
+        ui.userEmail = document.getElementById('user-email');
         ui.userPassword = document.getElementById('user-password');
         ui.userRole = document.getElementById('user-role');
+        if (ui.userRole) ui.userRole.addEventListener('change', syncUserCreateEmailRow);
         ui.filterCategoryMultiselect = document.getElementById('filter-category-multiselect');
         ui.filterCategoryDropdown = document.getElementById('filter-category-dropdown');
         ui.filterCategoryLabel = document.getElementById('filter-category-label');

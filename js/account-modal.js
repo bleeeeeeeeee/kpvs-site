@@ -44,10 +44,60 @@
         else document.documentElement.classList.remove('modal-open');
     }
 
+    function userHasPasswordSet(me) {
+        if (!me) return false;
+        var v = me.password_set;
+        return v === true || v === 1 || v === '1';
+    }
+
+    function collapseAccountPasswordPanel(built) {
+        if (!built) return;
+        if (built.pwdPanel) built.pwdPanel.hidden = true;
+        if (built.btnPwdToggle) built.btnPwdToggle.setAttribute('aria-expanded', 'false');
+    }
+
+    /** Первая установка пароля — блок «текущий пароль» вне DOM; смена пароля — снова в панели первым. */
+    function syncPasswordOldRow(built, me) {
+        if (!built || !built.rowOldWrap || !built.pwdPanel) return;
+        var needsOld = !!(me && userHasPasswordSet(me));
+        if (needsOld) {
+            if (!built.rowOldWrap.parentNode) {
+                built.pwdPanel.insertBefore(built.rowOldWrap, built.pwdPanel.firstChild);
+            }
+            built.rowOldWrap.hidden = false;
+            built.rowOldWrap.removeAttribute('aria-hidden');
+            if (built.inpOld) built.inpOld.disabled = false;
+        } else {
+            if (built.inpOld) {
+                built.inpOld.value = '';
+                built.inpOld.disabled = true;
+            }
+            built.rowOldWrap.remove();
+        }
+    }
+
     function fetchMe(token) {
-        return fetch('/api/user/auth/me', { headers: { Authorization: 'Bearer ' + token } })
+        return fetch('/api/user/auth/me?t=' + String(Date.now()), {
+            cache: 'no-store',
+            headers: { Authorization: 'Bearer ' + token }
+        })
             .then(function (r) { return r.ok ? r.json() : null; })
             .catch(function () { return null; });
+    }
+
+    function looksLikeEmail(s) {
+        if (!s || typeof s !== 'string') return false;
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s).trim().toLowerCase());
+    }
+
+    /** Почта для строки в модалке: поле email с API или логин в виде email (если в БД email пустой). */
+    function resolveDisplayEmail(me) {
+        if (!me) return '';
+        var em = me.email != null ? String(me.email).trim().toLowerCase() : '';
+        if (em && looksLikeEmail(em)) return em;
+        var un = me.username != null ? String(me.username).trim().toLowerCase() : '';
+        if (un && looksLikeEmail(un)) return un;
+        return '';
     }
 
     function dismissOauthPasswordPrompt() {
@@ -110,14 +160,16 @@
         row2.appendChild(inp2);
 
         var actions = ce('div', 'oauth-pwd-actions');
-        var btnSkip = ce('button', 'admin-ui-btn admin-ui-btn--outline');
-        btnSkip.type = 'button';
-        btnSkip.textContent = 'Позже';
         var btnSave = ce('button', 'admin-ui-btn admin-ui-btn--primary');
         btnSave.type = 'button';
+        btnSave.id = 'oauth-pwd-save';
         btnSave.textContent = 'Сохранить';
-        actions.appendChild(btnSkip);
+        var btnDismiss = ce('button', 'admin-ui-btn admin-ui-btn--secondary');
+        btnDismiss.type = 'button';
+        btnDismiss.id = 'oauth-pwd-dismiss';
+        btnDismiss.textContent = 'Позже';
         actions.appendChild(btnSave);
+        actions.appendChild(btnDismiss);
 
         body.appendChild(intro);
         body.appendChild(hint);
@@ -134,7 +186,7 @@
             if (e.target === modal) dismissOauthPasswordPrompt();
         });
 
-        btnSkip.addEventListener('click', function () { dismissOauthPasswordPrompt(); });
+        btnDismiss.addEventListener('click', function () { dismissOauthPasswordPrompt(); });
 
         btnSave.addEventListener('click', function () {
             var token = getToken();
@@ -145,6 +197,7 @@
             if (p !== p2) { hint.textContent = 'Пароли не совпадают'; return; }
             hint.textContent = '';
             btnSave.disabled = true;
+            btnDismiss.disabled = true;
             fetch('/api/user/auth/password', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
@@ -159,6 +212,7 @@
                 })
                 .then(function (res) {
                     btnSave.disabled = false;
+                    btnDismiss.disabled = false;
                     if (!res || !res.ok) {
                         hint.textContent = (res && res.json && res.json.error) ? res.json.error : 'Не удалось сохранить пароль';
                         return;
@@ -166,12 +220,13 @@
                     if (res.json && res.json.token) {
                         try { localStorage.setItem(TOKEN_KEY, String(res.json.token)); } catch {}
                     }
+                    try { sessionStorage.removeItem(OAUTH_PWD_PROMPT_KEY); } catch {}
                     dismissOauthPasswordPrompt();
-                    try { window.location.reload(); } catch {}
                 })
                 .catch(function () {
                     hint.textContent = 'Не удалось сохранить пароль';
                     btnSave.disabled = false;
+                    btnDismiss.disabled = false;
                 });
         });
 
@@ -225,7 +280,7 @@
                 try { localStorage.removeItem(TOKEN_KEY); } catch {}
                 return;
             }
-            if (me.password_set === true || me.password_set === 1) {
+            if (userHasPasswordSet(me)) {
                 try { sessionStorage.removeItem(OAUTH_PWD_PROMPT_KEY); } catch {}
                 return;
             }
@@ -262,9 +317,17 @@
         avatar.textContent = 'A';
         var meta = ce('div', 'account-meta');
         var nameRow = ce('div', 'account-name-row');
+        var renameWrap = ce('div', 'account-rename-wrap');
+        var loginPencilGroup = ce('div', 'account-login-pencil-group');
         var name = ce('div', 'account-name');
         name.textContent = 'Загрузка…';
-        var btnRename = ce('button', 'account-rename-icon-btn');
+        var renameInput = ce('input', 'account-input account-rename-input');
+        renameInput.type = 'text';
+        renameInput.id = 'account-rename-input';
+        renameInput.autocomplete = 'username';
+        renameInput.setAttribute('aria-label', 'Логин');
+        renameInput.setAttribute('inputmode', 'text');
+        var btnRename = ce('button', 'account-rename-icon-btn account-rename-pencil-btn');
         btnRename.type = 'button';
         btnRename.setAttribute('aria-label', 'Сменить логин');
         btnRename.setAttribute('title', 'Сменить логин');
@@ -273,30 +336,55 @@
         renameImg.alt = '';
         renameImg.className = 'account-rename-ico';
         btnRename.appendChild(renameImg);
-        var renameWrap = ce('div', 'account-rename-wrap');
-        var renameInput = ce('input', 'account-rename-input');
-        renameInput.type = 'text';
-        renameInput.autocomplete = 'username';
-        renameInput.hidden = true;
-        var btnRenameSave = ce('button', 'account-rename-save');
+        var btnRenameSave = ce('button', 'account-rename-icon-btn account-rename-decision-btn');
         btnRenameSave.type = 'button';
-        btnRenameSave.textContent = 'Сохранить';
-        btnRenameSave.hidden = true;
-        var btnRenameCancel = ce('button', 'account-rename-cancel');
+        btnRenameSave.id = 'account-rename-agree';
+        btnRenameSave.setAttribute('aria-label', 'Сохранить логин');
+        btnRenameSave.setAttribute('title', 'Сохранить');
+        var imgAgree = ce('img');
+        imgAgree.src = '/img/agree.svg';
+        imgAgree.alt = '';
+        imgAgree.className = 'account-rename-ico account-rename-ico--decision';
+        imgAgree.decoding = 'async';
+        btnRenameSave.appendChild(imgAgree);
+        var btnRenameCancel = ce('button', 'account-rename-icon-btn account-rename-decision-btn');
         btnRenameCancel.type = 'button';
-        btnRenameCancel.textContent = 'Отмена';
-        btnRenameCancel.hidden = true;
-        renameWrap.appendChild(name);
-        renameWrap.appendChild(renameInput);
-        renameWrap.appendChild(btnRename);
-        renameWrap.appendChild(btnRenameSave);
-        renameWrap.appendChild(btnRenameCancel);
+        btnRenameCancel.id = 'account-rename-disagree';
+        btnRenameCancel.setAttribute('aria-label', 'Отменить');
+        btnRenameCancel.setAttribute('title', 'Отмена');
+        var imgDisagree = ce('img');
+        imgDisagree.src = '/img/disagree.svg';
+        imgDisagree.alt = '';
+        imgDisagree.className = 'account-rename-ico account-rename-ico--decision';
+        imgDisagree.decoding = 'async';
+        btnRenameCancel.appendChild(imgDisagree);
+        loginPencilGroup.appendChild(name);
+        loginPencilGroup.appendChild(btnRename);
+        var renameEditor = ce('div', 'account-rename-editor');
+        renameEditor.setAttribute('role', 'group');
+        renameEditor.setAttribute('aria-label', 'Редактирование логина');
+        renameEditor.hidden = true;
+        renameEditor.setAttribute('aria-hidden', 'true');
+        var renameDecisions = ce('div', 'account-rename-decisions');
+        renameDecisions.appendChild(btnRenameSave);
+        renameDecisions.appendChild(btnRenameCancel);
+        renameEditor.appendChild(renameInput);
+        renameEditor.appendChild(renameDecisions);
+        renameWrap.appendChild(loginPencilGroup);
+        renameWrap.appendChild(renameEditor);
         nameRow.appendChild(renameWrap);
+        var emailLine = ce('div', 'account-email');
+        emailLine.id = 'account-email';
+        emailLine.hidden = true;
+        emailLine.textContent = '';
+        var identityStack = ce('div', 'account-identity-stack');
+        identityStack.appendChild(nameRow);
+        identityStack.appendChild(emailLine);
         var hint = ce('div', 'account-hint');
         hint.textContent = '';
         var status = ce('div', 'account-status');
         status.textContent = 'Проверяем…';
-        meta.appendChild(nameRow);
+        meta.appendChild(identityStack);
         meta.appendChild(hint);
         meta.appendChild(status);
         top.appendChild(avatar);
@@ -304,7 +392,7 @@
 
         var actions = ce('div', 'account-actions');
         var btnSupport = ce('a', 'admin-ui-btn admin-ui-btn--outline account-action-btn');
-        btnSupport.href = 'mailto:sbyt@kpvs.by';
+        btnSupport.href = 'mailto:kpvssupport@gmail.com';
         btnSupport.textContent = 'Поддержка';
         btnSupport.classList.add('account-action-btn--auth');
 
@@ -383,44 +471,68 @@
         var pwdHint = ce('div', 'account-security-hint');
         pwdHint.textContent = '';
 
-        var rowOld = ce('label', 'account-setting account-setting--password');
-        var rowOldLeft = ce('span', 'account-setting-label');
-        rowOldLeft.textContent = 'Текущий пароль';
-        var inpOld = ce('input', 'account-input');
-        inpOld.type = 'password';
-        inpOld.autocomplete = 'current-password';
-        rowOld.appendChild(rowOldLeft);
-        rowOld.appendChild(inpOld);
+        var btnPwdToggle = ce('button', 'admin-ui-btn admin-ui-btn--outline account-security-open-btn');
+        btnPwdToggle.type = 'button';
+        btnPwdToggle.id = 'account-password-toggle';
+        btnPwdToggle.setAttribute('aria-expanded', 'false');
+        btnPwdToggle.setAttribute('aria-controls', 'account-password-panel');
+        btnPwdToggle.textContent = 'Сменить пароль';
 
-        var rowNew = ce('label', 'account-setting account-setting--password');
-        var rowNewLeft = ce('span', 'account-setting-label');
+        var pwdPanel = ce('div', 'account-disclosure-panel account-password-panel');
+        pwdPanel.id = 'account-password-panel';
+        pwdPanel.hidden = true;
+
+        var rowOldWrap = ce('div', 'account-field-stack');
+        rowOldWrap.id = 'account-pwd-old-wrap';
+        var rowOldLeft = ce('span', 'account-field-label');
+        rowOldLeft.textContent = 'Текущий пароль';
+        var inpOld = ce('input', 'account-input account-input--full');
+        inpOld.type = 'password';
+        inpOld.id = 'account-pwd-old';
+        inpOld.autocomplete = 'current-password';
+        rowOldWrap.appendChild(rowOldLeft);
+        rowOldWrap.appendChild(inpOld);
+
+        var rowNew = ce('div', 'account-field-stack');
+        var rowNewLeft = ce('span', 'account-field-label');
         rowNewLeft.textContent = 'Новый пароль';
-        var inpNew = ce('input', 'account-input');
+        var inpNew = ce('input', 'account-input account-input--full');
         inpNew.type = 'password';
+        inpNew.id = 'account-pwd-new';
         inpNew.autocomplete = 'new-password';
         rowNew.appendChild(rowNewLeft);
         rowNew.appendChild(inpNew);
 
-        var rowNew2 = ce('label', 'account-setting account-setting--password');
-        var rowNew2Left = ce('span', 'account-setting-label');
+        var rowNew2 = ce('div', 'account-field-stack');
+        var rowNew2Left = ce('span', 'account-field-label');
         rowNew2Left.textContent = 'Повторите пароль';
-        var inpNew2 = ce('input', 'account-input');
+        var inpNew2 = ce('input', 'account-input account-input--full');
         inpNew2.type = 'password';
+        inpNew2.id = 'account-pwd-new2';
         inpNew2.autocomplete = 'new-password';
         rowNew2.appendChild(rowNew2Left);
         rowNew2.appendChild(inpNew2);
 
         var rowBtn = ce('div', 'account-security-actions');
-        var btnPwd = ce('button', 'admin-ui-btn admin-ui-btn--primary account-security-btn');
+        var btnPwd = ce('button', 'admin-ui-btn admin-ui-btn--primary account-security-btn account-security-btn--save');
         btnPwd.type = 'button';
+        btnPwd.id = 'account-password-save';
         btnPwd.textContent = 'Сохранить пароль';
+        var btnPwdCancel = ce('button', 'admin-ui-btn admin-ui-btn--secondary account-security-btn account-security-btn--cancel');
+        btnPwdCancel.type = 'button';
+        btnPwdCancel.id = 'account-password-cancel';
+        btnPwdCancel.textContent = 'Отмена';
         rowBtn.appendChild(btnPwd);
+        rowBtn.appendChild(btnPwdCancel);
+
+        pwdPanel.appendChild(rowOldWrap);
+        pwdPanel.appendChild(rowNew);
+        pwdPanel.appendChild(rowNew2);
+        pwdPanel.appendChild(rowBtn);
 
         security.appendChild(pwdHint);
-        security.appendChild(rowOld);
-        security.appendChild(rowNew);
-        security.appendChild(rowNew2);
-        security.appendChild(rowBtn);
+        security.appendChild(btnPwdToggle);
+        security.appendChild(pwdPanel);
 
         shell.appendChild(top);
         shell.appendChild(actions);
@@ -438,6 +550,7 @@
             modal: modal,
             close: close,
             name: name,
+            emailLine: emailLine,
             hint: hint,
             status: status,
             btnLogout: btnLogout,
@@ -447,6 +560,9 @@
             themeDarkBtn: themeDarkBtn,
             sPersistToggle: sPersistToggle,
             btnRename: btnRename,
+            loginPencilGroup: loginPencilGroup,
+            renameEditor: renameEditor,
+            renameWrap: renameWrap,
             nameRow: nameRow,
             renameInput: renameInput,
             btnRenameSave: btnRenameSave,
@@ -454,10 +570,14 @@
             secTitle: secTitle,
             security: security,
             pwdHint: pwdHint,
+            btnPwdToggle: btnPwdToggle,
+            pwdPanel: pwdPanel,
+            rowOldWrap: rowOldWrap,
             inpOld: inpOld,
             inpNew: inpNew,
             inpNew2: inpNew2,
             btnPwd: btnPwd,
+            btnPwdCancel: btnPwdCancel,
         };
     }
 
@@ -465,11 +585,12 @@
         if (modalState && modalState.modal && document.body.contains(modalState.modal)) return modalState;
         var existing = qs('#account-modal');
         if (existing && existing.nodeType === 1) {
-            // If it exists for some reason, reuse it but we rely on our standard structure.
+            // Reuse DOM (e.g. after partial injection) — same structure as buildModal().
             modalState = {
                 modal: existing,
                 close: qs('.modal-close', existing),
                 name: qs('.account-name', existing),
+                emailLine: qs('#account-email', existing),
                 hint: qs('.account-hint', existing),
                 status: qs('.account-status', existing),
                 btnLogout: qs('.admin-ui-btn--danger.account-action-btn', existing),
@@ -478,26 +599,35 @@
                 themeLightBtn: qs('#account-theme-light', existing),
                 themeDarkBtn: qs('#account-theme-dark', existing),
                 sPersistToggle: qsAllFallback('.account-setting-toggle', 1, existing),
-                btnRename: qs('.account-rename-icon-btn', existing),
+                btnRename: qs('.account-rename-pencil-btn', existing),
+                loginPencilGroup: qs('.account-login-pencil-group', existing),
+                renameEditor: qs('.account-rename-editor', existing),
+                renameWrap: qs('.account-rename-wrap', existing),
                 nameRow: qs('.account-name-row', existing),
-                renameInput: qs('.account-rename-input', existing),
-                btnRenameSave: qs('.account-rename-save', existing),
-                btnRenameCancel: qs('.account-rename-cancel', existing),
+                renameInput: qs('#account-rename-input', existing),
+                btnRenameSave: qs('#account-rename-agree', existing),
+                btnRenameCancel: qs('#account-rename-disagree', existing),
                 secTitle: qsAllFallback('.account-section-title', 1, existing),
                 security: qsAllFallback('.account-settings--security', 0, existing),
                 pwdHint: qs('.account-security-hint', existing),
-                inpOld: qsAllFallback('.account-setting--password .account-input', 0, existing),
-                inpNew: qsAllFallback('.account-setting--password .account-input', 1, existing),
-                inpNew2: qsAllFallback('.account-setting--password .account-input', 2, existing),
-                btnPwd: qs('.account-security-btn', existing),
-                __wired: true,
+                btnPwdToggle: qs('#account-password-toggle', existing),
+                pwdPanel: qs('#account-password-panel', existing),
+                rowOldWrap: qs('#account-pwd-old-wrap', existing),
+                inpOld: qs('#account-pwd-old', existing),
+                inpNew: qs('#account-pwd-new', existing),
+                inpNew2: qs('#account-pwd-new2', existing),
+                btnPwd: qs('#account-password-save', existing),
+                btnPwdCancel: qs('#account-password-cancel', existing),
+                __wired: false,
             };
-            return modalState;
+        } else {
+            modalState = buildModal();
+            document.body.appendChild(modalState.modal);
         }
-        modalState = buildModal();
-        document.body.appendChild(modalState.modal);
-        wireModal(modalState);
-        modalState.__wired = true;
+        if (!modalState.__wired) {
+            wireModal(modalState);
+            modalState.__wired = true;
+        }
         return modalState;
     }
 
@@ -513,6 +643,10 @@
     function hideModal() {
         var modal = qs('#account-modal');
         if (!modal) return;
+        if (modalState && typeof modalState.__exitRenameUi === 'function') {
+            try { modalState.__exitRenameUi(); } catch (_) {}
+        }
+        if (modalState) collapseAccountPasswordPanel(modalState);
         modal.classList.remove('show');
         unlock();
         setTimeout(function () {
@@ -546,12 +680,40 @@
 
         function setRenameMode(on) {
             if (!built.renameInput || !built.btnRenameSave || !built.btnRenameCancel || !built.btnRename) return;
-            built.renameInput.hidden = !on;
-            built.btnRenameSave.hidden = !on;
-            built.btnRenameCancel.hidden = !on;
-            built.btnRename.hidden = on;
-            if (built.name) built.name.hidden = on;
-            if (on) setTimeout(function () { try { built.renameInput.focus(); } catch {} }, 0);
+            if (built.loginPencilGroup) built.loginPencilGroup.hidden = !!on;
+            if (built.renameEditor) {
+                built.renameEditor.hidden = !on;
+                built.renameEditor.setAttribute('aria-hidden', on ? 'false' : 'true');
+            }
+            if (built.renameWrap) built.renameWrap.classList.toggle('account-rename-wrap--editing', !!on);
+            if (on && built.pwdPanel && built.btnPwdToggle) {
+                built.pwdPanel.hidden = true;
+                built.btnPwdToggle.setAttribute('aria-expanded', 'false');
+            }
+            if (on) {
+                setTimeout(function () {
+                    try {
+                        built.renameInput.focus();
+                        built.renameInput.select();
+                    } catch (_) {}
+                }, 0);
+            }
+        }
+
+        function setPasswordExpanded(on) {
+            if (!built.pwdPanel || !built.btnPwdToggle) return;
+            built.pwdPanel.hidden = !on;
+            built.btnPwdToggle.setAttribute('aria-expanded', on ? 'true' : 'false');
+            if (on) setRenameMode(false);
+            if (on) {
+                setTimeout(function () {
+                    try {
+                        var canFocusOld = built.rowOldWrap && built.rowOldWrap.isConnected && built.inpOld && !built.inpOld.disabled;
+                        if (canFocusOld) built.inpOld.focus();
+                        else if (built.inpNew) built.inpNew.focus();
+                    } catch (_) {}
+                }, 0);
+            }
         }
 
         function setRenameBusy(busy) {
@@ -564,7 +726,9 @@
         if (built.btnRename && built.renameInput && built.btnRenameSave && built.btnRenameCancel) {
             built.btnRename.addEventListener('click', function () {
                 built.hint.textContent = '';
-                built.renameInput.value = (built.name && built.name.textContent) ? String(built.name.textContent) : '';
+                var fromMe = typeof built.lastUsername === 'string' ? built.lastUsername.trim() : '';
+                var fromNode = built.name && built.name.textContent ? String(built.name.textContent).trim() : '';
+                built.renameInput.value = fromMe || fromNode;
                 setRenameMode(true);
             });
             built.btnRenameCancel.addEventListener('click', function () {
@@ -577,6 +741,7 @@
                 if (!token) return;
                 var nextName = String(built.renameInput.value || '').trim();
                 if (!nextName) { built.hint.textContent = 'Укажите логин'; return; }
+                if (nextName.indexOf('@') !== -1) { built.hint.textContent = 'Логин не может содержать символ @'; return; }
                 setRenameBusy(true);
                 built.hint.textContent = '';
                 fetch('/api/user/auth/username', {
@@ -604,8 +769,20 @@
                         }
                         if (res.json && res.json.user && res.json.user.username) {
                             built.name.textContent = String(res.json.user.username);
+                            built.lastUsername = String(res.json.user.username);
                         } else {
                             built.name.textContent = nextName;
+                            built.lastUsername = nextName;
+                        }
+                        if (built.emailLine && res.json && res.json.user) {
+                            var de = resolveDisplayEmail(res.json.user);
+                            if (de) {
+                                built.emailLine.hidden = false;
+                                built.emailLine.textContent = de;
+                            } else {
+                                built.emailLine.textContent = '';
+                                built.emailLine.hidden = true;
+                            }
                         }
                         built.hint.textContent = 'Логин обновлён';
                         setRenameBusy(false);
@@ -623,6 +800,31 @@
             });
         }
 
+        built.__exitRenameUi = function () {
+            try {
+                setRenameBusy(false);
+                setRenameMode(false);
+            } catch (_) {}
+        };
+
+        if (built.btnPwdToggle && built.pwdPanel) {
+            built.btnPwdToggle.addEventListener('click', function () {
+                var open = built.pwdPanel.hidden;
+                setPasswordExpanded(open);
+            });
+        }
+
+        if (built.btnPwdCancel) {
+            built.btnPwdCancel.addEventListener('click', function () {
+                var t = getToken();
+                collapseAccountPasswordPanel(built);
+                if (!t) return;
+                fetchMe(t).then(function (me) {
+                    if (me) renderAuthed(built, me);
+                });
+            });
+        }
+
         if (built.btnPwd) {
             built.btnPwd.addEventListener('click', function () {
                 var token = getToken();
@@ -633,6 +835,7 @@
                 if (!next || next.length < 6) { built.pwdHint.textContent = 'Пароль должен быть не менее 6 символов'; return; }
                 if (next !== next2) { built.pwdHint.textContent = 'Пароли не совпадают'; return; }
                 built.btnPwd.disabled = true;
+                if (built.btnPwdCancel) built.btnPwdCancel.disabled = true;
                 fetch('/api/user/auth/password', {
                     method: 'PATCH',
                     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
@@ -646,19 +849,28 @@
                         });
                     })
                     .then(function (res) {
+                        built.btnPwd.disabled = false;
+                        if (built.btnPwdCancel) built.btnPwdCancel.disabled = false;
                         if (!res || !res.ok) {
                             built.pwdHint.textContent = (res && res.json && res.json.error) ? res.json.error : 'Не удалось сменить пароль';
-                            built.btnPwd.disabled = false;
                             return;
                         }
                         if (res.json && res.json.token) {
                             try { localStorage.setItem(TOKEN_KEY, String(res.json.token)); } catch {}
                         }
-                        built.pwdHint.textContent = 'Пароль сохранён';
-                        built.btnPwd.disabled = false;
-                        try { window.location.reload(); } catch {}
+                        var tok = '';
+                        try { tok = localStorage.getItem(TOKEN_KEY) || ''; } catch {}
+                        fetchMe(tok).then(function (me) {
+                            try { sessionStorage.removeItem(OAUTH_PWD_PROMPT_KEY); } catch {}
+                            if (me) renderAuthed(built, me, 'Пароль сохранён');
+                            else collapseAccountPasswordPanel(built);
+                        });
                     })
-                    .catch(function () { built.pwdHint.textContent = 'Не удалось сменить пароль'; built.btnPwd.disabled = false; });
+                    .catch(function () {
+                        built.pwdHint.textContent = 'Не удалось сменить пароль';
+                        built.btnPwd.disabled = false;
+                        if (built.btnPwdCancel) built.btnPwdCancel.disabled = false;
+                    });
             });
         }
 
@@ -702,6 +914,7 @@
     }
 
     function renderLoading(built) {
+        built.lastUsername = '';
         built.name.textContent = '…';
         built.hint.textContent = '';
         if (built.status) {
@@ -712,17 +925,31 @@
         if (built.btnLogout) { built.btnLogout.hidden = true; built.btnLogout.style.display = 'none'; }
         if (built.btnLogin) { built.btnLogin.hidden = true; built.btnLogin.style.display = 'none'; }
         if (built.btnRename) { built.btnRename.disabled = true; built.btnRename.style.display = 'none'; }
-        if (built.renameInput) built.renameInput.hidden = true;
-        if (built.btnRenameSave) built.btnRenameSave.hidden = true;
-        if (built.btnRenameCancel) built.btnRenameCancel.hidden = true;
+        if (built.renameEditor) { built.renameEditor.hidden = true; built.renameEditor.setAttribute('aria-hidden', 'true'); }
+        if (built.loginPencilGroup) built.loginPencilGroup.hidden = false;
+        if (built.renameWrap) built.renameWrap.classList.remove('account-rename-wrap--editing');
         if (built.name) built.name.hidden = false;
+        if (built.btnPwdToggle) { built.btnPwdToggle.disabled = true; built.btnPwdToggle.style.display = 'none'; }
+        if (built.pwdPanel) built.pwdPanel.hidden = true;
+        if (built.emailLine) built.emailLine.hidden = true;
         if (built.secTitle) built.secTitle.style.display = 'none';
         if (built.security) built.security.style.display = 'none';
     }
 
-    function renderAuthed(built, me) {
-        built.name.textContent = me && me.username ? String(me.username) : 'Пользователь';
-        built.hint.textContent = (me && me.role) ? ('Роль: ' + me.role) : '';
+    function renderAuthed(built, me, pwdHintMessage) {
+        built.lastUsername = me && me.username ? String(me.username) : '';
+        built.name.textContent = built.lastUsername || 'Пользователь';
+        if (built.emailLine) {
+            var dispEmail = resolveDisplayEmail(me);
+            if (dispEmail) {
+                built.emailLine.hidden = false;
+                built.emailLine.textContent = dispEmail;
+            } else {
+                built.emailLine.textContent = '';
+                built.emailLine.hidden = true;
+            }
+        }
+        built.hint.textContent = '';
         if (built.status) {
             built.status.textContent = '';
             built.status.hidden = true;
@@ -731,10 +958,16 @@
         if (built.btnLogout) { built.btnLogout.hidden = false; built.btnLogout.style.display = 'inline-flex'; }
         if (built.btnLogin) { built.btnLogin.hidden = true; built.btnLogin.style.display = 'none'; }
         if (built.btnRename) { built.btnRename.disabled = false; built.btnRename.style.display = 'inline-flex'; }
-        if (built.renameInput) built.renameInput.hidden = true;
-        if (built.btnRenameSave) built.btnRenameSave.hidden = true;
-        if (built.btnRenameCancel) built.btnRenameCancel.hidden = true;
-        if (built.name) built.name.hidden = false;
+        var renameUiOpen = built.renameEditor && built.renameEditor.hidden === false;
+        if (!renameUiOpen) {
+            if (built.renameEditor) { built.renameEditor.hidden = true; built.renameEditor.setAttribute('aria-hidden', 'true'); }
+            if (built.loginPencilGroup) built.loginPencilGroup.hidden = false;
+            if (built.renameWrap) built.renameWrap.classList.remove('account-rename-wrap--editing');
+            if (built.name) built.name.hidden = false;
+        }
+        if (built.btnPwdToggle) { built.btnPwdToggle.disabled = false; built.btnPwdToggle.style.display = ''; }
+        if (built.pwdPanel) built.pwdPanel.hidden = true;
+        if (built.btnPwdToggle) built.btnPwdToggle.setAttribute('aria-expanded', 'false');
 
         if (built.secTitle) built.secTitle.style.display = '';
         if (built.security) built.security.style.display = '';
@@ -743,17 +976,23 @@
         if (built.inpNew) built.inpNew.value = '';
         if (built.inpNew2) built.inpNew2.value = '';
 
-        var mustSet = me && me.password_set === false;
+        var mustSet = me && !userHasPasswordSet(me);
         if (built.pwdHint) {
-            built.pwdHint.textContent = mustSet
-                ? 'Вы впервые вошли через Google. Установите пароль, чтобы в следующий раз можно было войти по email или логину.'
-                : 'Смена пароля требует ввода текущего пароля. Если забыли — используйте восстановление через email на странице входа.';
+            if (pwdHintMessage != null && pwdHintMessage !== '') {
+                built.pwdHint.textContent = String(pwdHintMessage);
+            } else {
+                built.pwdHint.textContent = mustSet
+                    ? 'Вы впервые вошли через Google. Установите пароль, чтобы в следующий раз можно было войти по email или логину.'
+                    : 'Смена пароля требует ввода текущего пароля. Если забыли — используйте восстановление через email на странице входа.';
+            }
         }
-        if (built.inpOld) built.inpOld.closest('.account-setting').style.display = mustSet ? 'none' : '';
-        if (built.btnPwd) built.btnPwd.textContent = mustSet ? 'Установить пароль' : 'Сменить пароль';
+        syncPasswordOldRow(built, me);
+        if (built.btnPwdToggle) built.btnPwdToggle.textContent = mustSet ? 'Установить пароль' : 'Сменить пароль';
+        if (built.btnPwd) built.btnPwd.textContent = 'Сохранить пароль';
     }
 
     function renderGuest(built) {
+        built.lastUsername = '';
         built.name.textContent = 'Гость';
         built.hint.textContent = 'Войдите, чтобы сохранять избранное и быстрее оформлять заявки';
         if (built.status) {
@@ -764,6 +1003,13 @@
         if (built.btnLogout) { built.btnLogout.hidden = true; built.btnLogout.style.display = 'none'; }
         if (built.btnLogin) { built.btnLogin.hidden = false; built.btnLogin.style.display = 'inline-flex'; }
         if (built.btnRename) { built.btnRename.disabled = true; built.btnRename.style.display = 'none'; }
+        if (built.btnPwdToggle) { built.btnPwdToggle.style.display = 'none'; }
+        if (built.renameEditor) { built.renameEditor.hidden = true; built.renameEditor.setAttribute('aria-hidden', 'true'); }
+        if (built.loginPencilGroup) built.loginPencilGroup.hidden = false;
+        if (built.renameWrap) built.renameWrap.classList.remove('account-rename-wrap--editing');
+        if (built.name) built.name.hidden = false;
+        if (built.pwdPanel) built.pwdPanel.hidden = true;
+        if (built.emailLine) built.emailLine.hidden = true;
         if (built.secTitle) built.secTitle.style.display = 'none';
         if (built.security) built.security.style.display = 'none';
     }
