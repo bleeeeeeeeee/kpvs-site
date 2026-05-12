@@ -2491,7 +2491,7 @@ html.modal-open body .notification * {
     max-width: 0;
 }
 
-/* Email — одна строка + ellipsis (как остальные колонки админ-таблицы), полный адрес в title (JS) */
+/* Email — одна строка + ellipsis, полный адрес в title (JS); цвет как у остальных ячеек таблицы */
 .admin-page .admin-users-table th.admin-users-th-email,
 .admin-page .admin-users-table td.cell-user-email {
     min-width: 0;
@@ -2500,7 +2500,6 @@ html.modal-open body .notification * {
     white-space: nowrap;
     text-align: left;
     font-variant-numeric: normal;
-    color: var(--text-secondary);
     font-weight: var(--admin-table-fw);
     line-height: 1.35;
 }

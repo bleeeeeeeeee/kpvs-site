@@ -888,20 +888,7 @@ async function ensureDefaultUsers() {
 
 async function listUsers() {
     const result = await pool.query(
-        `SELECT id, username,
-            NULLIF(trim(COALESCE(email::text, '')), '') AS email_db,
-            (
-                CASE
-                    WHEN NULLIF(trim(COALESCE(email::text, '')), '') IS NOT NULL THEN trim(email::text)
-                    WHEN trim(COALESCE(username::text, '')) LIKE '%@%'
-                        AND length(trim(COALESCE(username::text, '')))
-                            - length(replace(trim(COALESCE(username::text, '')), '@', '')) = 1
-                        AND split_part(lower(trim(COALESCE(username::text, ''))), '@', 2) LIKE '%.%'
-                    THEN lower(trim(COALESCE(username::text, '')))
-                    ELSE NULL
-                END
-            )::text AS list_email,
-            role, is_active, created_at, last_login
+        `SELECT id, username, email, role, is_active, created_at, last_login
          FROM users
          ORDER BY id`
     );

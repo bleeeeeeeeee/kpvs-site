@@ -145,15 +145,19 @@ const Admin = (() => {
         } catch { return '—'; }
     }
 
+    function looksLikeAccountEmail(s) {
+        if (!s || typeof s !== 'string') return false;
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(s).trim().toLowerCase());
+    }
+
+    /** Как в модалке аккаунта (`resolveDisplayEmail`): API `email`, иначе логин в виде почты. */
     function pickUserListEmail(u) {
         if (!u) return '';
-        var col = u.email != null ? String(u.email).trim() : '';
-        if (col) return col;
-        var login = u.username != null ? String(u.username).trim() : '';
-        if (login.indexOf('@') === -1) return '';
-        if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(login)) return login;
-        var at = login.indexOf('@');
-        if (at > 0 && login.indexOf('.', at + 1) !== -1) return login;
+        var em = u.email != null ? String(u.email).trim().toLowerCase() : '';
+        if (em && looksLikeAccountEmail(em)) return em;
+        var un = u.username != null ? String(u.username).trim().toLowerCase() : '';
+        if (un && looksLikeAccountEmail(un)) return un;
+        if (em) return em;
         return '';
     }
 
@@ -211,6 +215,7 @@ const Admin = (() => {
             ? data.map(function (row) {
                 if (!row || typeof row !== 'object') return row;
                 if (row.email == null && row.Email != null) row.email = row.Email;
+                if (row.email == null && row.user_email != null) row.email = row.user_email;
                 return row;
             })
             : [];

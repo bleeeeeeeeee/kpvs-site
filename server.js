@@ -533,16 +533,13 @@ function emailForProfile(row) {
     return null;
 }
 
-/** Список пользователей в админке: не терять «сырой» email из БД, если строгая проверка не прошла. */
-function buildAdminUserListEmail(u) {
-    if (!u) return null;
-    const listed = u.list_email != null ? String(u.list_email).trim() : '';
-    const db = u.email_db != null ? String(u.email_db).trim() : '';
-    const p = emailForProfile({ username: u.username, email: listed || db || null });
+/** Email в списке пользователей админки: как в профиле (`emailForProfile`), иначе нормализованное значение колонки `email` (в т.ч. Buffer из pg). */
+function emailForAdminUserList(row) {
+    if (!row) return null;
+    const p = emailForProfile(row);
     if (p) return p;
-    if (listed) return normalizeEmail(listed) || listed;
-    if (db) return normalizeEmail(db) || db;
-    return null;
+    const rawNorm = row.email != null ? normalizeEmail(row.email) : '';
+    return rawNorm || null;
 }
 
 function makeSixDigitCode() {
@@ -795,7 +792,7 @@ app.get('/api/admin/users', requireAuth, async (req, res) => {
         const payload = rows.map((u) => ({
             id: u.id != null ? Number(u.id) : u.id,
             username: u.username != null ? String(u.username) : '',
-            email: buildAdminUserListEmail(u),
+            email: emailForAdminUserList(u),
             role: u.role != null ? String(u.role) : '',
             is_active: Boolean(u.is_active),
             created_at: u.created_at,
