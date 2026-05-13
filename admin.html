@@ -6,6 +6,7 @@
     <title>Администрирование · КПВС</title>
     <link rel="stylesheet" href="/css/style.css">
     <script src="/js/modal-lock.js" defer></script>
+    <script src="/js/size-cascade.js" defer></script>
     <script src="/js/admin.js" defer></script>
 </head>
 <body class="admin-page">
@@ -28,6 +29,10 @@
                     <input id="search-input" type="search" class="catalog-search-input" placeholder="Поиск по артикулу, названию или описанию" autocomplete="off" />
                     <button type="button" id="admin-search-clear" class="catalog-search-clear ui-xbtn" title="Очистить" aria-label="Очистить поиск" hidden>&times;</button>
                 </div>
+                <div class="admin-search-scope" id="admin-search-scope" hidden role="group" aria-label="Область поиска">
+                    <button type="button" class="admin-search-scope-btn is-active" data-scope="products" aria-pressed="true">Товары</button>
+                    <button type="button" class="admin-search-scope-btn" data-scope="users" aria-pressed="false">Пользователи</button>
+                </div>
                 <button type="button" id="add-product-btn" class="admin-ui-btn admin-ui-btn--primary admin-add-product-btn">Добавить товар</button>
             </div>
             <div class="catalog-sort-row admin-catalog-sort-row admin-toolbar-row-sort">
@@ -49,7 +54,9 @@
 
         <p id="product-count" class="admin-toolbar-meta-between" aria-live="polite">0 товаров</p>
 
-        <div class="admin-table-container">
+        <section class="admin-data-panel" id="admin-products-panel">
+            <h2 class="admin-table-section-title">Товары</h2>
+            <div class="admin-table-container">
             <table class="admin-table">
                 <colgroup>
                     <col data-col="visible" style="width:74px;">
@@ -59,6 +66,7 @@
                     <col data-col="category" style="width:148px;">
                     <col data-col="gender" style="width:92px;">
                     <col data-col="brand" style="width:124px;">
+                    <col data-col="collections" style="width:160px;">
                 </colgroup>
                 <thead>
                     <tr>
@@ -69,23 +77,16 @@
                         <th scope="col">Категория</th>
                         <th scope="col">Пол</th>
                         <th scope="col">Бренд</th>
+                        <th scope="col">Подборки</th>
                     </tr>
                 </thead>
                 <tbody id="products-body"></tbody>
             </table>
-        </div>
-
-        <section class="admin-users-panel" id="admin-users-panel" hidden>
-            <div class="catalog-controls admin-catalog-controls">
-                <div class="catalog-search-row admin-toolbar-row-search">
-                    <div>
-                        <h2 class="admin-section-title">Пользователи и администраторы</h2>
-                        <p class="admin-section-subtitle">Доступно только для superadmin. Здесь можно создавать аккаунты, менять роли, сбрасывать пароли и отключать доступ.</p>
-                    </div>
-                    <button type="button" id="add-user-btn" class="admin-ui-btn admin-ui-btn--primary admin-add-product-btn">Добавить пользователя</button>
-                </div>
             </div>
+        </section>
 
+        <section class="admin-data-panel admin-users-data" id="admin-users-panel" hidden>
+            <h2 class="admin-table-section-title">Пользователи</h2>
             <div class="admin-table-container">
                 <table class="admin-table admin-users-table">
                     <colgroup>
@@ -207,7 +208,7 @@
 
                     <div class="form-grid">
                         <div class="form-row">
-                            <label for="product-art">Артикул</label>
+                            <label for="product-art">Артикул товара</label>
                             <input id="product-art" name="art" type="text" placeholder="Напр. COAT-001" autocomplete="off" />
                             <span class="field-error" id="err-art"></span>
                         </div>
@@ -219,7 +220,7 @@
 
                     <div class="form-row">
                         <label for="product-description">Описание</label>
-                        <textarea id="product-description" name="description" rows="3" placeholder="Краткое описание товара"></textarea>
+                        <textarea id="product-description" name="description" rows="6" class="admin-product-description-textarea" placeholder="Описание"></textarea>
                     </div>
 
                     <div class="form-grid">
@@ -297,13 +298,13 @@
                     <hr class="form-divider">
 
                     <div class="form-row">
-                        <label>Теги</label>
-                        <div id="product-tags-container" class="admin-multiselect">
-                            <button type="button" id="product-tags-trigger" class="admin-multiselect-trigger">
-                                <span>Выберите теги</span>
+                        <label>Подборки</label>
+                        <div id="product-collections-container" class="admin-multiselect">
+                            <button type="button" id="product-collections-trigger" class="admin-multiselect-trigger">
+                                <span>Выберите подборки</span>
                                 <span class="admin-multiselect-caret" aria-hidden="true">▾</span>
                             </button>
-                            <div id="product-tags-dropdown" class="admin-multiselect-dropdown"></div>
+                            <div id="product-collections-dropdown" class="admin-multiselect-dropdown"></div>
                         </div>
                     </div>
 
@@ -311,7 +312,7 @@
 
                     <div class="form-row">
                         <div class="form-row-header">
-                            <label>Варианты (размер + цвет + артикул)</label>
+                            <label>Варианты (размер, цвет, артикул)</label>
                             <button type="button" id="add-variant-btn" class="admin-ui-btn admin-ui-btn--primary admin-ui-btn--sm">+ Добавить вариант</button>
                         </div>
                         <div id="product-variants-container" class="admin-variants-list"></div>
@@ -326,6 +327,20 @@
                         </div>
                         <div id="product-attributes-container" class="admin-attributes-list"></div>
                     </div>
+
+                    <hr class="form-divider">
+
+                    <details class="admin-multiselect admin-product-meta-details" id="product-meta-details" hidden>
+                        <summary class="admin-multiselect-trigger">
+                            <span>Служебная информация</span>
+                            <span class="admin-multiselect-caret" aria-hidden="true">▾</span>
+                        </summary>
+                        <div class="admin-multiselect-dropdown admin-product-meta-dropdown">
+                            <div id="product-meta-created" class="admin-meta-line"></div>
+                            <div id="product-meta-updated" class="admin-meta-line"></div>
+                            <div id="product-meta-editor" class="admin-meta-line"></div>
+                        </div>
+                    </details>
                 </form>
                 <div class="product-modal-footer">
                     <div class="product-modal-footer-left">
@@ -336,6 +351,107 @@
                         <button type="submit" class="admin-ui-btn admin-ui-btn--primary" id="save-product-btn" form="product-form">Сохранить</button>
                     </div>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal admin-modal" id="collection-modal" role="dialog" aria-modal="true" aria-labelledby="collection-modal-title" style="display:none;">
+        <div class="modal-content admin-modal-content">
+            <div class="modal-header admin-modal-header">
+                <h2 id="collection-modal-title">Подборка</h2>
+                <button class="modal-close ui-xbtn collection-modal-close" type="button" aria-label="Закрыть">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="collection-form" class="admin-form" novalidate>
+                    <input type="hidden" id="collection-edit-id" value="" />
+                    <div class="form-row">
+                        <label for="collection-name">Название <span class="required">*</span></label>
+                        <input id="collection-name" type="text" autocomplete="off" placeholder="Например: Летняя коллекция" />
+                        <span class="field-error" id="err-collection-name"></span>
+                    </div>
+                    <div class="form-row">
+                        <label for="collection-slug">Slug</label>
+                        <input id="collection-slug" type="text" autocomplete="off" placeholder="Латиница; пусто — из названия" />
+                    </div>
+                    <div class="form-row">
+                        <label for="collection-icon">Иконка (эмодзи или символ)</label>
+                        <input id="collection-icon" type="text" maxlength="8" placeholder="🔥" />
+                    </div>
+                    <div class="form-row">
+                        <label for="collection-section">Раздел показа</label>
+                        <select id="collection-section">
+                            <option value="all">Все разделы (мужской, женский, общий)</option>
+                            <option value="mens">Только мужской</option>
+                            <option value="womens">Только женский</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label for="collection-sort">Номер в очереди на витрине</label>
+                        <input id="collection-sort" type="number" inputmode="numeric" step="1" min="-999" max="9999" value="0" placeholder="0" aria-describedby="collection-sort-hint" />
+                        <p class="field-hint admin-field-hint" id="collection-sort-hint">
+                            На сайте порядок карточек подборок задаётся на сервере: список отдаётся уже отсортированным — сначала по этому числу (меньше = раньше в ряду), при равных значениях — по названию А–Я.
+                            Отдельной «сортировки в браузере» нет: посетители видят тот же порядок, что заложен здесь. Обычно достаточно значения 0 у всех; если нужно явно поставить одну подборку выше другой, дайте ей меньшее число (например 0 и 10), остальным оставьте 0 или шаг 10, 20…
+                        </p>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer admin-modal-footer">
+                <button type="button" id="collection-cancel-btn" class="admin-ui-btn admin-ui-btn--secondary">Отмена</button>
+                <button type="button" id="collection-save-btn" class="admin-ui-btn admin-ui-btn--primary">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal admin-modal" id="brand-quick-modal" role="dialog" aria-modal="true" aria-labelledby="brand-quick-modal-title" style="display:none;">
+        <div class="modal-content admin-modal-content">
+            <div class="modal-header admin-modal-header">
+                <h2 id="brand-quick-modal-title">Новый бренд</h2>
+                <button class="modal-close ui-xbtn brand-quick-modal-close" type="button" aria-label="Закрыть">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="brand-quick-form" class="admin-form" novalidate>
+                    <div class="form-row">
+                        <label for="brand-quick-name">Название <span class="required">*</span></label>
+                        <input id="brand-quick-name" type="text" autocomplete="off" placeholder="Например: КПВС" />
+                        <span class="field-error" id="err-brand-quick-name"></span>
+                    </div>
+                    <div class="form-row">
+                        <label for="brand-quick-slug">Slug</label>
+                        <input id="brand-quick-slug" type="text" autocomplete="off" placeholder="Латиница; пусто — из названия" />
+                        <span class="field-error" id="err-brand-quick-slug"></span>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer admin-modal-footer">
+                <button type="button" id="brand-quick-cancel-btn" class="admin-ui-btn admin-ui-btn--secondary">Отмена</button>
+                <button type="button" id="brand-quick-save-btn" class="admin-ui-btn admin-ui-btn--primary">Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal admin-modal" id="size-quick-modal" role="dialog" aria-modal="true" aria-labelledby="size-quick-modal-title" style="display:none;">
+        <div class="modal-content admin-modal-content">
+            <div class="modal-header admin-modal-header">
+                <h2 id="size-quick-modal-title">Новый размер</h2>
+                <button class="modal-close ui-xbtn size-quick-modal-close" type="button" aria-label="Закрыть">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="size-quick-form" class="admin-form" novalidate>
+                    <div class="form-row">
+                        <label for="size-quick-value">Обозначение <span class="required">*</span></label>
+                        <input id="size-quick-value" type="text" autocomplete="off" placeholder="Например: 2XS, 2XL, 42, Универсальный" />
+                        <span class="field-error" id="err-size-quick"></span>
+                    </div>
+                    <div class="form-row">
+                        <label for="size-quick-type">Тип размера</label>
+                        <select id="size-quick-type"></select>
+                        <span class="field-hint admin-field-hint" id="size-quick-type-hint">Выберите тип, к которому относится обозначение (например одежда или обувь).</span>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer admin-modal-footer">
+                <button type="button" id="size-quick-cancel-btn" class="admin-ui-btn admin-ui-btn--secondary">Отмена</button>
+                <button type="button" id="size-quick-save-btn" class="admin-ui-btn admin-ui-btn--primary">Создать</button>
             </div>
         </div>
     </div>

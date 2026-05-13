@@ -7,6 +7,46 @@ function genderDisplayLabel(g) {
     return '';
 }
 
+function escapeAttr(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;');
+}
+
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function sanitizeProductImageUrl(u) {
+    const s = String(u || '').trim();
+    if (!s || s.length > 2048) return '';
+    const head = s.slice(0, 16).toLowerCase();
+    if (head.startsWith('javascript:') || head.startsWith('data:') || head.startsWith('vbscript:')) return '';
+    if (s.startsWith('/')) return s.startsWith('//') ? '' : s;
+    if (/^https?:\/\//i.test(s)) {
+        try {
+            const url = new URL(s);
+            if (url.username || url.password) return '';
+            if (url.protocol === 'http:' || url.protocol === 'https:') return s;
+        } catch (_) {}
+    }
+    return '';
+}
+
+function documentTitleFromProductName(name) {
+    const d = document.createElement('div');
+    d.textContent = name == null || name === '' ? 'Товар' : String(name);
+    return d.textContent + ' · КПВС';
+}
+
 function catalogHrefForGender(g) {
     const x = String(g || '').toLowerCase();
     if (x === 'mens' || x === 'male') return '/mens.html';
@@ -15,7 +55,6 @@ function catalogHrefForGender(g) {
     return '/all.html';
 }
 
-/** Вертикаль «Назад»: верх обёртки = верх основного фото (после layout / load картинки). */
 let productBackAlignState = null;
 
 function teardownProductBackAlign() {
@@ -34,6 +73,107 @@ function requestProductBackAlign() {
     if (productBackAlignState && typeof productBackAlignState.schedule === 'function') {
         productBackAlignState.schedule();
     }
+}
+
+let productAdaptiveColorsState = null;
+
+function teardownProductAdaptiveColorRows() {
+    if (productAdaptiveColorsState) {
+        if (productAdaptiveColorsState.ro) productAdaptiveColorsState.ro.disconnect();
+        if (productAdaptiveColorsState.onResize) {
+            window.removeEventListener('resize', productAdaptiveColorsState.onResize);
+        }
+        productAdaptiveColorsState = null;
+    }
+}
+
+function productColorRowCountFit(track, wraps) {
+    const limit = track.clientWidth;
+    let fit = 0;
+    for (let i = 0; i < wraps.length; i++) {
+        const el = wraps[i];
+        const right = el.offsetLeft + el.offsetWidth;
+        if (right <= limit + 1) fit = i + 1;
+        else break;
+    }
+    return fit;
+}
+
+function layoutOneAdaptiveColorRow(host) {
+    const track = host.querySelector('.product-size-colors-track');
+    const moreWrap = host.querySelector('.product-color-more-wrap');
+    const wraps = track ? track.querySelectorAll('.product-color-swatch-wrap') : [];
+    const btn = moreWrap ? moreWrap.querySelector('.product-color-more-circle') : null;
+    const n = wraps.length;
+    if (!track || !n) return;
+
+    wraps.forEach(function (w, i) {
+        w.removeAttribute('hidden');
+        w.style.zIndex = String(Math.max(1, 40 - i));
+    });
+    if (moreWrap) {
+        moreWrap.setAttribute('hidden', '');
+        if (btn) {
+            btn.textContent = '+0';
+            btn.setAttribute('aria-label', 'Показать скрытые цвета');
+        }
+    }
+
+    if (!moreWrap || n <= 1) return;
+
+    const fitWithMoreHidden = productColorRowCountFit(track, wraps);
+    if (fitWithMoreHidden >= n) return;
+
+    moreWrap.removeAttribute('hidden');
+    const fit2 = productColorRowCountFit(track, wraps);
+    const overflow = n - fit2;
+    if (overflow <= 0) {
+        moreWrap.setAttribute('hidden', '');
+        if (btn) {
+            btn.textContent = '+0';
+            btn.setAttribute('aria-label', 'Показать скрытые цвета');
+        }
+        return;
+    }
+    for (let i = fit2; i < n; i++) {
+        wraps[i].setAttribute('hidden', '');
+    }
+    for (let i = 0; i < fit2; i++) {
+        wraps[i].style.zIndex = String(Math.max(1, 40 - i));
+    }
+    if (btn) {
+        btn.textContent = '+' + overflow;
+        btn.setAttribute('aria-label', 'Показать ещё ' + overflow + ' ' + (overflow === 1 ? 'цвет' : overflow < 5 ? 'цвета' : 'цветов'));
+    }
+}
+
+function layoutProductAdaptiveColorRows(root) {
+    const scope = root && root.querySelectorAll ? root : document;
+    scope.querySelectorAll('.product-size-colors-adaptive').forEach(layoutOneAdaptiveColorRow);
+}
+
+function setupProductAdaptiveColorRows(productMainEl) {
+    teardownProductAdaptiveColorRows();
+    if (!productMainEl || !productMainEl.querySelector('.product-size-colors-adaptive')) return;
+
+    const run = function () {
+        layoutProductAdaptiveColorRows(productMainEl);
+    };
+    run();
+    requestAnimationFrame(run);
+
+    let ro = null;
+    if (typeof ResizeObserver !== 'undefined') {
+        ro = new ResizeObserver(function () {
+            run();
+        });
+        ro.observe(productMainEl);
+    }
+    const onResize = function () {
+        run();
+    };
+    window.addEventListener('resize', onResize);
+    productAdaptiveColorsState = { ro: ro, onResize: onResize };
 }
 
 function setupProductBackAlign() {
@@ -79,7 +219,6 @@ function setupProductBackAlign() {
     productBackAlignState = { ro: ro, onResize: onResize, schedule: schedule };
 }
 
-/** Кнопка «назад»: при переходе из каталога — history.back(), иначе ссылка на раздел по полу товара */
 function wireProductBackButton(product) {
     const el = document.getElementById('product-back-btn');
     if (!el) return;
@@ -107,6 +246,7 @@ async function loadProduct() {
     if (!productMainEl) return;
 
     teardownProductBackAlign();
+    teardownProductAdaptiveColorRows();
 
     if (!identifier) {
         productMainEl.innerHTML = '<p class="catalog-empty">Товар не найден. Укажите корректную ссылку или откройте <a href="/mens.html">каталог</a>.</p>';
@@ -127,85 +267,127 @@ async function loadProduct() {
         const isFavorite = getFavorites().some(f => f.id === product.id);
         const isInCart = getCart().some(c => c.id === product.id);
 
-        const tagsHtml = (product.tags || []).map(tag =>
-            '<span class="product-tag" style="background:' + (tag.color || '#eee') + '">' +
-            (tag.icon ? tag.icon + ' ' : '') + (tag.name || '') + '</span>'
-        ).join('');
-
         const images = Array.isArray(product.images) && product.images.length
             ? product.images
             : [];
         const mainImage = images.find(i => i.is_primary) || images[0] || null;
-        const mainSrc = mainImage ? (mainImage.url || '') : '/img/item.png';
+        const rawMain = mainImage ? (mainImage.url || '') : '';
+        const mainSrc = sanitizeProductImageUrl(rawMain) || '/img/item.png';
 
-        const galleryHtml = images.length > 1
-            ? '<div class="product-gallery">' +
-              images.map(img =>
-                  '<img src="' + (img.url || '') + '" alt="' + (product.name || '') + '" class="product-gallery-item" data-src="' + (img.url || '') + '">'
-              ).join('') +
-              '</div>'
-            : '';
+        const galleryHtml =
+            images.length > 1
+                ? '<div class="product-gallery">' +
+                  images
+                      .map(function (img) {
+                          const u = sanitizeProductImageUrl(img.url || '');
+                          if (!u) return '';
+                          return (
+                              '<img src="' +
+                              escapeAttr(u) +
+                              '" alt="' +
+                              escapeAttr(product.name || '') +
+                              '" class="product-gallery-item" data-src="' +
+                              escapeAttr(u) +
+                              '">'
+                          );
+                      })
+                      .join('') +
+                  '</div>'
+                : '';
 
         const variantsHtml = buildVariantsHtml(product.variants);
         const attributesHtml = buildAttributesHtml(product.attributes);
 
         const artHtml = product.art
-            ? '<p class="product-sku">Артикул: <strong>' + product.art + '</strong></p>'
+            ? '<p class="product-sku">Артикул: <strong>' + escapeHtml(product.art) + '</strong></p>'
             : '';
         const brandHtml = product.brand_name
-            ? '<p class="product-brand">Бренд: <strong>' + product.brand_name + '</strong></p>'
+            ? '<p class="product-brand">Бренд: <strong>' + escapeHtml(product.brand_name) + '</strong></p>'
             : '';
         const seasonHtml = product.season
-            ? '<p class="product-season">Сезон: <strong>' + product.season + '</strong></p>'
+            ? '<p class="product-season">Сезон: <strong>' + escapeHtml(product.season) + '</strong></p>'
             : '';
         const materialsHtml = product.materials
-            ? '<p class="product-materials">Состав: ' + product.materials + '</p>'
+            ? '<p class="product-materials">Состав: ' + escapeHtml(product.materials) + '</p>'
             : '';
 
-        productMainEl.innerHTML = `
-            <div class="product-page">
-                <div class="product-image-block">
-                    <div class="product-image-wrapper">
-                        <img src="${mainSrc}" alt="${product.name || ''}" class="product-image">
-                    </div>
-                    ${galleryHtml}
-                    <div class="product-actions site-product-actions">
-                        <button type="button" class="admin-ui-btn admin-ui-btn--primary product-page-action-btn favorite-action-btn ${isFavorite ? 'in-favorites' : ''}" onclick="toggleFavorite(${product.id}, this)">
-                            ${isFavorite ? 'Удалить из избранного' : 'Добавить в избранное'}
-                        </button>
-                        <button type="button" class="admin-ui-btn admin-ui-btn--primary product-page-action-btn cart-action-btn ${isInCart ? 'in-cart' : ''}" onclick="toggleCart(${product.id}, this)">
-                            ${isInCart ? 'Удалить из корзины' : 'В корзину'}
-                        </button>
-                        <button type="button" class="admin-ui-btn inquire-action-btn" onclick="inquirePrice('${(product.name || '').replace(/'/g, "\\'")}', ${product.id})">
-                            Запросить цену
-                        </button>
-                    </div>
-                </div>
-                <div class="product-info">
-                    <h1 class="product-title">${product.name || ''}</h1>
-                    <p class="product-meta">${genderDisplayLabel(product.gender) || 'Товар'}${product.category_name ? ' · ' + product.category_name : ''}</p>
-                    ${artHtml}
-                    ${brandHtml}
+        const metaGender = genderDisplayLabel(product.gender) || 'Товар';
+        const catPart = product.category_name ? ' · ' + escapeHtml(product.category_name) : '';
 
-                    <div class="product-summary">
-                        <p class="product-description">${product.description || 'Описание товара будет добавлено позже.'}</p>
-                        <div class="product-tags">${tagsHtml || '<span>Нет тегов</span>'}</div>
-                    </div>
+        productMainEl.innerHTML =
+            '<div class="product-page">' +
+            '<div class="product-image-block">' +
+            '<div class="product-image-wrapper">' +
+            '<img src="' +
+            escapeAttr(mainSrc) +
+            '" alt="' +
+            escapeAttr(product.name || '') +
+            '" class="product-image">' +
+            '</div>' +
+            galleryHtml +
+            '<div class="product-actions site-product-actions">' +
+            '<button type="button" class="admin-ui-btn admin-ui-btn--primary product-page-action-btn favorite-action-btn ' +
+            (isFavorite ? 'in-favorites' : '') +
+            '" data-action="product-favorite">' +
+            (isFavorite ? 'Удалить из избранного' : 'Добавить в избранное') +
+            '</button>' +
+            '<button type="button" class="admin-ui-btn admin-ui-btn--primary product-page-action-btn cart-action-btn ' +
+            (isInCart ? 'in-cart' : '') +
+            '" data-action="product-cart">' +
+            (isInCart ? 'Удалить из корзины' : 'В корзину') +
+            '</button>' +
+            '<button type="button" class="admin-ui-btn inquire-action-btn" data-action="product-inquire">Запросить цену</button>' +
+            '</div>' +
+            '</div>' +
+            '<div class="product-info">' +
+            '<h1 class="product-title">' +
+            escapeHtml(product.name || '') +
+            '</h1>' +
+            '<p class="product-meta">' +
+            escapeHtml(metaGender) +
+            catPart +
+            '</p>' +
+            artHtml +
+            brandHtml +
+            '<div class="product-summary">' +
+            '<p class="product-description">' +
+            (product.description
+                ? escapeHtml(product.description)
+                : 'Описание товара будет добавлено позже.') +
+            '</p>' +
+            '</div>' +
+            '<div class="product-specs">' +
+            seasonHtml +
+            materialsHtml +
+            variantsHtml +
+            attributesHtml +
+            '</div>' +
+            '</div>' +
+            '</div>';
 
-                    <div class="product-specs">
-                        ${seasonHtml}
-                        ${materialsHtml}
-                        ${variantsHtml}
-                        ${attributesHtml}
-                        <p class="product-meta">Дата добавления: ${product.created_at ? new Date(product.created_at).toLocaleDateString('ru-RU') : 'не указана'}</p>
-                    </div>
-                </div>
-            </div>
-        `;
+        const favBtn = productMainEl.querySelector('[data-action="product-favorite"]');
+        const cartBtnEl = productMainEl.querySelector('[data-action="product-cart"]');
+        const inqBtn = productMainEl.querySelector('[data-action="product-inquire"]');
+        if (favBtn) {
+            favBtn.addEventListener('click', function () {
+                toggleFavorite(product.id, favBtn);
+            });
+        }
+        if (cartBtnEl) {
+            cartBtnEl.addEventListener('click', function () {
+                toggleCart(product.id, cartBtnEl);
+            });
+        }
+        if (inqBtn) {
+            inqBtn.addEventListener('click', function () {
+                inquirePrice(product.name || '', product.id);
+            });
+        }
 
-        document.title = (product.name || 'Товар').replace(/</g, '') + ' · КПВС';
+        document.title = documentTitleFromProductName(product.name);
         wireProductBackButton(product);
         setupProductBackAlign();
+        setupProductAdaptiveColorRows(productMainEl);
 
         if (images.length > 1) {
             document.querySelectorAll('.product-gallery-item').forEach(thumb => {
@@ -216,46 +398,226 @@ async function loadProduct() {
                 });
             });
         }
+
+        const legacyDlg = document.getElementById('product-colors-dialog');
+        if (legacyDlg && legacyDlg.parentNode) legacyDlg.parentNode.removeChild(legacyDlg);
     } catch (err) {
         console.error('Error loading product:', err);
         if (productMainEl) productMainEl.innerHTML = '<p class="catalog-empty">Ошибка загрузки товара. Попробуйте обновить страницу.</p>';
     }
 }
 
+function colorCountLabelRu(n) {
+    n = Math.max(0, Number(n) || 0);
+    const mod100 = n % 100;
+    const mod10 = n % 10;
+    if (mod100 >= 11 && mod100 <= 14) return n + ' цветов';
+    if (mod10 === 1) return n + ' цвет';
+    if (mod10 >= 2 && mod10 <= 4) return n + ' цвета';
+    return n + ' цветов';
+}
+
+function sizeDisplaySortKey(label) {
+    const v = String(label || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '');
+    const rank = { '2xs': 1, xxs: 1, xs: 2, s: 3, m: 4, l: 5, xl: 6, xxl: 7, '2xl': 7, '3xl': 8 };
+    if (rank[v] != null) return [0, rank[v], String(label)];
+    const num = parseFloat(String(label).replace(',', '.'));
+    if (Number.isFinite(num)) return [1, num, String(label)];
+    return [2, 0, String(label)];
+}
+
+function sortSizeLabels(labels) {
+    return labels.slice().sort(function(a, b) {
+        const ka = sizeDisplaySortKey(a);
+        const kb = sizeDisplaySortKey(b);
+        for (let i = 0; i < 2; i++) {
+            if (ka[i] !== kb[i]) return ka[i] < kb[i] ? -1 : 1;
+        }
+        return String(ka[2]).localeCompare(String(kb[2]), 'ru', { numeric: true });
+    });
+}
+
+function swatchInlineStyle(hex) {
+    const h = String(hex || '').trim();
+    if (/^#[0-9A-Fa-f]{3,8}$/.test(h)) return 'background-color:' + h + ';';
+    if (/^[0-9A-Fa-f]{3,8}$/.test(h)) return 'background-color:#' + h + ';';
+    return '';
+}
+
+function uniqueColorsForSize(activeVariants, sizeLabel) {
+    const map = new Map();
+    activeVariants.forEach(function(v) {
+        if (String(v.size_value || '') !== String(sizeLabel)) return;
+        const name = v.color_name != null ? String(v.color_name).trim() : '';
+        const hex = v.color_hex != null ? String(v.color_hex).trim() : '';
+        if (!name && !hex) return;
+        const key =
+            v.color_id != null && Number.isFinite(Number(v.color_id))
+                ? 'id:' + v.color_id
+                : 'n:' + name + '|' + hex;
+        if (!map.has(key)) map.set(key, { name: name || 'Цвет', hex: hex });
+    });
+    return Array.from(map.values()).sort(function(a, b) {
+        return String(a.name).localeCompare(String(b.name), 'ru');
+    });
+}
+
+function uniqueColorsAll(activeVariants) {
+    const map = new Map();
+    activeVariants.forEach(function(v) {
+        const name = v.color_name != null ? String(v.color_name).trim() : '';
+        const hex = v.color_hex != null ? String(v.color_hex).trim() : '';
+        if (!name && !hex) return;
+        const key =
+            v.color_id != null && Number.isFinite(Number(v.color_id))
+                ? 'id:' + v.color_id
+                : 'n:' + name + '|' + hex;
+        if (!map.has(key)) map.set(key, { name: name || 'Цвет', hex: hex });
+    });
+    return Array.from(map.values()).sort(function(a, b) {
+        return String(a.name).localeCompare(String(b.name), 'ru');
+    });
+}
+
+function renderProductSwatchButton(c) {
+    const name = c.name || '—';
+    const st = swatchInlineStyle(c.hex);
+    const styleAttr = st ? ' style="' + escapeAttr(st) + '"' : '';
+    const cls = 'product-color-swatch' + (st ? '' : ' product-color-swatch--muted');
+    return (
+        '<span class="product-color-swatch-wrap" data-tip="' +
+        escapeAttr(name) +
+        '" title="' +
+        escapeAttr(name) +
+        '">' +
+        '<button type="button" class="' +
+        cls +
+        '"' +
+        styleAttr +
+        ' aria-label="' +
+        escapeAttr(name) +
+        '"></button></span>'
+    );
+}
+
+function renderProductColorOverflowPopover(allColors, headingLine) {
+    const arr = Array.isArray(allColors) ? allColors : [];
+    if (arr.length <= 1) return '';
+    const rows = arr
+        .map(function(c) {
+            const st = swatchInlineStyle(c.hex);
+            const styleAttr = st ? ' style="' + escapeAttr(st) + '"' : '';
+            const dotCls = 'product-color-more-pop-dot' + (st ? '' : ' product-color-more-pop-dot--muted');
+            return (
+                '<div class="product-color-more-pop-row">' +
+                '<span class="' +
+                dotCls +
+                '"' +
+                styleAttr +
+                ' aria-hidden="true"></span>' +
+                '<span class="product-color-more-pop-name">' +
+                escapeHtml(c.name || '—') +
+                '</span></div>'
+            );
+        })
+        .join('');
+    const head =
+        headingLine && String(headingLine).trim()
+            ? '<span class="product-color-more-pop-heading">' + escapeHtml(String(headingLine).trim()) + '</span>'
+            : '';
+    return (
+        '<span class="product-color-more-wrap" hidden>' +
+        '<button type="button" class="product-color-more-circle" aria-label="Показать скрытые цвета">+0</button>' +
+        '<span class="product-color-more-popover" role="tooltip">' +
+        head +
+        rows +
+        '</span></span>'
+    );
+}
+
+function buildProductColorsAdaptiveRow(colors, headingLine) {
+    const arr = Array.isArray(colors) ? colors : [];
+    if (!arr.length) return '';
+    let row = '';
+    arr.forEach(function(c) {
+        row += renderProductSwatchButton(c);
+    });
+    const overflow = renderProductColorOverflowPopover(arr, headingLine);
+    const total =
+        '<span class="product-size-colors-total" title="Всего оттенков">' + escapeHtml(colorCountLabelRu(arr.length)) + '</span>';
+    return (
+        '<div class="product-size-colors-adaptive">' +
+        '<div class="product-size-colors-track">' +
+        row +
+        '</div>' +
+        overflow +
+        total +
+        '</div>'
+    );
+}
+
 function buildVariantsHtml(variants) {
     if (!Array.isArray(variants) || !variants.length) return '';
 
+    const active = variants.filter(function(v) {
+        return v.is_active !== false;
+    });
+    if (!active.length) return '';
+
     const bySize = {};
-    const byColor = {};
-    variants.forEach(v => {
-        if (v.size_value) {
-            if (!bySize[v.size_value]) bySize[v.size_value] = [];
-            bySize[v.size_value].push(v);
-        }
-        if (v.color_name) {
-            if (!byColor[v.color_name]) byColor[v.color_name] = { hex: v.color_hex, variants: [] };
-            byColor[v.color_name].variants.push(v);
+    active.forEach(function(v) {
+        if (!v.size_value) return;
+        if (!bySize[v.size_value]) {
+            bySize[v.size_value] = { hint: v.size_equivalent_hint ? String(v.size_equivalent_hint) : '' };
+        } else if (!bySize[v.size_value].hint && v.size_equivalent_hint) {
+            bySize[v.size_value].hint = String(v.size_equivalent_hint);
         }
     });
 
     let html = '<div class="product-variants">';
+    const sizes = sortSizeLabels(Object.keys(bySize));
 
-    const sizes = Object.keys(bySize);
     if (sizes.length) {
-        html += '<div class="product-spec-group"><p class="product-spec-heading">Размеры</p><ul class="product-size-list">';
-        sizes.forEach(size => { html += '<li>' + size + '</li>'; });
-        html += '</ul></div>';
-    }
-
-    const colors = Object.keys(byColor);
-    if (colors.length) {
-        html += '<div class="product-spec-group"><p class="product-spec-heading">Цвета</p><div class="product-colors">';
-        colors.forEach(colorName => {
-            const hex = byColor[colorName].hex;
-            const style = hex ? 'background:' + hex + ';' : '';
-            html += '<span class="product-color-swatch" title="' + colorName + '" style="' + style + 'display:inline-block;width:20px;height:20px;border-radius:50%;border:1px solid #ccc;margin-right:4px;"></span>';
+        html +=
+            '<div class="product-spec-group product-spec-group--sizes-colors">' +
+            '<p class="product-spec-heading">Размеры и цвета</p>' +
+            '<ul class="product-size-color-list">';
+        sizes.forEach(function(size) {
+            const meta = bySize[size];
+            const hint = meta && meta.hint ? ' <span class="product-size-equiv">≈ ' + escapeHtml(meta.hint) + '</span>' : '';
+            const colors = uniqueColorsForSize(active, size);
+            let chips = '';
+            if (!colors.length) {
+                chips = '<span class="product-size-colors-empty">цвет не указан</span>';
+            } else {
+                chips = buildProductColorsAdaptiveRow(colors, 'Размер ' + size);
+            }
+            html +=
+                '<li class="product-size-color-row">' +
+                '<span class="product-size-color-label">' +
+                escapeHtml(size) +
+                hint +
+                '</span>' +
+                '<div class="product-size-colors">' +
+                chips +
+                '</div>' +
+                '</li>';
         });
-        html += '</div></div>';
+        html += '</ul></div>';
+    } else {
+        const flat = uniqueColorsAll(active);
+        if (flat.length) {
+            html +=
+                '<div class="product-spec-group product-spec-group--sizes-colors">' +
+                '<p class="product-spec-heading">Цвета</p>' +
+                '<div class="product-size-color-row product-size-color-row--solo">' +
+                '<div class="product-size-colors">' +
+                buildProductColorsAdaptiveRow(flat, 'Все цвета') +
+                '</div></div></div>';
+        }
     }
 
     html += '</div>';
@@ -266,7 +628,13 @@ function buildAttributesHtml(attributes) {
     if (!Array.isArray(attributes) || !attributes.length) return '';
     let html = '<div class="product-attributes"><p class="product-spec-heading">Характеристики</p><ul class="product-attr-list">';
     attributes.forEach(attr => {
-        html += '<li><span class="attr-name">' + attr.name + ':</span> <span class="attr-value">' + attr.value + '</span></li>';
+        if (!attr || (!attr.name && !attr.value)) return;
+        html +=
+            '<li><span class="attr-name">' +
+            escapeHtml(attr.name) +
+            ':</span> <span class="attr-value">' +
+            escapeHtml(attr.value) +
+            '</span></li>';
     });
     html += '</ul></div>';
     return html;
@@ -287,7 +655,9 @@ function getProductImage(product) {
     if (!product) return '/img/item.png';
     if (Array.isArray(product.images) && product.images.length) {
         const primary = product.images.find(i => i.is_primary) || product.images[0];
-        return primary ? (primary.url || '') : '/img/item.png';
+        const u = primary ? (primary.url || '') : '';
+        const clean = sanitizeProductImageUrl(u);
+        return clean || '/img/item.png';
     }
     return '/img/item.png';
 }
@@ -310,10 +680,12 @@ function refreshProductButtons() {
 }
 
 function toggleCart(productId, buttonElement) {
+    const id = Number(productId);
+    if (!Number.isFinite(id)) return;
     let cart = getCart();
-    const idx = cart.findIndex(i => i.id === productId);
+    const idx = cart.findIndex(i => Number(i.id) === id);
     if (idx === -1) {
-        cart.push({ id: productId, source: 'product' });
+        cart.push({ id, source: 'product' });
         localStorage.setItem('cart', JSON.stringify(cart));
         if (buttonElement) { buttonElement.textContent = 'Удалить из корзины'; buttonElement.classList.add('in-cart'); }
     } else {
@@ -322,6 +694,13 @@ function toggleCart(productId, buttonElement) {
         if (buttonElement) { buttonElement.textContent = 'В корзину'; buttonElement.classList.remove('in-cart'); }
     }
     refreshProductButtons();
+    document.querySelectorAll('#kpvs-favorites-modal [data-action="toggle-cart"]').forEach(btn => {
+        const pid = Number(btn.dataset && btn.dataset.productId);
+        if (!Number.isFinite(pid)) return;
+        const inCart = getCart().some(i => Number(i.id) === pid);
+        btn.textContent = inCart ? 'Удалить из корзины' : 'В корзину';
+        btn.classList.toggle('in-cart', inCart);
+    });
 }
 
 function toggleCartFromModal(productId, buttonElement) {
@@ -351,8 +730,17 @@ function removeFromFavorites(productId) {
 }
 
 function removeFromCart(productId) {
-    localStorage.setItem('cart', JSON.stringify(getCart().filter(i => i.id !== productId)));
+    const id = Number(productId);
+    if (!Number.isFinite(id)) return;
+    localStorage.setItem('cart', JSON.stringify(getCart().filter(i => Number(i.id) !== id)));
     refreshProductButtons();
+    document.querySelectorAll('#kpvs-favorites-modal [data-action="toggle-cart"]').forEach(btn => {
+        const pid = Number(btn.dataset && btn.dataset.productId);
+        if (!Number.isFinite(pid)) return;
+        const inCart = getCart().some(i => Number(i.id) === pid);
+        btn.textContent = inCart ? 'Удалить из корзины' : 'В корзину';
+        btn.classList.toggle('in-cart', inCart);
+    });
 }
 
 function getFavorites() {
@@ -422,29 +810,53 @@ function openFavoritesModal() {
     }
 
     getProductsByIds(ids).then(products => {
-        modal.innerHTML = `
-            <div class="modal-content modal-content--cart-favorites">
-                <div class="modal-header"><h2>Избранное</h2><button type="button" class="modal-close ui-xbtn" onclick="kpvsDismissTopModal(this)" aria-label="Закрыть">&times;</button></div>
-                <div class="modal-body">
-                    <div class="modal-items">
-                        ${products.filter(p => p && p.id).map(p => {
-                            const isInCart = getCart().some(i => i.id === p.id);
-                            const imgSrc = getProductImage(p);
-                            return `
-                            <div class="modal-item" data-product-id="${p.id}">
-                                <img src="${imgSrc}" alt="${p.name || 'Товар'}" class="modal-item-img">
-                                <div class="modal-item-info">
-                                    <h3>${p.name || 'Товар'}</h3>
-                                    <div class="modal-item-actions">
-                                        <button class="btn-add-to-cart ${isInCart ? 'in-cart' : ''}" data-action="toggle-cart" data-product-id="${p.id}">${isInCart ? 'Удалить из корзины' : 'В корзину'}</button>
-                                        <button class="btn-remove" data-action="remove-favorite" data-product-id="${p.id}">Удалить</button>
-                                    </div>
-                                </div>
-                            </div>`;
-                        }).join('')}
-                    </div>
-                </div>
-            </div>`;
+        const itemsHtml = products
+            .filter(function (p) {
+                return p && p.id;
+            })
+            .map(function (p) {
+                const isInCart = getCart().some(function (i) {
+                    return i.id === p.id;
+                });
+                const imgSrc = getProductImage(p);
+                const safeSrc = escapeAttr(imgSrc);
+                const disp = escapeHtml(p.name || 'Товар');
+                const altA = escapeAttr(p.name || 'Товар');
+                const pid = Number(p.id);
+                return (
+                    '<div class="modal-item" data-product-id="' +
+                    pid +
+                    '">' +
+                    '<img src="' +
+                    safeSrc +
+                    '" alt="' +
+                    altA +
+                    '" class="modal-item-img">' +
+                    '<div class="modal-item-info">' +
+                    '<h3>' +
+                    disp +
+                    '</h3>' +
+                    '<div class="modal-item-actions">' +
+                    '<button type="button" class="admin-ui-btn admin-ui-btn--primary admin-ui-btn--sm ' +
+                    (isInCart ? 'in-cart' : '') +
+                    '" data-action="toggle-cart" data-product-id="' +
+                    pid +
+                    '">' +
+                    (isInCart ? 'Удалить из корзины' : 'В корзину') +
+                    '</button>' +
+                    '<button type="button" class="admin-ui-btn admin-ui-btn--danger admin-ui-btn--sm" data-action="remove-favorite" data-product-id="' +
+                    pid +
+                    '">Удалить</button>' +
+                    '</div></div></div>'
+                );
+            })
+            .join('');
+        modal.innerHTML =
+            '<div class="modal-content modal-content--cart-favorites">' +
+            '<div class="modal-header"><h2>Избранное</h2><button type="button" class="modal-close ui-xbtn" onclick="kpvsDismissTopModal(this)" aria-label="Закрыть">&times;</button></div>' +
+            '<div class="modal-body"><div class="modal-items">' +
+            itemsHtml +
+            '</div></div></div>';
         document.body.appendChild(modal);
         if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
         setTimeout(() => modal.classList.add('show'), 10);
@@ -494,30 +906,47 @@ function openCartModal() {
     }
 
     getProductsByIds(ids).then(products => {
-        modal.innerHTML = `
-            <div class="modal-content modal-content--cart-favorites">
-                <div class="modal-header"><h2>Корзина</h2><button type="button" class="modal-close ui-xbtn" onclick="kpvsDismissTopModal(this)" aria-label="Закрыть">&times;</button></div>
-                <div class="modal-body">
-                    <div class="modal-items">
-                        ${products.filter(p => p && p.id).map(p => {
-                            const imgSrc = getProductImage(p);
-                            return `
-                            <div class="modal-item" data-product-id="${p.id}">
-                                <img src="${imgSrc}" alt="${p.name || 'Товар'}" class="modal-item-img">
-                                <div class="modal-item-info">
-                                    <h3>${p.name || 'Товар'}</h3>
-                                    <div class="modal-item-actions">
-                                        <button class="btn-remove" data-action="remove-from-cart" data-product-id="${p.id}">Удалить</button>
-                                    </div>
-                                </div>
-                            </div>`;
-                        }).join('')}
-                    </div>
-                    <div class="cart-actions">
-                        <button type="button" class="cart-inquire-btn" onclick="kpvsDismissTopModal(this); inquirePriceFromCart();">Узнать цену на все товары</button>
-                    </div>
-                </div>
-            </div>`;
+        const itemsHtml = products
+            .filter(function (p) {
+                return p && p.id;
+            })
+            .map(function (p) {
+                const imgSrc = getProductImage(p);
+                const safeSrc = escapeAttr(imgSrc);
+                const disp = escapeHtml(p.name || 'Товар');
+                const altA = escapeAttr(p.name || 'Товар');
+                const pid = Number(p.id);
+                return (
+                    '<div class="modal-item" data-product-id="' +
+                    pid +
+                    '">' +
+                    '<img src="' +
+                    safeSrc +
+                    '" alt="' +
+                    altA +
+                    '" class="modal-item-img">' +
+                    '<div class="modal-item-info">' +
+                    '<h3>' +
+                    disp +
+                    '</h3>' +
+                    '<div class="modal-item-actions">' +
+                    '<button type="button" class="admin-ui-btn admin-ui-btn--danger admin-ui-btn--sm" data-action="remove-from-cart" data-product-id="' +
+                    pid +
+                    '">Удалить</button>' +
+                    '</div></div></div>'
+                );
+            })
+            .join('');
+        modal.innerHTML =
+            '<div class="modal-content modal-content--cart-favorites">' +
+            '<div class="modal-header"><h2>Корзина</h2><button type="button" class="modal-close ui-xbtn" onclick="kpvsDismissTopModal(this)" aria-label="Закрыть">&times;</button></div>' +
+            '<div class="modal-body">' +
+            '<div class="modal-items">' +
+            itemsHtml +
+            '</div>' +
+            '<div class="cart-actions">' +
+            '<button type="button" class="cart-inquire-btn" data-action="cart-inquire-all">Узнать цену на все товары</button>' +
+            '</div></div></div>';
         document.body.appendChild(modal);
         if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
         setTimeout(() => modal.classList.add('show'), 10);
@@ -534,6 +963,14 @@ function openCartModal() {
                 }
             });
         });
+        const inquireAll = modal.querySelector('[data-action="cart-inquire-all"]');
+        if (inquireAll) {
+            inquireAll.addEventListener('click', function (e) {
+                e.stopPropagation();
+                window.kpvsDismissTopModal(modal);
+                inquirePriceFromCart();
+            });
+        }
     });
 }
 

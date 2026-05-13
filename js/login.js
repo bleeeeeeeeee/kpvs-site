@@ -465,7 +465,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     try {
         if (mode === 'admin') {
-            const r = await fetch('/api/auth/me');
+            const r = await fetch('/api/auth/me', { credentials: 'include' });
             if (r.ok) {
                 window.location.replace(next || '/admin.html');
                 return;
@@ -543,6 +543,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (mode === 'admin') {
                 const res = await fetch('/api/auth/login', {
                     method: 'POST',
+                    credentials: 'include',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ username, password })
                 });

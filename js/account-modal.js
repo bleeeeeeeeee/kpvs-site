@@ -23,13 +23,6 @@
         if (t) setTheme(t);
     }
 
-    function loadCurrency() {
-        if (window.KpvsCurrency && typeof window.KpvsCurrency.getSelectedCurrency === 'function') {
-            return window.KpvsCurrency.getSelectedCurrency();
-        }
-        return 'BYN';
-    }
-
     function openLogin(nextPath) {
         var p = nextPath || window.location.pathname;
         window.location.href = '/login.html?mode=user&next=' + encodeURIComponent(p);
@@ -53,7 +46,10 @@
     function collapseAccountPasswordPanel(built) {
         if (!built) return;
         if (built.pwdPanel) built.pwdPanel.hidden = true;
-        if (built.btnPwdToggle) built.btnPwdToggle.setAttribute('aria-expanded', 'false');
+        if (built.btnPwdToggle) {
+            built.btnPwdToggle.setAttribute('aria-expanded', 'false');
+            built.btnPwdToggle.hidden = false;
+        }
     }
 
     /** Первая установка пароля — блок «текущий пароль» вне DOM; смена пароля — снова в панели первым. */
@@ -417,14 +413,6 @@
 
         var settings = ce('div', 'account-settings');
 
-        var sCurrency = ce('label', 'account-setting account-setting--select');
-        var sCurrencyLeft = ce('span', 'account-setting-label');
-        sCurrencyLeft.textContent = 'Валюта';
-        var sCurrencySelect = ce('select', 'account-select');
-        sCurrencySelect.innerHTML = '<option value="BYN">BYN</option><option value="RUB">RUB</option><option value="USD">USD</option><option value="EUR">EUR</option>';
-        sCurrency.appendChild(sCurrencyLeft);
-        sCurrency.appendChild(sCurrencySelect);
-
         var sTheme = ce('div', 'account-setting account-setting--tabs');
         var sThemeLeft = ce('span', 'account-setting-label');
         sThemeLeft.textContent = 'Тема';
@@ -453,14 +441,14 @@
 
         var sPersist = ce('label', 'account-setting');
         var sPersistLeft = ce('span', 'account-setting-label');
-        sPersistLeft.textContent = 'Запоминать фильтры и поиск';
+        sPersistLeft.textContent = 'Запоминать фильтры, поиск и подборки';
         var sPersistToggle = ce('input');
         sPersistToggle.type = 'checkbox';
         sPersistToggle.className = 'account-setting-toggle';
+        sPersistToggle.id = 'account-persist-filters';
         sPersist.appendChild(sPersistLeft);
         sPersist.appendChild(sPersistToggle);
 
-        settings.appendChild(sCurrency);
         settings.appendChild(sTheme);
         settings.appendChild(sPersist);
 
@@ -549,13 +537,13 @@
         return {
             modal: modal,
             close: close,
+            avatar: avatar,
             name: name,
             emailLine: emailLine,
             hint: hint,
             status: status,
             btnLogout: btnLogout,
             btnLogin: btnLogin,
-            sCurrencySelect: sCurrencySelect,
             themeLightBtn: themeLightBtn,
             themeDarkBtn: themeDarkBtn,
             sPersistToggle: sPersistToggle,
@@ -589,16 +577,16 @@
             modalState = {
                 modal: existing,
                 close: qs('.modal-close', existing),
+                avatar: qs('.account-avatar', existing),
                 name: qs('.account-name', existing),
                 emailLine: qs('#account-email', existing),
                 hint: qs('.account-hint', existing),
                 status: qs('.account-status', existing),
                 btnLogout: qs('.admin-ui-btn--danger.account-action-btn', existing),
                 btnLogin: qs('.admin-ui-btn--primary.account-action-btn', existing),
-                sCurrencySelect: qs('.account-select', existing),
                 themeLightBtn: qs('#account-theme-light', existing),
                 themeDarkBtn: qs('#account-theme-dark', existing),
-                sPersistToggle: qsAllFallback('.account-setting-toggle', 1, existing),
+                sPersistToggle: qs('#account-persist-filters', existing) || qsAllFallback('.account-setting-toggle', 0, existing),
                 btnRename: qs('.account-rename-pencil-btn', existing),
                 loginPencilGroup: qs('.account-login-pencil-group', existing),
                 renameEditor: qs('.account-rename-editor', existing),
@@ -629,6 +617,29 @@
             modalState.__wired = true;
         }
         return modalState;
+    }
+
+    function syncAccountAvatar(built, textSource) {
+        if (!built || !built.avatar) return;
+        var raw = textSource != null ? String(textSource).trim() : '';
+        var ch = '?';
+        if (raw.length) {
+            var arr = [];
+            try {
+                arr = Array.from(raw);
+            } catch (e) {
+                arr = raw.split('');
+            }
+            ch = arr[0] || '?';
+            try {
+                ch = String(ch).toLocaleUpperCase('ru-RU');
+            } catch (e2) {
+                try {
+                    ch = String(ch).toUpperCase();
+                } catch (e3) {}
+            }
+        }
+        built.avatar.textContent = ch;
     }
 
     function showModal(built) {
@@ -689,6 +700,7 @@
             if (on && built.pwdPanel && built.btnPwdToggle) {
                 built.pwdPanel.hidden = true;
                 built.btnPwdToggle.setAttribute('aria-expanded', 'false');
+                built.btnPwdToggle.hidden = false;
             }
             if (on) {
                 setTimeout(function () {
@@ -704,6 +716,7 @@
             if (!built.pwdPanel || !built.btnPwdToggle) return;
             built.pwdPanel.hidden = !on;
             built.btnPwdToggle.setAttribute('aria-expanded', on ? 'true' : 'false');
+            built.btnPwdToggle.hidden = !!on;
             if (on) setRenameMode(false);
             if (on) {
                 setTimeout(function () {
@@ -774,6 +787,7 @@
                             built.name.textContent = nextName;
                             built.lastUsername = nextName;
                         }
+                        syncAccountAvatar(built, built.lastUsername);
                         if (built.emailLine && res.json && res.json.user) {
                             var de = resolveDisplayEmail(res.json.user);
                             if (de) {
@@ -876,7 +890,6 @@
 
         // Settings
         loadTheme();
-        var currency = loadCurrency();
         (function () {
             function setSelected(theme) {
                 var t = theme === 'dark' ? 'dark' : 'light';
@@ -889,33 +902,19 @@
             if (built.themeDarkBtn) built.themeDarkBtn.addEventListener('click', function () { setTheme('dark'); setSelected('dark'); });
         })();
 
-        if (built.sCurrencySelect) {
-            built.sCurrencySelect.value = currency;
-            built.sCurrencySelect.addEventListener('change', function () {
-                if (window.KpvsCurrency && typeof window.KpvsCurrency.setSelectedCurrency === 'function') {
-                    window.KpvsCurrency.setSelectedCurrency(built.sCurrencySelect.value);
-                    // try refresh rates, but keep cached on failure
-                    if (typeof window.KpvsCurrency.ensureRates === 'function') {
-                        window.KpvsCurrency.ensureRates({ force: true }).finally(function () {
-                            try { window.location.reload(); } catch {}
-                        });
-                        return;
-                    }
-                }
-                try { window.location.reload(); } catch {}
+        var persistKey = 'kpvs.catalog.persist';
+        if (built.sPersistToggle) {
+            try { built.sPersistToggle.checked = localStorage.getItem(persistKey) !== '0'; } catch { built.sPersistToggle.checked = true; }
+            built.sPersistToggle.addEventListener('change', function () {
+                try { localStorage.setItem(persistKey, built.sPersistToggle.checked ? '1' : '0'); } catch {}
             });
         }
-
-        var persistKey = 'kpvs.catalog.persist';
-        try { built.sPersistToggle.checked = localStorage.getItem(persistKey) !== '0'; } catch { built.sPersistToggle.checked = true; }
-        built.sPersistToggle.addEventListener('change', function () {
-            try { localStorage.setItem(persistKey, built.sPersistToggle.checked ? '1' : '0'); } catch {}
-        });
     }
 
     function renderLoading(built) {
         built.lastUsername = '';
         built.name.textContent = '…';
+        syncAccountAvatar(built, '');
         built.hint.textContent = '';
         if (built.status) {
             built.status.textContent = '';
@@ -939,6 +938,7 @@
     function renderAuthed(built, me, pwdHintMessage) {
         built.lastUsername = me && me.username ? String(me.username) : '';
         built.name.textContent = built.lastUsername || 'Пользователь';
+        syncAccountAvatar(built, built.lastUsername || built.name.textContent);
         if (built.emailLine) {
             var dispEmail = resolveDisplayEmail(me);
             if (dispEmail) {
@@ -965,7 +965,7 @@
             if (built.renameWrap) built.renameWrap.classList.remove('account-rename-wrap--editing');
             if (built.name) built.name.hidden = false;
         }
-        if (built.btnPwdToggle) { built.btnPwdToggle.disabled = false; built.btnPwdToggle.style.display = ''; }
+        if (built.btnPwdToggle) { built.btnPwdToggle.disabled = false; built.btnPwdToggle.style.display = ''; built.btnPwdToggle.hidden = false; }
         if (built.pwdPanel) built.pwdPanel.hidden = true;
         if (built.btnPwdToggle) built.btnPwdToggle.setAttribute('aria-expanded', 'false');
 
@@ -994,6 +994,7 @@
     function renderGuest(built) {
         built.lastUsername = '';
         built.name.textContent = 'Гость';
+        syncAccountAvatar(built, 'Гость');
         built.hint.textContent = 'Войдите, чтобы сохранять избранное и быстрее оформлять заявки';
         if (built.status) {
             built.status.hidden = false;
@@ -1049,10 +1050,6 @@
     document.addEventListener('DOMContentLoaded', function () {
         bindTriggers();
         loadTheme();
-        loadCurrency();
-        if (window.KpvsCurrency && typeof window.KpvsCurrency.ensureRates === 'function') {
-            window.KpvsCurrency.ensureRates({ force: false });
-        }
         setTimeout(function () { maybeShowOAuthPasswordPrompt(); }, 0);
     });
 })();

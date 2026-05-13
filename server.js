@@ -17,12 +17,24 @@ const GoogleStrategy = require('passport-google-oauth20').Strategy;
 
 const {
     pool,
+    publicMediaUrl,
     connectDB,
     getCategories,
     getBrands,
+    createBrand,
     getSizes,
+    getSizeTypes,
+    getCategorySizeTypeLinks,
+    createSize,
+    ensureSizesUniqueValueIndex,
+    ensureReferenceSizesSeed,
     getColors,
-    getTags,
+    getCollections,
+    getCollectionsAdmin,
+    getSectionCollectionsWithProducts,
+    createCollection,
+    updateCollection,
+    deleteCollection,
     getProducts,
     getProduct,
     createProduct,
@@ -37,6 +49,14 @@ const {
     findUserByEmail,
     findUserById,
     ensureUserAuthSchema,
+    ensureProductsEditorColumn,
+    ensureCollectionsSchema,
+    ensureCategorySizeTypesSchema,
+    ensureSizeGroupsSchema,
+    listSizeGroups,
+    createSizeGroup,
+    deleteSizeGroup,
+    listSizeEquivalenceBuckets,
     upsertOAuthUser,
     ensureDefaultUsers,
     listUsers,
@@ -47,20 +67,57 @@ const {
     insertPasswordResetToken,
     consumePasswordResetToken,
     changeUsername,
-    setUserRole
-    ,deleteUserById
-    ,insertEmailVerificationCode
-    ,getLatestEmailVerification
-    ,consumeEmailVerificationCode
+    setUserRole,
+    deleteUserById,
+    insertEmailVerificationCode,
+    getLatestEmailVerification,
+    consumeEmailVerificationCode
 } = require('./db');
 
+const isProduction = process.env.NODE_ENV === 'production';
+const allowDebugNdjsonRoute = !isProduction;
 const app = express();
+if (String(process.env.TRUST_PROXY || '').trim() === '1') {
+    app.set('trust proxy', 1);
+}
 const PORT = Number(process.env.PORT || 3000);
-const SESSION_SECRET = process.env.SESSION_SECRET || 'kpvs-secret-change-in-production';
+if (isProduction && (!process.env.SESSION_SECRET || String(process.env.SESSION_SECRET).length < 24)) {
+    console.error('FATAL: In production set SESSION_SECRET (at least 24 characters).');
+    process.exit(1);
+}
+const SESSION_SECRET = process.env.SESSION_SECRET || 'kpvs-dev-session-secret';
 const JWT_SECRET = process.env.JWT_SECRET || SESSION_SECRET;
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 const GOOGLE_CALLBACK_URL = process.env.GOOGLE_CALLBACK_URL || `http://localhost:${PORT}/api/user/oauth/google/callback`;
+
+function sanitizeOAuthNextPath(raw) {
+    const s = String(raw || '').trim();
+    if (!s.startsWith('/') || s.startsWith('//')) return '/welcome.html';
+    if (s.includes('\0') || s.includes('\\')) return '/welcome.html';
+    if (s.length > 512) return '/welcome.html';
+    const pathOnly = s.split('?')[0];
+    if (/[\s<>"'`]/.test(pathOnly)) return '/welcome.html';
+    return s;
+}
+
+function isSafeProductImageUrl(url) {
+    const s = String(url || '').trim();
+    if (!s || s.length > 2048) return false;
+    const head = s.slice(0, 16).toLowerCase();
+    if (head.startsWith('javascript:') || head.startsWith('data:') || head.startsWith('vbscript:')) return false;
+    if (s.startsWith('/')) return !s.startsWith('//');
+    if (/^https?:\/\//i.test(s)) {
+        try {
+            const u = new URL(s);
+            if (u.username || u.password) return false;
+            return u.protocol === 'http:' || u.protocol === 'https:';
+        } catch {
+            return false;
+        }
+    }
+    return false;
+}
 
 app.use(cors({ origin: false }));
 app.use(express.json());
@@ -77,7 +134,8 @@ app.use(session({
     cookie: {
         maxAge: 8 * 60 * 60 * 1000,
         httpOnly: true,
-        sameSite: 'lax'
+        sameSite: 'lax',
+        secure: String(process.env.COOKIE_SECURE || '').toLowerCase() === 'true'
     }
 }));
 
@@ -89,11 +147,8 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
         clientID: GOOGLE_CLIENT_ID,
         clientSecret: GOOGLE_CLIENT_SECRET,
         callbackURL: GOOGLE_CALLBACK_URL,
-        // Рекомендуемый OIDC userinfo (passport по умолчанию — oauth2/v3/userinfo).
         userProfileURL: 'https://openidconnect.googleapis.com/v1/userinfo'
     }, (accessToken, refreshToken, params, profile, done) => {
-        // ВАЖНО: arity === 5 — иначе passport-oauth2 передаёт (accessToken, refreshToken, profile, done)
-        // и второй аргумент станет «profile», accessToken потеряется, userinfo/id_token не сработают.
         if (!profile || !profile.id) return done(new Error('google_profile_incomplete'));
         done(null, {
             profile,
@@ -105,10 +160,12 @@ if (GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET) {
 
 app.use(passport.initialize());
 
-app.use((req, res, next) => {
-    console.log(`${req.method} ${req.originalUrl}`);
-    next();
-});
+if (!isProduction) {
+    app.use((req, res, next) => {
+        console.log(`${req.method} ${req.originalUrl}`);
+        next();
+    });
+}
 
 function requireAuth(req, res, next) {
     if (req.session && req.session.user) return next();
@@ -172,11 +229,27 @@ function sendHtmlError(res, statusCode) {
 
 app.get('/', (req, res) => res.redirect('/welcome.html'));
 
+if (allowDebugNdjsonRoute) {
+    const KPVS_DEBUG_LOG_FILE = path.join(__dirname, '.cursor', 'debug-575784.log');
+    app.post('/api/__debug_ndjson', (req, res) => {
+        try {
+            const body = req.body;
+            if (body && typeof body === 'object') {
+                fs.mkdirSync(path.dirname(KPVS_DEBUG_LOG_FILE), { recursive: true });
+                fs.appendFileSync(KPVS_DEBUG_LOG_FILE, JSON.stringify(body) + '\n', 'utf8');
+            }
+        } catch (_) {}
+        res.status(204).end();
+    });
+}
+
 app.post('/api/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body || {};
-        if (!username || !password) return res.status(400).json({ error: 'Укажите логин и пароль' });
-        const user = await verifyUser(String(username).trim(), String(password));
+        const u = String(username || '').trim();
+        const p = String(password || '').trim();
+        if (!u || !p) return res.status(400).json({ error: 'Укажите логин и пароль' });
+        const user = await verifyUser(u, p);
         if (!user) return res.status(401).json({ error: 'Неверный логин или пароль' });
         if (user.role === 'user') return res.status(403).json({ error: 'Доступ запрещён' });
         req.session.user = user;
@@ -228,7 +301,7 @@ app.post('/api/user/auth/register', async (req, res) => {
 app.post('/api/user/auth/login', async (req, res) => {
     try {
         const { username, password } = req.body || {};
-        const u = String(username || '').trim(); // may be username OR email
+        const u = String(username || '').trim();
         const p = String(password || '');
         if (!u || !p) return res.status(400).json({ error: 'Укажите логин и пароль' });
         const user = await verifyUserByLogin(u, p);
@@ -294,8 +367,6 @@ app.get('/api/user/auth/me', requireUserJwt, async (req, res) => {
     }
 });
 
-// Change username for the currently authenticated storefront user.
-// Returns a refreshed JWT because username is embedded into the token payload.
 app.patch('/api/user/auth/username', requireUserJwt, async (req, res) => {
     try {
         const id = Number(req.userJwt.sub);
@@ -303,7 +374,6 @@ app.patch('/api/user/auth/username', requireUserJwt, async (req, res) => {
         const row = await findUserById(id);
         if (!row) return res.status(404).json({ error: 'Пользователь не найден' });
         if (!row.is_active) return res.status(403).json({ error: 'Аккаунт отключён' });
-        // Storefront self-service rename: only role `user` (not admin sessions / staff accounts).
         if (String(row.role || '') !== 'user') {
             return res.status(403).json({ error: 'Смена логина доступна только для клиентского аккаунта' });
         }
@@ -377,7 +447,6 @@ function isValidEmail(e) {
     return !!e && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
 }
 
-/** Email из id_token (Google OIDC). iss/aud проверяем; email_verified — только явный false отклоняем. */
 function extractEmailFromGoogleIdToken(idToken, clientId) {
     if (!idToken || typeof idToken !== 'string') return null;
     const cid = String(clientId || '').trim();
@@ -400,7 +469,6 @@ function extractEmailFromGoogleIdToken(idToken, clientId) {
     }
 }
 
-/** Email из ответа Google (passport-google-oauth20): разные формы профиля. */
 function extractGoogleProfileEmail(profile) {
     if (!profile) return null;
     const seen = new Set();
@@ -450,7 +518,6 @@ function extractGoogleProfileEmail(profile) {
     return ordered.length ? ordered[0] : null;
 }
 
-/** Запасной путь: userinfo по access token (Bearer). */
 function fetchGoogleUserinfoEmail(accessToken) {
     return new Promise((resolve) => {
         const tok = String(accessToken || '').trim();
@@ -523,7 +590,6 @@ async function resolveGoogleLoginEmail(ctx) {
     return email || null;
 }
 
-/** Email для профиля API: колонка `email`, иначе при пустом — логин, если он выглядит как email (старые записи). */
 function emailForProfile(row) {
     if (!row) return null;
     const stored = row.email != null ? normalizeEmail(row.email) : '';
@@ -533,7 +599,6 @@ function emailForProfile(row) {
     return null;
 }
 
-/** Email в списке пользователей админки: как в профиле (`emailForProfile`), иначе нормализованное значение колонки `email` (в т.ч. Buffer из pg). */
 function emailForAdminUserList(row) {
     if (!row) return null;
     const p = emailForProfile(row);
@@ -604,8 +669,8 @@ app.post('/api/user/auth/email-code', async (req, res) => {
         if (!isValidEmail(e)) return res.status(400).json({ error: 'Укажите корректный email' });
         if (!['register'].includes(p)) return res.status(400).json({ error: 'Некорректный запрос' });
 
-        const already = await pool.query('SELECT id FROM users WHERE email = $1 LIMIT 1', [e]);
-        if (already.rows && already.rows.length) {
+        const already = await findUserByEmail(e);
+        if (already) {
             return res.status(409).json({
                 error: 'Этот email уже занят (в том числе если входили через Google). Войдите через Google или задайте пароль в аккаунте.'
             });
@@ -626,10 +691,9 @@ app.post('/api/user/auth/email-code', async (req, res) => {
 
         try {
             const sent = await trySendEmailVerificationCode(e, code);
-            if (!sent) console.log('[email-verify] email disabled. code=', code, 'email=', e);
+            if (!sent) console.warn('[email-verify] SMTP not configured; code was not sent by email');
         } catch (mailErr) {
-            console.error('[email-verify] send failed:', mailErr);
-            console.log('[email-verify] fallback code=', code, 'email=', e);
+            console.error('[email-verify] send failed:', mailErr && mailErr.message ? mailErr.message : mailErr);
         }
         res.json({ ok: true });
     } catch (err) {
@@ -667,7 +731,7 @@ app.post('/api/user/auth/recover', async (req, res) => {
 
         const rawToken = crypto.randomBytes(32).toString('hex');
         const tokenHash = sha256Hex(rawToken);
-        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1h
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
         await insertPasswordResetToken(Number(row.id), tokenHash, expiresAt);
 
         const base = process.env.APP_BASE_URL || `http://localhost:${PORT}`;
@@ -676,15 +740,13 @@ app.post('/api/user/auth/recover', async (req, res) => {
         try {
             const sent = await trySendResetEmail(e, link);
             if (!sent) {
-                console.log('[password-recover] SMTP не настроен, ссылка для разработки:', link);
                 return res.status(503).json({
                     error: 'Отправка письма сейчас недоступна (не настроена почта на сервере). Обратитесь к администратору.',
                     code: 'recover_mail_disabled'
                 });
             }
         } catch (mailErr) {
-            console.error('[password-recover] send failed:', mailErr);
-            console.log('[password-recover] fallback link=', link);
+            console.error('[password-recover] send failed:', mailErr && mailErr.message ? mailErr.message : mailErr);
             return res.status(500).json({
                 error: 'Не удалось отправить письмо. Попробуйте позже.',
                 code: 'recover_send_failed'
@@ -720,10 +782,8 @@ app.post('/api/user/auth/reset', async (req, res) => {
 app.get('/api/user/oauth/google/start', (req, res, next) => {
     if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) return res.redirect('/login.html?mode=user&oauth_error=not_configured');
     const nextUrl = typeof req.query.next === 'string' ? req.query.next : '';
-    req.session.oauth_next = nextUrl;
-    // Ensure oauth_next is persisted before redirect to Google.
+    req.session.oauth_next = sanitizeOAuthNextPath(nextUrl);
     req.session.save(() => {
-        console.log('OAuth Google start. next=', nextUrl);
         passport.authenticate('google', {
             scope: [
                 'openid',
@@ -747,19 +807,12 @@ app.get('/api/user/oauth/google/callback', (req, res, next) => {
             const accessToken = oauthCtx && oauthCtx.accessToken;
             const tokenParams = oauthCtx && oauthCtx.tokenParams;
             if (!profile || !profile.id) {
-                console.error('OAuth Google callback missing profile:', oauthCtx);
+                console.error('OAuth Google callback missing profile');
                 return res.redirect('/login.html?mode=user&oauth_error=profile');
             }
             const email = await resolveGoogleLoginEmail({ profile, accessToken, tokenParams });
             if (!email) {
-                const hasIdToken = !!(tokenParams && (tokenParams.id_token || tokenParams.idToken));
-                console.error('OAuth Google callback: no verified email', {
-                    sub: profile.id,
-                    hasIdToken,
-                    hasAccessToken: !!String(accessToken || '').trim(),
-                    hasEmailsArray: !!(profile.emails && profile.emails.length),
-                    jsonEmail: profile._json && profile._json.email
-                });
+                console.error('OAuth Google callback: no verified email', { sub: profile.id });
                 return res.redirect('/login.html?mode=user&oauth_error=no_email');
             }
             const user = await upsertOAuthUser('google', String(profile.id), email);
@@ -768,13 +821,12 @@ app.get('/api/user/oauth/google/callback', (req, res, next) => {
                 return res.redirect('/login.html?mode=user&oauth_error=user');
             }
             const token = createJwtToken(user);
-            const dest = req.session.oauth_next && String(req.session.oauth_next).startsWith('/') ? String(req.session.oauth_next) : '/welcome.html';
+            const dest = sanitizeOAuthNextPath(req.session.oauth_next);
             try { delete req.session.oauth_next; } catch {}
             const row = await findUserById(user.id);
             const suggestPassword = row && String(row.role || '') === 'user' && !row.password_set;
             let loginQs = 'mode=user&next=' + encodeURIComponent(dest) + '&token=' + encodeURIComponent(token);
             if (suggestPassword) loginQs += '&oauth_set_password=1';
-            console.log('OAuth Google success. user=', user.id, 'dest=', dest, 'suggestPassword=', !!suggestPassword);
             res.redirect('/login.html?' + loginQs);
         } catch (e) {
             console.error('OAuth Google callback exception:', e);
@@ -786,7 +838,13 @@ app.get('/api/user/oauth/google/callback', (req, res, next) => {
 app.get('/api/admin/users', requireAuth, async (req, res) => {
     try {
         if (req.session.user.role !== 'superadmin') return res.status(403).json({ error: 'Forbidden' });
-        const rows = await listUsers();
+        const rows = await listUsers({
+            q: req.query.q,
+            role: req.query.role,
+            active: req.query.active,
+            sort_by: req.query.sort_by,
+            sort_direction: req.query.sort_direction
+        });
         res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
         res.set('Pragma', 'no-cache');
         const payload = rows.map((u) => ({
@@ -897,8 +955,7 @@ app.delete('/api/admin/users/:id', requireAuth, async (req, res) => {
         const id = Number(req.params.id);
         if (!id) return res.status(400).json({ error: 'Некорректный id' });
         if (id === Number(req.session.user.id)) return res.status(400).json({ error: 'Нельзя удалить текущего пользователя' });
-        // Do not allow deleting superadmin accounts.
-        const users = await listUsers();
+        const users = await listUsers({});
         const target = Array.isArray(users) ? users.find(u => Number(u.id) === id) : null;
         if (target && target.role === 'superadmin') return res.status(400).json({ error: 'Нельзя удалить superadmin' });
         const deleted = await deleteUserById(id);
@@ -921,8 +978,21 @@ app.get('/api/brands', async (req, res) => {
 });
 
 app.get('/api/sizes', async (req, res) => {
-    try { res.json(await getSizes()); }
-    catch (err) { console.error('GET /api/sizes:', err); res.status(500).json({ error: 'Failed to load sizes' }); }
+    try {
+        const raw = req.query.category_id;
+        const cid = raw != null && String(raw).trim() !== '' ? Number(raw) : NaN;
+        const categoryId = Number.isFinite(cid) && cid > 0 ? cid : null;
+        res.json(await getSizes(categoryId));
+    } catch (err) { console.error('GET /api/sizes:', err); res.status(500).json({ error: 'Failed to load sizes' }); }
+});
+
+app.get('/api/size-equivalence-buckets', async (req, res) => {
+    try {
+        res.json(await listSizeEquivalenceBuckets());
+    } catch (err) {
+        console.error('GET /api/size-equivalence-buckets:', err);
+        res.status(500).json({ error: 'Failed to load size equivalence' });
+    }
 });
 
 app.get('/api/colors', async (req, res) => {
@@ -930,16 +1000,25 @@ app.get('/api/colors', async (req, res) => {
     catch (err) { console.error('GET /api/colors:', err); res.status(500).json({ error: 'Failed to load colors' }); }
 });
 
-app.get('/api/tags', async (req, res) => {
-    try { res.json(await getTags()); }
-    catch (err) { console.error('GET /api/tags:', err); res.status(500).json({ error: 'Failed to load tags' }); }
+app.get('/api/collections', async (req, res) => {
+    try { res.json(await getCollections()); }
+    catch (err) { console.error('GET /api/collections:', err); res.status(500).json({ error: 'Failed to load collections' }); }
+});
+
+app.get('/api/section-collections/:gender', async (req, res) => {
+    try {
+        res.json(await getSectionCollectionsWithProducts(req.params.gender));
+    } catch (err) {
+        console.error('GET /api/section-collections/:gender:', err);
+        res.status(500).json({ error: 'Failed to load section collections' });
+    }
 });
 
 app.get('/api/products/:gender', async (req, res) => {
     try {
-        const { category, tag, q, brand, season, color, size, limit = 20, offset = 0 } = req.query;
+        const { category, q, brand, season, color, size, size_id, color_id, collection_id, limit = 20, offset = 0 } = req.query;
         res.json(await getProducts(req.params.gender, {
-            category, tag, q, brand, season, color, size,
+            category, q, brand, season, color, size, size_id, color_id, collection_id,
             limit: Number(limit) || 20,
             offset: Number(offset) || 0
         }));
@@ -994,18 +1073,124 @@ const upload = multer({
 app.post('/api/admin/uploads', requireAuth, upload.array('images', 12), (req, res) => {
     try {
         const files = Array.isArray(req.files) ? req.files : [];
-        res.status(201).json({ files: files.map(f => `/img/uploads/${f.filename}`) });
+        res.status(201).json({ files: files.map(f => publicMediaUrl(`/img/uploads/${f.filename}`)) });
     } catch (err) {
         console.error('POST /api/admin/uploads:', err);
         res.status(500).json({ error: 'Failed to upload images' });
     }
 });
 
+app.get('/api/admin/collections', requireAuth, async (req, res) => {
+    try { res.json(await getCollectionsAdmin()); }
+    catch (err) { console.error('GET /api/admin/collections:', err); res.status(500).json({ error: 'Не удалось загрузить подборки' }); }
+});
+
+app.post('/api/admin/collections', requireAuth, async (req, res) => {
+    try {
+        res.status(201).json(await createCollection(req.body));
+    } catch (err) {
+        console.error('POST /api/admin/collections:', err);
+        res.status(400).json({ error: err.message || 'Не удалось создать подборку' });
+    }
+});
+
+app.put('/api/admin/collections/:id', requireAuth, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!Number.isFinite(id)) return res.status(400).json({ error: 'Некорректный id' });
+        const row = await updateCollection(id, req.body);
+        if (!row) return res.status(404).json({ error: 'Подборка не найдена' });
+        res.json(row);
+    } catch (err) {
+        console.error('PUT /api/admin/collections/:id:', err);
+        res.status(400).json({ error: err.message || 'Не удалось обновить подборку' });
+    }
+});
+
+app.delete('/api/admin/collections/:id', requireAuth, async (req, res) => {
+    try {
+        const id = Number(req.params.id);
+        if (!Number.isFinite(id)) return res.status(400).json({ error: 'Некорректный id' });
+        const ok = await deleteCollection(id);
+        if (!ok) return res.status(404).json({ error: 'Подборка не найдена' });
+        res.status(204).send();
+    } catch (err) {
+        console.error('DELETE /api/admin/collections/:id:', err);
+        res.status(500).json({ error: 'Не удалось удалить подборку' });
+    }
+});
+
+app.get('/api/admin/size-types', requireAuth, async (req, res) => {
+    try { res.json(await getSizeTypes()); }
+    catch (err) { console.error('GET /api/admin/size-types:', err); res.status(500).json({ error: 'Не удалось загрузить типы размеров' }); }
+});
+
+app.get('/api/admin/category-size-types', requireAuth, async (req, res) => {
+    try { res.json(await getCategorySizeTypeLinks()); }
+    catch (err) {
+        console.error('GET /api/admin/category-size-types:', err);
+        res.status(500).json({ error: 'Не удалось загрузить связи категорий с типами размеров' });
+    }
+});
+
+app.post('/api/admin/brands', requireAuth, async (req, res) => {
+    try {
+        res.status(201).json(await createBrand(req.body));
+    } catch (err) {
+        console.error('POST /api/admin/brands:', err);
+        res.status(400).json({ error: err.message || 'Не удалось создать бренд' });
+    }
+});
+
+app.post('/api/admin/sizes', requireAuth, async (req, res) => {
+    try {
+        res.status(201).json(await createSize(req.body));
+    } catch (err) {
+        console.error('POST /api/admin/sizes:', err);
+        res.status(400).json({ error: err.message || 'Не удалось создать размер' });
+    }
+});
+
+async function handleListSizeGroups(req, res) {
+    try {
+        res.json(await listSizeGroups());
+    } catch (err) {
+        console.error('GET /api/admin/size-groups:', err);
+        res.status(500).json({ error: 'Не удалось загрузить группы размеров' });
+    }
+}
+
+async function handleCreateSizeGroup(req, res) {
+    try {
+        res.status(201).json(await createSizeGroup(req.body || {}));
+    } catch (err) {
+        console.error('POST /api/admin/size-groups:', err);
+        res.status(400).json({ error: err.message || 'Не удалось создать группу' });
+    }
+}
+
+async function handleDeleteSizeGroup(req, res) {
+    try {
+        const id = req.query.id ?? req.query.group_id;
+        await deleteSizeGroup(id);
+        res.status(204).send();
+    } catch (err) {
+        console.error('DELETE /api/admin/size-groups:', err);
+        res.status(400).json({ error: err.message || 'Не удалось удалить группу' });
+    }
+}
+
+['/api/admin/size-groups', '/api/admin/size-equivalent-groups'].forEach(path => {
+    app.get(path, requireAuth, handleListSizeGroups);
+    app.post(path, requireAuth, handleCreateSizeGroup);
+    app.delete(path, requireAuth, handleDeleteSizeGroup);
+});
+
 app.get('/api/admin/products', requireAuth, async (req, res) => {
     try {
-        const { q, gender, category, brand, season, tag, size_id, color_id, active, sort_by, sort_direction, limit = 100, offset = 0 } = req.query;
+        const { q, gender, category, brand, season, size_id, color_id, collection_id, active, sort_by, sort_direction, limit = 100, offset = 0 } = req.query;
         res.json(await getProducts(null, {
-            q, gender, category, brand, season, tag, size_id, color_id, active, sort_by, sort_direction,
+            q, gender, category, brand, season, size_id, color_id, collection_id, active, sort_by, sort_direction,
             include_inactive: true,
             limit: Number(limit) || 100,
             offset: Number(offset) || 0
@@ -1091,11 +1276,21 @@ function validateProductPayload(payload) {
         else payload.images.forEach(img => {
             if (!img || typeof img !== 'object' || !img.url || typeof img.url !== 'string') {
                 errors.push('Каждый элемент images должен содержать поле url (строка)');
+            } else if (!isSafeProductImageUrl(img.url)) {
+                errors.push('Поле images.url: допустимы только относительные пути (/...) или http(s) URL');
             }
         });
     }
     if (payload.variants !== undefined && !Array.isArray(payload.variants)) errors.push('Поле variants должно быть массивом');
     if (payload.attributes !== undefined && !Array.isArray(payload.attributes)) errors.push('Поле attributes должно быть массивом');
+    if (payload.collections !== undefined) {
+        if (!Array.isArray(payload.collections)) errors.push('Поле collections должно быть массивом');
+        else payload.collections.forEach(c => {
+            if (!c || typeof c !== 'object' || !Number.isFinite(Number(c.id))) {
+                errors.push('Каждый элемент collections должен содержать id (число)');
+            }
+        });
+    }
     return errors;
 }
 
@@ -1103,7 +1298,8 @@ app.post('/api/admin/products', requireAuth, async (req, res) => {
     try {
         const errors = validateProductPayload(req.body);
         if (errors.length) return res.status(400).json({ error: errors.join('. ') });
-        res.status(201).json(await createProduct(req.body));
+        const editorId = req.session.user && req.session.user.id != null ? Number(req.session.user.id) : null;
+        res.status(201).json(await createProduct(req.body, { editorUserId: editorId }));
     } catch (err) {
         console.error('POST /api/admin/products:', err);
         res.status(400).json({ error: err.message || 'Failed to create product' });
@@ -1114,7 +1310,8 @@ app.put('/api/admin/products/:id', requireAuth, async (req, res) => {
     try {
         const errors = validateProductPayload(req.body);
         if (errors.length) return res.status(400).json({ error: errors.join('. ') });
-        const updated = await updateProduct(Number(req.params.id), req.body);
+        const editorId = req.session.user && req.session.user.id != null ? Number(req.session.user.id) : null;
+        const updated = await updateProduct(Number(req.params.id), req.body, { editorUserId: editorId });
         if (!updated) return res.status(404).json({ error: 'Product not found' });
         res.json(updated);
     } catch (err) {
@@ -1199,6 +1396,12 @@ app.use((err, req, res, next) => {
 
 connectDB()
     .then(() => ensureUserAuthSchema())
+    .then(() => ensureProductsEditorColumn())
+    .then(() => ensureCollectionsSchema())
+    .then(() => ensureCategorySizeTypesSchema())
+    .then(() => ensureSizeGroupsSchema())
+    .then(() => ensureSizesUniqueValueIndex())
+    .then(() => ensureReferenceSizesSeed())
     .then(() => ensureDefaultUsers())
     .then(() => {
         app.listen(PORT, () => {

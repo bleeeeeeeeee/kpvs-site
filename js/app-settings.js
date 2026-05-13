@@ -10,9 +10,6 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         applyTheme();
-        if (window.KpvsCurrency && typeof window.KpvsCurrency.ensureRates === 'function') {
-            window.KpvsCurrency.ensureRates({ force: false });
-        }
     });
 })();
 
