@@ -1,0 +1,57 @@
+.catalog-page .catalog-controls {
+  background: var(--surface-elevated);
+  border: 1px solid var(--border-color);
+}
+
+.catalog-page .catalog-search-input,
+.catalog-page .catalog-sort-select {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border-color: var(--border-color);
+}
+
+.catalog-page .catalog-search-input::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.catalog-page .catalog-sort-label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.catalog-page .section-title {
+  color: var(--text-primary);
+}
+
+.catalog-page .card-name {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.catalog-page .card-art {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.catalog-page .card-price {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-accent);
+}
+
+.catalog-page .card-price--muted {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.catalog-page #items-container .itemsSection .effect-section .items {
+  scrollbar-color: var(--accent-color) var(--surface-elevated);
+}
+
+.table-responsive {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}

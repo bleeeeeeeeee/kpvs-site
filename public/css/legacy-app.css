@@ -75,13 +75,13 @@
 
 :where(.filter-button,
     .admin-action-btn,
-    .admin-ui-btn--primary,
+    .btn--primary,
     .filter-apply-btn,
     .admin-cancel-btn,
-    .admin-ui-btn--secondary,
+    .btn--secondary,
     .filter-clear-btn,
-    .admin-ui-btn--danger,
-    .admin-ui-btn--outline) {
+    .btn--danger,
+    .btn--outline) {
     --btn-min-h: 2.75rem;
     --btn-pad-y: 0.85rem;
     --btn-pad-x: 1.4rem;
@@ -122,22 +122,22 @@
 
 :where(.filter-button,
     .admin-action-btn,
-    .admin-ui-btn--primary,
+    .btn--primary,
     .filter-apply-btn) {
     --btn-border: none;
-    --btn-color: #fff;
-    --btn-bg: linear-gradient(135deg, #3b5223 0%, #6b8a3a 100%);
+    --btn-color: var(--btn-grad-text-on-primary);
+    --btn-bg: var(--btn-gradient-primary);
     background-size: 200% 200%;
     background-position: 0% 50%;
-    --btn-shadow: 0 2px 8px rgba(59, 82, 35, 0.18);
-    --btn-shadow-hover: 0 4px 12px rgba(59, 82, 35, 0.24);
-    --btn-filter-hover: brightness(1.02);
-    --btn-shadow-focus: 0 0 0 4px rgba(182, 197, 63, 0.28);
+    --btn-shadow: var(--btn-grad-shadow-primary-soft);
+    --btn-shadow-hover: var(--btn-grad-shadow-primary-soft-hover);
+    --btn-filter-hover: var(--btn-grad-filter-hover);
+    --btn-shadow-focus: var(--btn-grad-focus-ring-primary);
 }
 
 :where(.filter-button:hover,
     .admin-action-btn:hover,
-    .admin-ui-btn--primary:hover,
+    .btn--primary:hover,
     .filter-apply-btn:hover) {
     background-position: 100% 50%;
     filter: var(--btn-filter-hover);
@@ -146,7 +146,7 @@
 
 :where(.filter-button:active,
     .admin-action-btn:active,
-    .admin-ui-btn--primary:active,
+    .btn--primary:active,
     .filter-apply-btn:active) {
     background-position: 100% 50%;
     box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
@@ -155,14 +155,14 @@
 
 :where(.filter-button:focus-visible,
     .admin-action-btn:focus-visible,
-    .admin-ui-btn--primary:focus-visible,
+    .btn--primary:focus-visible,
     .filter-apply-btn:focus-visible) {
     outline: none;
     box-shadow: var(--btn-shadow-focus);
 }
 
 .admin-cancel-btn,
-.admin-ui-btn--secondary,
+.btn--secondary,
 .filter-clear-btn {
     --btn-color: var(--text-primary);
     --btn-bg: var(--bg-primary);
@@ -172,26 +172,26 @@
 }
 
 .admin-cancel-btn:hover,
-.admin-ui-btn--secondary:hover,
+.btn--secondary:hover,
 .filter-clear-btn:hover {
     background: var(--bg-secondary);
     border-color: rgba(59, 82, 35, 0.38);
 }
 
 .admin-cancel-btn:active,
-.admin-ui-btn--secondary:active,
+.btn--secondary:active,
 .filter-clear-btn:active {
     transform: translateY(0.5px);
 }
 
 .admin-cancel-btn:focus-visible,
-.admin-ui-btn--secondary:focus-visible,
+.btn--secondary:focus-visible,
 .filter-clear-btn:focus-visible {
     outline: none;
     box-shadow: 0 0 0 4px rgba(182, 197, 63, 0.2);
 }
 
-[data-theme="dark"] .admin-ui-btn--secondary,
+[data-theme="dark"] .btn--secondary,
 [data-theme="dark"] .filter-clear-btn,
 [data-theme="dark"] .admin-cancel-btn {
     background: var(--bg-primary);
@@ -199,43 +199,43 @@
     color: var(--text-primary);
 }
 
-[data-theme="dark"] .admin-ui-btn--secondary:hover,
+[data-theme="dark"] .btn--secondary:hover,
 [data-theme="dark"] .filter-clear-btn:hover,
 [data-theme="dark"] .admin-cancel-btn:hover {
     background: var(--bg-secondary);
     border-color: rgba(182, 197, 63, 0.45);
 }
 
-.admin-ui-btn--danger {
+.btn--danger {
     --btn-border: none;
-    --btn-color: #fff;
-    --btn-bg: linear-gradient(135deg, #5a1e1e 0%, #a02828 48%, #c53d3d 100%);
+    --btn-color: var(--btn-grad-text-on-danger);
+    --btn-bg: var(--btn-gradient-danger);
     background-size: 200% 200%;
     background-position: 0% 50%;
-    --btn-shadow: 0 2px 10px rgba(176, 42, 42, 0.32);
-    --btn-shadow-hover: 0 4px 14px rgba(176, 42, 42, 0.38);
-    --btn-filter-hover: brightness(1.03);
-    --btn-shadow-focus: 0 0 0 4px rgba(197, 61, 61, 0.35);
+    --btn-shadow: var(--btn-grad-shadow-danger);
+    --btn-shadow-hover: var(--btn-grad-shadow-danger-hover);
+    --btn-filter-hover: var(--btn-grad-filter-hover);
+    --btn-shadow-focus: var(--btn-grad-focus-ring-danger);
 }
 
-.admin-ui-btn--danger:hover {
+.btn--danger:hover {
     background-position: 100% 50%;
     filter: var(--btn-filter-hover);
     box-shadow: var(--btn-shadow-hover);
 }
 
-.admin-ui-btn--danger:active {
+.btn--danger:active {
     background-position: 100% 50%;
     box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.22);
     transform: var(--btn-transform-active);
 }
 
-.admin-ui-btn--danger:focus-visible {
+.btn--danger:focus-visible {
     outline: none;
     box-shadow: var(--btn-shadow-focus);
 }
 
-.admin-ui-btn--outline {
+.btn--outline {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -257,30 +257,30 @@
     transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
 }
 
-.admin-ui-btn--outline:hover {
+.btn--outline:hover {
     background: rgba(59, 82, 35, 0.08);
     border-color: var(--secondary-color);
     color: #24352a;
 }
 
-.admin-ui-btn--outline:focus-visible {
+.btn--outline:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px rgba(59, 82, 35, 0.22);
 }
 
-[data-theme="dark"] .admin-ui-btn--outline {
+[data-theme="dark"] .btn--outline {
     color: var(--text-primary);
     border-color: rgba(182, 197, 63, 0.42);
     box-shadow: none;
 }
 
-[data-theme="dark"] .admin-ui-btn--outline:hover {
+[data-theme="dark"] .btn--outline:hover {
     background: rgba(182, 197, 63, 0.12);
     border-color: rgba(182, 197, 63, 0.72);
     color: var(--text-primary);
 }
 
-.admin-ui-btn--icon-square {
+.btn--icon-square {
     width: 2.5rem;
     min-width: 2.5rem;
     padding: 0;
@@ -288,17 +288,17 @@
     border-color: #d0d0d0;
 }
 
-.admin-ui-btn--icon-square:hover {
+.btn--icon-square:hover {
     background: #f6f6f6;
     border-color: #b8b8b8;
     color: var(--text-primary);
 }
 
-[data-theme="dark"] .admin-ui-btn--icon-square {
+[data-theme="dark"] .btn--icon-square {
     border-color: rgba(255, 255, 255, 0.2);
 }
 
-[data-theme="dark"] .admin-ui-btn--icon-square:hover {
+[data-theme="dark"] .btn--icon-square:hover {
     background: var(--bg-secondary);
     border-color: rgba(255, 255, 255, 0.28);
 }
@@ -312,7 +312,7 @@
     transition: opacity 0.15s ease;
 }
 
-.admin-ui-btn--outline:hover .admin-toolbar-refresh-icon {
+.btn--outline:hover .admin-toolbar-refresh-icon {
     opacity: 1;
 }
 
@@ -321,11 +321,11 @@
     opacity: 0.75;
 }
 
-[data-theme="dark"] .admin-ui-btn--outline:hover .admin-toolbar-refresh-icon {
+[data-theme="dark"] .btn--outline:hover .admin-toolbar-refresh-icon {
     opacity: 0.95;
 }
 
-.admin-ui-btn--sm {
+.btn--small {
     --btn-min-h: 2.35rem;
     --btn-pad-y: 0.55rem;
     --btn-pad-x: 0.95rem;
@@ -430,7 +430,7 @@
     flex-shrink: 0;
 }
 
-/* Обрезание только фото; оверлей и эмоджи поверх — не клипуются */
+
 .card-visual-wrap {
     position: relative;
     width: 14rem;
@@ -1362,7 +1362,7 @@ html.modal-open body .notification * {
     width: min(480px, calc(100vw - 2rem));
 }
 
-/* Форма «Задайте пароль»: сетка вместо space-between — поля в одной колонке, подписи ровно */
+
 .oauth-password-modal label.account-setting.account-setting--password {
     display: grid;
     grid-template-columns: minmax(9.25rem, 36%) minmax(0, 1fr);
@@ -1423,7 +1423,7 @@ html.modal-open body .notification * {
     margin-top: 1rem;
 }
 
-.oauth-password-modal .oauth-pwd-actions>.admin-ui-btn {
+.oauth-password-modal .oauth-pwd-actions>.btn {
     min-height: 2.75rem;
     height: auto;
     padding: 0.82rem 1.1rem;
@@ -1485,7 +1485,7 @@ html.modal-open body .notification * {
     transition: color 0.15s ease, opacity 0.15s ease;
 }
 
-/* Universal centered "×" buttons (avoid font-metric drift) */
+
 .ui-xbtn {
     position: relative;
     display: inline-grid;
@@ -1494,9 +1494,9 @@ html.modal-open body .notification * {
     line-height: 1;
     aspect-ratio: 1 / 1;
     font-size: 0 !important;
-    /* suppress &times; text everywhere */
+    
     text-indent: -9999px;
-    /* extra safety for text nodes */
+    
     overflow: hidden;
 }
 
@@ -1544,7 +1544,7 @@ html.modal-open body .notification * {
     text-underline-offset: 0.25rem;
 }
 
-/* Account modal: no underline on close */
+
 #account-modal .modal-close:focus-visible {
     text-decoration: none;
 }
@@ -1604,7 +1604,7 @@ html.modal-open body .notification * {
     gap: 0.45rem;
 }
 
-/* Имя, email и подсказки — без фиксированной высоты, чтобы блок гостя не обрезался */
+
 .account-identity-stack {
     display: flex;
     flex-direction: column;
@@ -1619,7 +1619,7 @@ html.modal-open body .notification * {
     min-height: 0;
 }
 
-/* Высота строки логина + почты = 3rem у аватара — компактная кнопка карандаша */
+
 .account-identity-stack .account-rename-pencil-btn.account-rename-icon-btn {
     width: 1.75rem;
     height: 1.75rem;
@@ -1656,8 +1656,8 @@ html.modal-open body .notification * {
     justify-content: center;
 }
 
-/* Выровнять с кнопками «Сохранить / Отмена» в панели пароля (у outline был height 2.5rem) */
-.account-settings--security>#account-password-toggle.admin-ui-btn {
+
+.account-settings--security>#account-password-toggle.btn {
     min-height: 2.75rem;
     height: auto;
     padding: 0.82rem 1.1rem;
@@ -1751,7 +1751,7 @@ html.modal-open body .notification * {
     display: inline-flex;
     align-items: center;
     gap: 0.22rem;
-    /* Не растягиваем на всю строку — карандаш остаётся у ника; длинный ник режется в пределах блока */
+    
     flex: 0 1 auto;
     min-width: 0;
     max-width: 100%;
@@ -1761,7 +1761,7 @@ html.modal-open body .notification * {
     display: none !important;
 }
 
-/* Логин на всю доступную ширину строки; многоточие только если реально не помещается */
+
 .account-login-pencil-group>.account-name {
     flex: 1 1 auto;
     min-width: 0;
@@ -1771,7 +1771,7 @@ html.modal-open body .notification * {
     white-space: nowrap;
 }
 
-/* Поле смены логина: перебить min(320px) у .account-input — строка «поле | ✓ ✗» на всю ширину meta */
+
 .account-rename-editor .account-input.account-rename-input {
     flex: 1 1 0%;
     min-width: 0;
@@ -1788,7 +1788,7 @@ html.modal-open body .notification * {
     height: 18px;
 }
 
-/* agree.svg: галочка заполняет viewBox плотнее; disagree.svg — поля вокруг креста в 512² — чуть крупнее ✓ для той же визуальной массы */
+
 #account-rename-agree .account-rename-ico--decision {
     width: 23px;
     height: 23px;
@@ -1951,7 +1951,7 @@ html.modal-open body .notification * {
     box-sizing: border-box;
 }
 
-/* When auth action is a single visible button, span both columns */
+
 .account-actions .account-action-btn.account-action-btn--auth {
     grid-column: 1 / -1;
 }
@@ -2010,7 +2010,7 @@ html.modal-open body .notification * {
     box-sizing: border-box;
 }
 
-.account-security-actions>.admin-ui-btn {
+.account-security-actions>.btn {
     min-height: 2.75rem;
     height: auto;
     padding: 0.82rem 1.1rem;
@@ -2103,7 +2103,7 @@ html.modal-open body .notification * {
     min-width: 0;
 }
 
-/* Единый вид чекбоксов (как «Запоминать фильтры и поиск» в аккаунте) */
+
 .account-setting-toggle,
 .filter-option input[type="checkbox"],
 .admin-multiselect-option input[type="checkbox"] {
@@ -2221,8 +2221,8 @@ html.modal-open body .notification * {
     flex-wrap: wrap;
 }
 
-.modal-footer.filters-modal-footer .admin-ui-btn,
-.modal-footer.catalog-filter-modal-footer .admin-ui-btn {
+.modal-footer.filters-modal-footer .btn,
+.modal-footer.catalog-filter-modal-footer .btn {
     order: unset;
 }
 
@@ -2290,7 +2290,7 @@ html.modal-open body .notification * {
     margin-top: auto;
 }
 
-.modal .modal-item-actions .admin-ui-btn,
+.modal .modal-item-actions .btn,
 .modal .cart-inquire-btn {
     display: inline-flex;
     align-items: center;
@@ -2304,16 +2304,28 @@ html.modal-open body .notification * {
     line-height: 1.2;
     cursor: pointer;
     box-sizing: border-box;
-    transition: background 0.15s ease, filter 0.15s ease, transform 0.05s ease;
+    transition:
+        background 0.15s ease,
+        background-position 0.35s ease,
+        filter 0.15s ease,
+        transform 0.05s ease;
     flex: 1 1 auto;
     min-width: 0;
     min-height: 2.5rem;
     white-space: nowrap;
 }
 
-.modal .modal-item-actions .admin-ui-btn.in-cart {
-    background: #c53d3d;
-    color: #fff;
+.modal .modal-item-actions .btn.in-cart {
+    background: var(--btn-gradient-danger);
+    background-size: 200% 200%;
+    background-position: 0% 50%;
+    color: var(--btn-grad-text-on-danger);
+    box-shadow: var(--btn-grad-shadow-danger);
+}
+
+.modal .modal-item-actions .btn.in-cart:hover {
+    background-position: 100% 50%;
+    filter: var(--btn-grad-filter-hover);
 }
 
 .cart-actions {
@@ -2326,15 +2338,23 @@ html.modal-open body .notification * {
 .modal .cart-inquire-btn {
     width: 100%;
     max-width: 100%;
-    background: var(--light-accent);
-    color: var(--primary-color);
-    border: 1px solid rgba(36, 53, 42, 0.12);
+    background: var(--btn-gradient-primary);
+    background-size: 200% 200%;
+    background-position: 0% 50%;
+    color: var(--btn-grad-text-on-primary);
+    border: 1px solid rgba(36, 53, 42, 0.2);
+    box-shadow: var(--btn-grad-shadow-primary-soft);
 }
 
 .modal .cart-inquire-btn:hover {
-    background: var(--accent-color);
-    color: #fff;
-    border-color: transparent;
+    background-position: 100% 50%;
+    filter: var(--btn-grad-filter-hover-strong);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .modal .cart-inquire-btn {
+    border-color: rgba(182, 197, 63, 0.28);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
 }
 
 .notification {
@@ -2455,7 +2475,7 @@ html.modal-open body .notification * {
     justify-self: end;
 }
 
-.admin-page #logout-btn.admin-ui-btn--danger {
+.admin-page #logout-btn.btn--danger {
     flex-shrink: 0;
     white-space: nowrap;
     min-height: 2.75rem;
@@ -2465,7 +2485,7 @@ html.modal-open body .notification * {
     box-sizing: border-box;
 }
 
-[data-theme="dark"] .admin-page #logout-btn.admin-ui-btn--danger {
+[data-theme="dark"] .admin-page #logout-btn.btn--danger {
     box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
 }
 
@@ -2563,7 +2583,7 @@ html.modal-open body .notification * {
     text-decoration: none;
 }
 
-/* Шапка: только SVG, без «плитки» (фон/рамка) — зона нажатия сохраняем */
+
 .site-header-actions .site-icon-btn {
     min-width: 44px;
     min-height: 44px;
@@ -2637,7 +2657,7 @@ html.modal-open body .notification * {
     padding-right: 0;
 }
 
-/* product.html: «Назад» — слева с логотипом; вертикаль: --product-back-top из JS по верху .product-image */
+
 .product-page-header #product-details.product-page-shell {
     position: relative;
 }
@@ -2736,7 +2756,7 @@ html.modal-open body .notification * {
     flex-wrap: wrap;
 }
 
-/* Ensure consistent spacing between header actions everywhere */
+
 .site-header-actions {
     gap: 0.5rem;
 }
@@ -2790,7 +2810,7 @@ html.modal-open body .notification * {
     pointer-events: none;
 }
 
-/* «Назад» на product: не наследовать 1.95rem от .site-icon-btn; размер ближе к иконкам шапки */
+
 .product-page-header #product-details .site-back-nav-btn.site-icon-btn .site-back-nav-btn__img {
     width: auto;
     height: clamp(1.35rem, 3.6vw, 1.75rem);
@@ -2821,39 +2841,39 @@ html.modal-open body .notification * {
 }
 
 .site-account-login-btn {
-    /* Layout only; visuals come from the button system variables */
+    
     text-decoration: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     white-space: nowrap;
     box-sizing: border-box;
-    /* Typography comes from the button variant (e.g. .admin-ui-btn--primary) */
+    
 }
 
 .site-header-actions .site-account-login-btn {
-    /* Match "Фильтры" button sizing (admin-add-product-btn) */
+    
     flex-shrink: 0;
     white-space: nowrap;
     align-self: center;
     box-sizing: border-box;
 
     --btn-min-h: 2.75rem;
-    /* Same sizing as "Фильтры" */
+    
     --btn-pad-y: 0.65rem;
     --btn-pad-x: 1.15rem;
     --btn-fz: 0.9375rem;
     --btn-radius: 0.65rem;
 
-    /* Keep header tap target at least 44px */
+    
     min-width: 44px;
-    /* Preserve previous visual width of the "Войти" pill */
+    
     min-inline-size: 5.1rem;
-    /* Avoid shadow bleeding into the gap */
+    
     --btn-shadow: none;
     --btn-shadow-hover: none;
 
-    /* Add same “air” as icon buttons' padding */
+    
     margin-left: 0.4rem;
 }
 
@@ -2916,70 +2936,13 @@ html.modal-open body .notification * {
     margin-top: 1rem;
 }
 
-.site-product-actions .admin-ui-btn.product-page-action-btn {
+.site-product-actions .btn.product-page-action-btn {
     width: 100%;
     justify-content: center;
     box-sizing: border-box;
     min-height: 2.75rem;
     font-weight: 700;
     border-radius: 0.75rem;
-}
-
-.site-product-actions .admin-ui-btn.product-page-action-btn:not(.in-favorites):not(.in-cart) {
-    background: linear-gradient(135deg, #3b5223 0%, #6b8a3a 100%);
-    background-size: 200% 200%;
-    background-position: 0% 50%;
-    color: #fff;
-    border: none;
-    box-shadow: 0 2px 8px rgba(59, 82, 35, 0.18);
-}
-
-.site-product-actions .admin-ui-btn.product-page-action-btn:not(.in-favorites):not(.in-cart):hover {
-    background-position: 100% 50%;
-    filter: brightness(1.02);
-}
-
-.site-product-actions .admin-ui-btn.product-page-action-btn.in-favorites {
-    background: #727b26;
-    color: #fff;
-    border: 1px solid #5a661f;
-}
-
-.site-product-actions .admin-ui-btn.product-page-action-btn.in-favorites:hover {
-    filter: brightness(1.05);
-}
-
-.site-product-actions .admin-ui-btn.product-page-action-btn.in-cart {
-    background: linear-gradient(135deg, #5a1e1e 0%, #a02828 55%, #c53d3d 100%);
-    color: #fff;
-    border: none;
-}
-
-.site-product-actions .admin-ui-btn.product-page-action-btn.in-cart:hover {
-    filter: brightness(1.03);
-}
-
-.site-product-actions .admin-ui-btn.inquire-action-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0.85rem 1.4rem;
-    border-radius: 0.75rem;
-    font-size: 1rem;
-    font-weight: 700;
-    font-family: inherit;
-    line-height: 1.2;
-    cursor: pointer;
-    border: 1px solid rgba(36, 53, 42, 0.12);
-    background: rgba(182, 197, 63, 0.95);
-    color: #24352a;
-    box-shadow: 0 2px 6px rgba(59, 82, 35, 0.12);
-    transition: background 0.15s ease, filter 0.15s ease, transform 0.05s ease;
-}
-
-.site-product-actions .admin-ui-btn.inquire-action-btn:hover {
-    background: #d9dc9b;
-    filter: none;
 }
 
 .admin-page .admin-catalog-controls.catalog-controls {
@@ -3097,9 +3060,9 @@ html.modal-open body .notification * {
     box-sizing: border-box;
 }
 
-/* Actions column (same layout if used on any admin table) */
-.admin-page .admin-table .admin-actions-cell .admin-ui-btn--outline,
-.admin-page .admin-table .admin-actions-cell .admin-ui-btn--danger {
+
+.admin-page .admin-table .admin-actions-cell .btn--outline,
+.admin-page .admin-table .admin-actions-cell .btn--danger {
     height: 2.5rem;
     min-height: 2.5rem;
     padding: 0 1rem;
@@ -3168,7 +3131,7 @@ html.modal-open body .notification * {
     --admin-table-fw: 400;
     --admin-table-fw-head: 600;
     --admin-table-fw-primary: 500;
-    /* Row rules: separate border model avoids subpixel gaps from collapsed borders + col resize */
+    
     --admin-table-row-rule: rgba(36, 53, 42, 0.22);
     font-size: var(--admin-table-font);
     line-height: var(--admin-table-line);
@@ -3194,7 +3157,7 @@ html.modal-open body .notification * {
     background-clip: padding-box;
 }
 
-/* Row separators: draw as a full-width background, not per-cell borders (prevents breaks at column seams) */
+
 .admin-page .admin-table thead tr,
 .admin-page .admin-table tbody tr {
     background-image: linear-gradient(to bottom, transparent calc(100% - 1px), var(--admin-table-row-rule) 0);
@@ -3219,7 +3182,7 @@ html.modal-open body .notification * {
     text-align: center;
 }
 
-/* Space between products table and users panel */
+
 #admin-users-panel {
     margin-top: 0.85rem;
 }
@@ -3230,7 +3193,7 @@ html.modal-open body .notification * {
     vertical-align: middle;
 }
 
-/* Цвет зебры + нижняя линия строки (не затирать background-image у tr) */
+
 .admin-page .admin-table tbody tr:nth-child(odd) {
     background-color: rgba(182, 197, 63, 0.045);
     background-image: linear-gradient(to bottom, transparent calc(100% - 1px), var(--admin-table-row-rule) 0);
@@ -3451,7 +3414,7 @@ html.modal-open body .notification * {
     overflow: hidden;
 }
 
-/* Ячейка действий — обычная table-cell; flex только у внутренней обёртки (иначе ломается сетка таблицы) */
+
 .admin-page .admin-table .admin-actions-cell {
     display: table-cell;
     vertical-align: middle;
@@ -3470,12 +3433,12 @@ html.modal-open body .notification * {
     -webkit-overflow-scrolling: touch;
 }
 
-.admin-page .admin-users-table .admin-users-actions-inner .admin-ui-btn {
+.admin-page .admin-users-table .admin-users-actions-inner .btn {
     white-space: nowrap;
     flex-shrink: 0;
 }
 
-/* Таблица пользователей — как товары: table-layout из .admin-table (fixed), ширины колонок в colgroup в px + ресайзер */
+
 .admin-page .admin-users-table {
     table-layout: fixed;
     width: 100%;
@@ -3519,7 +3482,7 @@ html.modal-open body .notification * {
     padding-right: 0.75rem;
 }
 
-/* Логин — одна строка с многоточием при нехватке места */
+
 .admin-page .admin-users-table td.cell-user-login {
     overflow: hidden;
     text-overflow: ellipsis;
@@ -3527,7 +3490,7 @@ html.modal-open body .notification * {
     max-width: 0;
 }
 
-/* Email — одна строка + ellipsis, полный адрес в title (JS); цвет как у остальных ячеек таблицы */
+
 .admin-page .admin-users-table th.admin-users-th-email,
 .admin-page .admin-users-table td.cell-user-email {
     min-width: 0;
@@ -3545,14 +3508,14 @@ html.modal-open body .notification * {
     font-weight: var(--admin-table-fw-head);
 }
 
-/* Дата последнего входа — одна строка, многоточие только если совсем тесно */
+
 .admin-page .admin-users-table td.cell-user-last-login {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-/* Убрать зебру на <tr> у таблицы пользователей (она только на <td>), иначе перебивает общий .admin-table tbody tr:nth-child(odd) */
+
 .admin-page .admin-users-table tbody tr,
 .admin-page .admin-users-table tbody tr:nth-child(odd),
 .admin-page .admin-users-table tbody tr:nth-child(even) {
@@ -3561,7 +3524,7 @@ html.modal-open body .notification * {
     cursor: pointer;
 }
 
-/* Фон зебры/hover на ячейках — полная заливка при любой высоте строки */
+
 .admin-page .admin-users-table tbody tr:nth-child(odd) td {
     background-color: rgba(182, 197, 63, 0.045);
 }
@@ -3574,7 +3537,7 @@ html.modal-open body .notification * {
     background-color: rgba(182, 197, 63, 0.1);
 }
 
-/* Разделители строк: сплошная линия между всеми строками (без «пропусков» у зебры) */
+
 .admin-page .admin-users-table thead>tr>th {
     box-shadow: none;
     border-bottom: 1px solid var(--admin-table-row-rule);
@@ -3626,12 +3589,12 @@ html.modal-open body .notification * {
     max-width: 900px;
 }
 
-.modal.admin-modal .admin-modal-footer .admin-ui-btn--secondary,
+.modal.admin-modal .admin-modal-footer .btn--secondary,
 .modal.admin-modal .admin-modal-footer .filter-clear-btn {
     order: 1;
 }
 
-.modal.admin-modal .admin-modal-footer .admin-ui-btn--primary,
+.modal.admin-modal .admin-modal-footer .btn--primary,
 .modal.admin-modal .admin-modal-footer .filter-apply-btn {
     order: 2;
 }
@@ -3640,7 +3603,7 @@ html.modal-open body .notification * {
     justify-content: space-between;
 }
 
-#filter-modal.modal.admin-modal .admin-modal-footer.filters-modal-footer .admin-ui-btn {
+#filter-modal.modal.admin-modal .admin-modal-footer.filters-modal-footer .btn {
     order: unset;
 }
 
@@ -3757,12 +3720,14 @@ html.modal-open body .notification * {
 }
 
 #product-modal .admin-form .admin-material-row .mat-name,
+#product-modal .admin-form .admin-material-row .mat-name-select,
 #product-modal .admin-form .admin-material-row .mat-percent {
     background: #ffffff;
     border: 1px solid #d8d8d8;
 }
 
 #product-modal .admin-form .admin-material-row .mat-name:focus,
+#product-modal .admin-form .admin-material-row .mat-name-select:focus,
 #product-modal .admin-form .admin-material-row .mat-percent:focus {
     outline: none;
     border-color: #a8a8a8;
@@ -3828,6 +3793,7 @@ html.modal-open body .notification * {
 }
 
 [data-theme="dark"] #product-modal .admin-form .admin-material-row .mat-name,
+[data-theme="dark"] #product-modal .admin-form .admin-material-row .mat-name-select,
 [data-theme="dark"] #product-modal .admin-form .admin-material-row .mat-percent {
     background: var(--bg-primary);
     border-color: rgba(255, 255, 255, 0.14);
@@ -3875,9 +3841,9 @@ html.modal-open body .notification * {
     margin-left: auto;
 }
 
-#product-modal .product-modal-footer .admin-ui-btn--primary,
-#product-modal .product-modal-footer .admin-ui-btn--secondary,
-#product-modal .product-modal-footer .admin-ui-btn--danger {
+#product-modal .product-modal-footer .btn--primary,
+#product-modal .product-modal-footer .btn--secondary,
+#product-modal .product-modal-footer .btn--danger {
     padding: 0.65rem 1.15rem;
     font-size: 0.9375rem;
     border-radius: 0.65rem;
@@ -3918,7 +3884,28 @@ html.modal-open body .notification * {
 }
 
 .product-exit-draft-footer {
-    justify-content: space-between;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 0.75rem;
+}
+
+#product-exit-draft-modal .product-exit-draft-actions {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0.65rem;
+    width: 100%;
+}
+
+#product-exit-draft-modal .product-exit-draft-actions .btn {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+#product-exit-draft-modal .product-exit-draft-stay {
+    width: 100%;
 }
 
 .admin-form {
@@ -4385,7 +4372,8 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     border-radius: 0.75rem;
 }
 
-.admin-material-row .mat-name {
+.admin-material-row .mat-name,
+.admin-material-row .mat-name-select {
     width: 100%;
     padding: 0.6rem 0.75rem;
     border: 1px solid var(--border-color);
@@ -4395,6 +4383,11 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     font-size: 0.95rem;
     height: 40px;
     box-sizing: border-box;
+}
+
+.admin-material-row .mat-name-select {
+    min-width: 0;
+    cursor: pointer;
 }
 
 .admin-material-row .mat-percent-wrap {
@@ -4550,10 +4543,6 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
 }
 
 @media (max-width: 768px) {
-    * {
-        font-size: 18px;
-    }
-
     .container {
         margin: 1rem 1.5rem;
     }
@@ -4896,7 +4885,7 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
         flex-direction: column;
     }
 
-    .modal .modal-item-actions .admin-ui-btn,
+    .modal .modal-item-actions .btn,
     .modal .cart-inquire-btn {
         width: 100%;
         min-width: 100%;
@@ -5060,7 +5049,7 @@ select option.admin-select-action-option,
     border-top: 1px dashed var(--border-color, rgba(0, 0, 0, 0.12));
 }
 
-#product-collections-container .admin-multiselect-add-action.admin-ui-btn {
+#product-collections-container .admin-multiselect-add-action.btn {
     width: 100%;
     max-width: 100%;
     justify-content: center;
@@ -5139,7 +5128,7 @@ select option.admin-select-action-option,
     display: none !important;
 }
 
-/* Зарезервировано под разметку с .checkbox-custom вне label (сейчас скрыт внутри .checkbox-label) */
+
 .checkbox-custom {
     display: none;
 }
@@ -5195,7 +5184,7 @@ select option.admin-select-action-option,
     white-space: nowrap;
 }
 
-/* Размеры: категория → плоский список (фильтры); вариант — select по категории товара */
+
 .variant-size-cell {
     position: relative;
     min-width: 0;
@@ -6063,7 +6052,7 @@ select option.admin-select-action-option,
     border-color: rgba(59, 82, 35, 0.22);
 }
 
-/* Атрибут hidden задаёт display:none, но общий display:flex его перебивает — явно скрываем. */
+
 .login-register-suggest[hidden] {
     display: none !important;
 }
@@ -6228,14 +6217,20 @@ select option.admin-select-action-option,
     user-select: none;
     white-space: nowrap;
     max-width: 100%;
-    transition: filter 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
+    transition:
+        filter 0.15s ease,
+        box-shadow 0.15s ease,
+        transform 0.05s ease,
+        background-position 0.35s ease;
 }
 
 .active-filter-tag {
     justify-content: flex-start;
     gap: 0.15rem;
-    background: linear-gradient(135deg, #3b5223 0%, #6b8a3a 100%);
-    box-shadow: 0 2px 10px rgba(59, 82, 35, 0.18);
+    background: var(--btn-gradient-primary);
+    background-size: 200% 200%;
+    background-position: 0% 50%;
+    box-shadow: var(--btn-grad-shadow-primary-soft);
 }
 
 .active-filter-label {
@@ -6281,8 +6276,9 @@ select option.admin-select-action-option,
 }
 
 .active-filter-tag:hover {
-    filter: brightness(1.05);
-    box-shadow: 0 4px 14px rgba(59, 82, 35, 0.22);
+    filter: var(--btn-grad-filter-hover);
+    background-position: 100% 50%;
+    box-shadow: var(--btn-grad-shadow-primary-soft-hover);
 }
 
 .active-filter-tag:active {
@@ -6294,13 +6290,16 @@ select option.admin-select-action-option,
 }
 
 .active-filter-clear-all {
-    background: linear-gradient(135deg, #5a1e1e 0%, #a02828 48%, #c53d3d 100%);
-    box-shadow: 0 2px 10px rgba(176, 42, 42, 0.22);
+    background: var(--btn-gradient-danger);
+    background-size: 200% 200%;
+    background-position: 0% 50%;
+    box-shadow: var(--btn-grad-shadow-danger);
 }
 
 .active-filter-clear-all:hover {
-    filter: brightness(1.05);
-    box-shadow: 0 4px 14px rgba(176, 42, 42, 0.28);
+    filter: var(--btn-grad-filter-hover);
+    background-position: 100% 50%;
+    box-shadow: var(--btn-grad-shadow-danger-hover);
 }
 
 .active-filter-clear-all:active {
@@ -6309,7 +6308,7 @@ select option.admin-select-action-option,
 
 .active-filter-clear-all:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 4px rgba(197, 61, 61, 0.35);
+    box-shadow: var(--btn-grad-focus-ring-danger), var(--btn-grad-shadow-danger);
 }
 
 .catalog-controls {
@@ -6707,8 +6706,8 @@ select option.admin-select-action-option,
     gap: 0.75rem;
 }
 
-.open-page-popup-btns .admin-ui-btn--primary,
-.open-page-popup-btns .admin-ui-btn--secondary {
+.open-page-popup-btns .btn--primary,
+.open-page-popup-btns .btn--secondary {
     width: 100%;
     justify-content: center;
     text-align: center;

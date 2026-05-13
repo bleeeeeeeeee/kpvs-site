@@ -14,10 +14,10 @@
     <div class="container">
         <header>
             <div class="section admin-header-bar">
-                <a href="/welcome.html" class="admin-logo-link" target="_blank" rel="noopener noreferrer"><img src="/img/logo.png" alt="ООО КПВС" id="logo"></a>
+                <a href="/welcome.html" class="admin-logo-link" target="_blank" rel="noopener noreferrer"><img src="/img/logo.png" alt="ООО КПВС" id="logo" width="140" height="42"></a>
                 <h1 class="admin-header-title">Администрирование</h1>
                 <div class="admin-header-actions">
-                    <button type="button" id="logout-btn" class="admin-ui-btn admin-ui-btn--danger">Выйти</button>
+                    <button type="button" id="logout-btn" class="btn btn--danger">Выйти</button>
                 </div>
             </div>
         </header>
@@ -34,7 +34,7 @@
                     <button type="button" class="admin-search-scope-btn is-active" data-scope="products" aria-pressed="true">Товары</button>
                     <button type="button" class="admin-search-scope-btn" data-scope="users" aria-pressed="false">Пользователи</button>
                 </div>
-                <button type="button" id="add-product-btn" class="admin-ui-btn admin-ui-btn--primary admin-add-product-btn">Добавить товар</button>
+                <button type="button" id="add-product-btn" class="btn btn--primary admin-add-product-btn">Добавить товар</button>
             </div>
             <div class="catalog-sort-row admin-catalog-sort-row admin-toolbar-row-sort">
                 <label for="sort-by" class="catalog-sort-label">Сортировка</label>
@@ -45,8 +45,8 @@
                     <option value="name_desc">Название Я–А</option>
                 </select>
                 <div class="admin-toolbar-sort-actions">
-                    <button type="button" id="open-filters-btn" class="admin-ui-btn admin-ui-btn--outline">Фильтры</button>
-                    <button type="button" id="refresh-btn" class="admin-ui-btn admin-ui-btn--outline" title="Обновить список" aria-label="Обновить список">
+                    <button type="button" id="open-filters-btn" class="btn btn--outline">Фильтры</button>
+                    <button type="button" id="refresh-btn" class="btn btn--outline" title="Обновить список" aria-label="Обновить список">
                         <img src="/img/reload.svg" alt="" class="admin-toolbar-refresh-icon" width="20" height="20" />
                     </button>
                 </div>
@@ -187,8 +187,8 @@
                 </div>
             </div>
             <div class="modal-footer admin-modal-footer filters-modal-footer">
-                <button id="clear-filters-btn" class="admin-ui-btn admin-ui-btn--danger" type="button">Сбросить</button>
-                <button id="apply-filters-btn" class="admin-ui-btn admin-ui-btn--primary filter-apply-btn" type="button">Применить</button>
+                <button id="clear-filters-btn" class="btn btn--danger" type="button">Сбросить</button>
+                <button id="apply-filters-btn" class="btn btn--primary filter-apply-btn" type="button">Применить</button>
             </div>
         </div>
     </div>
@@ -260,7 +260,7 @@
                     <div class="form-row">
                         <div class="form-row-header">
                             <label>Состав / Материалы</label>
-                            <button type="button" id="add-material-btn" class="admin-ui-btn admin-ui-btn--primary admin-ui-btn--sm">+ Добавить</button>
+                            <button type="button" id="add-material-btn" class="btn btn--primary btn--small">+ Добавить</button>
                         </div>
                         <div id="product-materials-list" class="admin-materials-list"></div>
                     </div>
@@ -290,7 +290,7 @@
                             </label>
                             <div class="admin-image-url-row">
                                 <input id="product-image-url" type="url" placeholder="Или вставьте URL изображения" />
-                                <button type="button" id="add-image-url-btn" class="admin-ui-btn admin-ui-btn--primary admin-ui-btn--sm">Добавить</button>
+                                <button type="button" id="add-image-url-btn" class="btn btn--primary btn--small">Добавить</button>
                             </div>
                         </div>
                         <div id="product-images-list" class="admin-image-list" aria-live="polite"></div>
@@ -314,7 +314,7 @@
                     <div class="form-row">
                         <div class="form-row-header">
                             <label>Варианты (размер, цвет, артикул)</label>
-                            <button type="button" id="add-variant-btn" class="admin-ui-btn admin-ui-btn--primary admin-ui-btn--sm">+ Добавить вариант</button>
+                            <button type="button" id="add-variant-btn" class="btn btn--primary btn--small">+ Добавить вариант</button>
                         </div>
                         <div id="product-variants-container" class="admin-variants-list"></div>
                     </div>
@@ -324,7 +324,7 @@
                     <div class="form-row">
                         <div class="form-row-header">
                             <label>Характеристики</label>
-                            <button type="button" id="add-attribute-btn" class="admin-ui-btn admin-ui-btn--primary admin-ui-btn--sm">+ Добавить</button>
+                            <button type="button" id="add-attribute-btn" class="btn btn--primary btn--small">+ Добавить</button>
                         </div>
                         <div id="product-attributes-container" class="admin-attributes-list"></div>
                     </div>
@@ -345,11 +345,11 @@
                 </form>
                 <div class="product-modal-footer">
                     <div class="product-modal-footer-left">
-                        <button type="button" class="admin-ui-btn admin-ui-btn--danger" id="delete-product-btn" hidden>Удалить</button>
+                        <button type="button" class="btn btn--danger" id="delete-product-btn" hidden>Удалить</button>
                     </div>
                     <div class="product-modal-footer-right">
-                        <button type="button" class="admin-ui-btn admin-ui-btn--secondary" id="cancel-product-btn">Отмена</button>
-                        <button type="submit" class="admin-ui-btn admin-ui-btn--primary" id="save-product-btn" form="product-form">Сохранить</button>
+                        <button type="button" class="btn btn--secondary" id="cancel-product-btn">Отмена</button>
+                        <button type="submit" class="btn btn--primary" id="save-product-btn" form="product-form">Сохранить</button>
                     </div>
                 </div>
             </div>
@@ -397,8 +397,8 @@
                 </form>
             </div>
             <div class="modal-footer admin-modal-footer">
-                <button type="button" id="collection-cancel-btn" class="admin-ui-btn admin-ui-btn--secondary">Отмена</button>
-                <button type="button" id="collection-save-btn" class="admin-ui-btn admin-ui-btn--primary">Сохранить</button>
+                <button type="button" id="collection-cancel-btn" class="btn btn--secondary">Отмена</button>
+                <button type="button" id="collection-save-btn" class="btn btn--primary">Сохранить</button>
             </div>
         </div>
     </div>
@@ -424,8 +424,8 @@
                 </form>
             </div>
             <div class="modal-footer admin-modal-footer">
-                <button type="button" id="brand-quick-cancel-btn" class="admin-ui-btn admin-ui-btn--secondary">Отмена</button>
-                <button type="button" id="brand-quick-save-btn" class="admin-ui-btn admin-ui-btn--primary">Создать</button>
+                <button type="button" id="brand-quick-cancel-btn" class="btn btn--secondary">Отмена</button>
+                <button type="button" id="brand-quick-save-btn" class="btn btn--primary">Создать</button>
             </div>
         </div>
     </div>
@@ -451,8 +451,8 @@
                 </form>
             </div>
             <div class="modal-footer admin-modal-footer">
-                <button type="button" id="size-quick-cancel-btn" class="admin-ui-btn admin-ui-btn--secondary">Отмена</button>
-                <button type="button" id="size-quick-save-btn" class="admin-ui-btn admin-ui-btn--primary">Создать</button>
+                <button type="button" id="size-quick-cancel-btn" class="btn btn--secondary">Отмена</button>
+                <button type="button" id="size-quick-save-btn" class="btn btn--primary">Создать</button>
             </div>
         </div>
     </div>
@@ -491,8 +491,8 @@
                 </form>
             </div>
             <div class="modal-footer admin-modal-footer">
-                <button type="button" id="user-cancel-btn" class="admin-ui-btn admin-ui-btn--secondary">Отмена</button>
-                <button type="button" id="user-save-btn" class="admin-ui-btn admin-ui-btn--primary">Создать</button>
+                <button type="button" id="user-cancel-btn" class="btn btn--secondary">Отмена</button>
+                <button type="button" id="user-save-btn" class="btn btn--primary">Создать</button>
             </div>
         </div>
     </div>
@@ -507,8 +507,8 @@
                 <p id="visibility-confirm-message" class="visibility-confirm-message"></p>
             </div>
             <div class="modal-footer visibility-confirm-footer admin-modal-footer">
-                <button type="button" id="visibility-confirm-cancel" class="admin-ui-btn admin-ui-btn--secondary filter-clear-btn">Отмена</button>
-                <button type="button" id="visibility-confirm-ok" class="admin-ui-btn admin-ui-btn--primary filter-apply-btn">Подтвердить</button>
+                <button type="button" id="visibility-confirm-cancel" class="btn btn--secondary filter-clear-btn">Отмена</button>
+                <button type="button" id="visibility-confirm-ok" class="btn btn--primary filter-apply-btn">Подтвердить</button>
             </div>
         </div>
     </div>
@@ -523,9 +523,11 @@
                 <p class="visibility-confirm-message">Есть несохранённые на сервере изменения. Выберите действие.</p>
             </div>
             <div class="modal-footer admin-modal-footer visibility-confirm-footer product-exit-draft-footer">
-                <button type="button" id="product-exit-draft-stay" class="admin-ui-btn admin-ui-btn--secondary filter-clear-btn">Остаться</button>
-                <button type="button" id="product-exit-draft-discard" class="admin-ui-btn admin-ui-btn--danger">Выйти без сохранения</button>
-                <button type="button" id="product-exit-draft-save" class="admin-ui-btn admin-ui-btn--primary filter-apply-btn">Сохранить черновик и выйти</button>
+                <button type="button" id="product-exit-draft-stay" class="btn btn--secondary filter-clear-btn product-exit-draft-stay">Остаться</button>
+                <div class="product-exit-draft-actions">
+                    <button type="button" id="product-exit-draft-discard" class="btn btn--danger">Выйти без сохранения</button>
+                    <button type="button" id="product-exit-draft-save" class="btn btn--primary filter-apply-btn">Сохранить черновик и выйти</button>
+                </div>
             </div>
         </div>
     </div>

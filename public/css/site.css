@@ -3,8 +3,9 @@
 @import './components/modal.css';
 @import './components/card.css';
 @import './components/form.css';
+@import './legacy-app.css';
 @import './pages/catalog.css';
 @import './pages/product.css';
 @import './pages/admin.css';
 @import './pages/welcome.css';
-@import './legacy-app.css';
+@import './pages/login.css';
