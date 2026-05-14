@@ -13,7 +13,16 @@ const Admin = (() => {
       } catch {
       }
       const usersPanel = document.getElementById("admin-users-panel");
-      if (usersPanel && !(user && user.role === "superadmin")) usersPanel.hidden = true;
+      const isSuperadmin = !!(user && user.role === "superadmin");
+      document.body.classList.toggle("admin-no-users-panel", !!user && !isSuperadmin);
+      if (usersPanel) {
+        if (!isSuperadmin) {
+          usersPanel.hidden = true;
+          usersPanel.setAttribute("aria-hidden", "true");
+        } else {
+          usersPanel.removeAttribute("aria-hidden");
+        }
+      }
       return true;
     } catch {
       window.location.replace("/login.html?mode=admin&next=%2Fadmin.html");
@@ -263,11 +272,20 @@ const Admin = (() => {
     if (!isSuperadminSession()) {
       productsPanel.hidden = false;
       usersPanel.hidden = true;
+      productsPanel.removeAttribute("aria-hidden");
+      usersPanel.setAttribute("aria-hidden", "true");
       return;
     }
     const usersScope = effectiveAdminSearchScope() === "users";
     productsPanel.hidden = usersScope;
     usersPanel.hidden = !usersScope;
+    if (usersScope) {
+      productsPanel.setAttribute("aria-hidden", "true");
+      usersPanel.removeAttribute("aria-hidden");
+    } else {
+      productsPanel.removeAttribute("aria-hidden");
+      usersPanel.setAttribute("aria-hidden", "true");
+    }
   }
   function syncAdminToolbarForSearchScope() {
     syncPrimaryToolbarAddButton();
@@ -317,6 +335,7 @@ const Admin = (() => {
         }
       };
     });
+    syncAdminDataPanelsVisibility();
   }
   function scheduleAdminToolbarSearch() {
     clearTimeout(searchInputTimer);
@@ -3534,8 +3553,10 @@ const Admin = (() => {
     checkAuth().then(function(ok) {
       if (!ok) return;
       bindUsersEvents();
-      fetchUsers().catch(function() {
-      });
+      if (ui.currentUser && ui.currentUser.role === "superadmin") {
+        fetchUsers().catch(function() {
+        });
+      }
       Promise.all([
         fetchCategories(),
         fetchBrands(),

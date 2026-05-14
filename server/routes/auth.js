@@ -89,13 +89,19 @@ function mountAuthRoutes(app, ctx) {
       res.status(500).json({ error: "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430" });
     }
   });
+  const sessionCookieClearOpts = () => ({
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+    secure: !!COOKIE_SECURE
+  });
   app.post("/api/auth/logout", (req, res) => {
     req.session.destroy((err) => {
       if (err) {
         console.error("Session destroy error:", err);
         return res.status(500).json({ error: "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u044C \u0441\u0435\u0441\u0441\u0438\u044E" });
       }
-      res.clearCookie("connect.sid");
+      res.clearCookie("connect.sid", sessionCookieClearOpts());
       res.json({ ok: true });
     });
   });
@@ -325,8 +331,24 @@ function mountAuthRoutes(app, ctx) {
     }
   });
   app.post("/api/user/auth/logout", (req, res) => {
-    res.clearCookie(JWT_COOKIE_NAME, { path: "/", httpOnly: true, sameSite: "strict", secure: COOKIE_SECURE });
-    res.type("application/json").json({ ok: true });
+    res.clearCookie(JWT_COOKIE_NAME, cookieOpts());
+    const hasStaffSession = !!(req.session && req.session.user);
+    if (hasStaffSession) {
+      res.type("application/json").json({ ok: true });
+      return;
+    }
+    const finish = () => {
+      res.clearCookie("connect.sid", sessionCookieClearOpts());
+      res.type("application/json").json({ ok: true });
+    };
+    if (req.session && typeof req.session.destroy === "function") {
+      req.session.destroy((destroyErr) => {
+        if (destroyErr) console.error("POST /api/user/auth/logout session destroy:", destroyErr);
+        finish();
+      });
+    } else {
+      finish();
+    }
   });
   async function handleRecover(req, res) {
     try {

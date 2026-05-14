@@ -545,6 +545,35 @@
     background: var(--primary-color);
 }
 
+[data-theme="dark"] .card-visual-wrap .card-hover-overlay {
+    background: rgba(0, 0, 0, 0.88);
+}
+
+[data-theme="dark"] .card-favorite-btn {
+    background: #4d5616;
+    color: #f4f6ea;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="dark"] .card-favorite-btn:hover {
+    background: #5d6820;
+    color: #fff;
+}
+
+[data-theme="dark"] .card-cart-btn {
+    background: #8faa3a;
+    color: #12160a;
+    font-weight: 700;
+    border: 1px solid rgba(0, 0, 0, 0.28);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="dark"] .card-cart-btn:hover {
+    background: #9eb84a;
+    color: #0a0c06;
+}
+
 .card-tags {
     position: absolute;
     top: 0.55rem;
@@ -613,6 +642,10 @@
 .central {
     --welcome-card-w: clamp(10rem, 18vw, 15rem);
     --welcome-gap: clamp(5rem, 16vw, 34rem);
+    --welcome-plaque-py: 0.55rem;
+    --welcome-plaque-px: 0.75rem;
+    --welcome-plaque-fs: clamp(1rem, 1.6vw, 1.45rem);
+    --welcome-plaque-lh: 1.35;
 }
 
 .welcome-glass {
@@ -668,20 +701,24 @@
     height: auto;
 }
 
+.central .genders .caption,
+.welcome-shell .welcome-all-btn {
+    padding: var(--welcome-plaque-py) var(--welcome-plaque-px);
+    font-size: var(--welcome-plaque-fs);
+    line-height: var(--welcome-plaque-lh);
+    font-weight: 600;
+    text-align: center;
+    box-sizing: border-box;
+    min-height: calc(2 * var(--welcome-plaque-py) + var(--welcome-plaque-lh) * 1em);
+}
+
 .central .genders .caption {
     position: absolute;
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 0.55rem 0.75rem;
-    font-size: clamp(1rem, 1.6vw, 1.45rem);
-    font-weight: 600;
-    text-align: center;
     border-radius: 0.75rem;
     transform: none;
-}
-
-.central .genders .caption {
     background: rgba(192, 192, 192, 0.5);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -1666,6 +1703,11 @@ html.modal-open body .notification * {
     line-height: 1.2;
 }
 
+/* .btn sets display:inline-flex; keep toggle hidden while password panel is open */
+.account-settings--security>#account-password-toggle.btn[hidden] {
+    display: none !important;
+}
+
 .account-disclosure-panel {
     display: flex;
     flex-direction: column;
@@ -2546,11 +2588,11 @@ html.modal-open body .notification * {
 .welcome-all-btn {
     width: 100%;
     border: 0;
-    padding: 0.55rem 0.75rem;
-    font-size: clamp(1rem, 1.6vw, 1.45rem);
-    font-weight: 600;
     cursor: pointer;
     transform: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .welcome-all-btn:active {
@@ -2560,6 +2602,13 @@ html.modal-open body .notification * {
 .welcome-all-btn:focus-visible {
     outline: none;
     box-shadow: 0 0 0 4px rgba(182, 197, 63, 0.25);
+}
+
+@media (max-width: 767px) {
+    .welcome-shell .welcome-all-btn.btn {
+        min-height: calc(2 * var(--welcome-plaque-py) + var(--welcome-plaque-lh) * 1em);
+        min-width: 0;
+    }
 }
 
 .site-icon-btn {
@@ -2936,15 +2985,6 @@ html.modal-open body .notification * {
     margin-top: 1rem;
 }
 
-.site-product-actions .btn.product-page-action-btn {
-    width: 100%;
-    justify-content: center;
-    box-sizing: border-box;
-    min-height: 2.75rem;
-    font-weight: 700;
-    border-radius: 0.75rem;
-}
-
 .admin-page .admin-catalog-controls.catalog-controls {
     padding: 1rem 1.1rem;
     margin-bottom: 0.5rem;
@@ -3024,6 +3064,10 @@ html.modal-open body .notification * {
 
 #admin-products-panel {
     margin-top: 0.15rem;
+}
+
+#admin-products-panel[hidden] {
+    display: none !important;
 }
 
 .admin-section-title {
@@ -3185,6 +3229,15 @@ html.modal-open body .notification * {
 
 #admin-users-panel {
     margin-top: 0.85rem;
+}
+
+/* Секция пользователей только для superadmin (дублирует hidden: надёжнее чем .admin-data-panel { display:block }) */
+.admin-page.admin-no-users-panel #admin-users-panel {
+    display: none !important;
+}
+
+#admin-users-panel[hidden] {
+    display: none !important;
 }
 
 .admin-page .admin-table td {
@@ -4581,8 +4634,12 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
         justify-content: center;
     }
 
+    .central {
+        --welcome-plaque-fs: 1.25rem;
+    }
+
     .central .genders .caption {
-        font-size: 1.25rem;
+        width: 12rem;
     }
 
     .central header #welcome-logo {
@@ -4590,10 +4647,6 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 
     .central .genders img {
-        width: 12rem;
-    }
-
-    .central .genders .caption {
         width: 12rem;
     }
 
@@ -4707,6 +4760,9 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     .central {
         padding: 1.25rem 1rem;
         height: 100dvh;
+        --welcome-plaque-py: 0.5rem;
+        --welcome-plaque-px: 0.5rem;
+        --welcome-plaque-fs: 1rem;
     }
 
     .central header {
@@ -4734,8 +4790,6 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     .central .genders .caption {
         width: 100%;
         max-width: 14rem;
-        font-size: 1rem;
-        padding: 0.5rem;
     }
 
     .secTitle {
@@ -4978,9 +5032,12 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
         max-width: 12rem;
     }
 
+    .central {
+        --welcome-plaque-fs: 0.9rem;
+    }
+
     .central .genders .caption {
         max-width: 12rem;
-        font-size: 0.9rem;
     }
 
     .card-visual-wrap {

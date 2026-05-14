@@ -62,7 +62,8 @@
     if (built.pwdPanel) built.pwdPanel.hidden = true;
     if (built.btnPwdToggle) {
       built.btnPwdToggle.setAttribute("aria-expanded", "false");
-      built.btnPwdToggle.hidden = false;
+      built.btnPwdToggle.removeAttribute("hidden");
+      built.btnPwdToggle.style.display = "";
     }
   }
   function syncPasswordOldRow(built, me) {
@@ -670,12 +671,38 @@
       }
     });
     built.btnLogout.addEventListener("click", function() {
-      try {
-        localStorage.removeItem(TOKEN_KEY);
-      } catch {
-      }
-      hideModal();
-      window.location.reload();
+      built.btnLogout.disabled = true;
+      if (built.hint) built.hint.textContent = "";
+      apiFetchAccount("/api/csrf-token", { method: "GET" })
+        .catch(function() {})
+        .then(function() {
+          return apiFetchAccount("/api/user/auth/logout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: "{}"
+          });
+        })
+        .then(function(r) {
+          built.btnLogout.disabled = false;
+          if (r && r.ok) {
+            try {
+              localStorage.removeItem(TOKEN_KEY);
+            } catch (_) {}
+            hideModal();
+            window.location.reload();
+            return;
+          }
+          if (built.hint) {
+            built.hint.textContent =
+              "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0432\u044B\u0439\u0442\u0438. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437.";
+          }
+        })
+        .catch(function() {
+          built.btnLogout.disabled = false;
+          if (built.hint) {
+            built.hint.textContent = "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0442\u0438.";
+          }
+        });
     });
     built.btnLogin.addEventListener("click", function() {
       hideModal();
@@ -692,7 +719,8 @@
       if (on && built.pwdPanel && built.btnPwdToggle) {
         built.pwdPanel.hidden = true;
         built.btnPwdToggle.setAttribute("aria-expanded", "false");
-        built.btnPwdToggle.hidden = false;
+        built.btnPwdToggle.removeAttribute("hidden");
+        built.btnPwdToggle.style.display = "";
       }
       if (on) {
         setTimeout(function() {
@@ -708,7 +736,13 @@
       if (!built.pwdPanel || !built.btnPwdToggle) return;
       built.pwdPanel.hidden = !on;
       built.btnPwdToggle.setAttribute("aria-expanded", on ? "true" : "false");
-      built.btnPwdToggle.hidden = !!on;
+      if (on) {
+        built.btnPwdToggle.setAttribute("hidden", "");
+        built.btnPwdToggle.style.display = "none";
+      } else {
+        built.btnPwdToggle.removeAttribute("hidden");
+        built.btnPwdToggle.style.display = "";
+      }
       if (on) setRenameMode(false);
       if (on) {
         setTimeout(function() {
@@ -1008,8 +1042,8 @@
     }
     if (built.btnPwdToggle) {
       built.btnPwdToggle.disabled = false;
+      built.btnPwdToggle.removeAttribute("hidden");
       built.btnPwdToggle.style.display = "";
-      built.btnPwdToggle.hidden = false;
     }
     if (built.pwdPanel) built.pwdPanel.hidden = true;
     if (built.btnPwdToggle) built.btnPwdToggle.setAttribute("aria-expanded", "false");

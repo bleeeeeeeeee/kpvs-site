@@ -409,7 +409,8 @@
   height: 1.4rem !important;
 }
 
-.site-product-actions .btn.product-page-action-btn {
+/* Единая типографика и размеры для всех CTA на карточке товара (цвета — у вариантов ниже) */
+.site-product-actions > .btn {
   width: 100%;
   justify-content: center;
   box-sizing: border-box;
@@ -420,6 +421,9 @@
   letter-spacing: 0.01em;
   line-height: 1.25;
   border-radius: var(--radius-lg);
+}
+
+.site-product-actions .btn.product-page-action-btn {
   border: none;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
