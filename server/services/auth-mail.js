@@ -64,6 +64,92 @@ function brevoSender() {
   if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user)) return { name: "KPVS", email: user };
   return { name: "", email: "" };
 }
+function sendgridApiKey() {
+  return String(process.env.SENDGRID_API_KEY || "").trim();
+}
+function sendgridSender() {
+  const direct = String(process.env.SENDGRID_FROM_EMAIL || "").trim();
+  if (direct && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(direct)) {
+    const name = String(process.env.SENDGRID_FROM_NAME || process.env.SMTP_SENDER_NAME || "KPVS").trim() || "KPVS";
+    return { name, email: direct };
+  }
+  const resendHdr = stripOuterQuotes(process.env.RESEND_FROM || "");
+  const fromResend = parseNameEmailFromFromHeader(resendHdr);
+  if (fromResend.email) {
+    return { name: fromResend.name || "KPVS", email: fromResend.email };
+  }
+  return brevoSender();
+}
+function sendgridFirstErrorMessage(parsed) {
+  if (!parsed || typeof parsed !== "object") return "";
+  const arr = parsed.errors;
+  if (!Array.isArray(arr) || !arr.length) return "";
+  const m = arr[0] && arr[0].message;
+  return typeof m === "string" ? m : "";
+}
+async function trySendViaSendGrid(toEmail, subject, text) {
+  const apiKey = sendgridApiKey();
+  const sender = sendgridSender();
+  if (!apiKey || !sender.email) return false;
+  const apiHost = String(process.env.SENDGRID_API_HOST || "api.sendgrid.com")
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/.*$/, "");
+  const sendUrl = "https://" + (apiHost || "api.sendgrid.com") + "/v3/mail/send";
+  const payload = {
+    personalizations: [{ to: [{ email: String(toEmail || "").trim() }] }],
+    from: { email: sender.email, name: sender.name || "KPVS" },
+    subject: String(subject || ""),
+    content: [{ type: "text/plain", value: String(text || "") }]
+  };
+  let res;
+  try {
+    res = await fetch(sendUrl, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer " + apiKey,
+        "content-type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    logMailError("sendgrid-fetch", err);
+    return false;
+  }
+  if (!res.ok) {
+    let raw = "";
+    try {
+      raw = await res.text();
+    } catch {
+    }
+    console.error("[mail] sendgrid HTTP", res.status, raw.slice(0, 1200));
+    let j = null;
+    try {
+      j = JSON.parse(raw);
+    } catch {
+    }
+    const apiMsg = sendgridFirstErrorMessage(j) || raw.slice(0, 500);
+    if (res.status === 401) {
+      throw new MailProviderError(
+        "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u0438\u043B\u0438 \u043E\u0442\u0437\u043E\u0432\u0430\u043D\u043D\u044B\u0439 SendGrid API key (\u043E\u0442\u0432\u0435\u0442 401). \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u0443\u044E SENDGRID_API_KEY \u0432 \u043F\u0430\u043D\u0435\u043B\u0438 SendGrid (\u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 API Keys) \u0438 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u044F \u0434\u043E\u0441\u0442\u0443\u043F\u0430 \u043A API." +
+          (apiMsg ? " SendGrid: " + apiMsg : ""),
+        { clientCode: "sendgrid_unauthorized", httpStatus: 503 }
+      );
+    }
+    const first = Array.isArray(j && j.errors) ? j.errors[0] : null;
+    const firstField = first && String(first.field || "");
+    const firstMsg = first && typeof first.message === "string" ? first.message : "";
+    if (res.status === 403 && (firstField === "from" || /verified Sender Identity|Sender Identity|authenticated domain|does not match a verified/i.test(firstMsg + apiMsg))) {
+      throw new MailProviderError(
+        "\u041E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u0435\u043B\u044C \u043D\u0435 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0451\u043D \u0432 SendGrid (Single Sender \u0438\u043B\u0438 Domain Authentication). \u0412 \u043A\u0430\u0431\u0438\u043D\u0435\u0442\u0435 SendGrid \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0434\u0438\u0442\u0435 \u0442\u043E\u0442 \u0436\u0435 email, \u0447\u0442\u043E \u0432 SENDGRID_FROM_EMAIL / \u0430\u0434\u0440\u0435\u0441 \u0432 From." +
+          (apiMsg ? " SendGrid: " + apiMsg : ""),
+        { clientCode: "sendgrid_sender_not_verified", httpStatus: 503 }
+      );
+    }
+    return false;
+  }
+  return true;
+}
 async function trySendViaBrevo(toEmail, subject, text) {
   const apiKey = brevoApiKey();
   const sender = brevoSender();
@@ -216,6 +302,7 @@ async function trySendResetEmail(toEmail, link) {
 ${link}
 
 \u0415\u0441\u043B\u0438 \u0432\u044B \u043D\u0435 \u0437\u0430\u043F\u0440\u0430\u0448\u0438\u0432\u0430\u043B\u0438 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u2014 \u043F\u0440\u043E\u0441\u0442\u043E \u0438\u0433\u043D\u043E\u0440\u0438\u0440\u0443\u0439\u0442\u0435 \u044D\u0442\u043E \u043F\u0438\u0441\u044C\u043C\u043E.`;
+  if (await trySendViaSendGrid(toEmail, subject, text)) return true;
   if (await trySendViaBrevo(toEmail, subject, text)) return true;
   if (await trySendViaResend(toEmail, subject, text)) return true;
   const cfg = createTransportFromEnv();
@@ -233,6 +320,7 @@ async function trySendEmailVerificationCode(toEmail, code) {
 
 \u041A\u043E\u0434 \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u0435\u0442 10 \u043C\u0438\u043D\u0443\u0442.
 \u0415\u0441\u043B\u0438 \u0432\u044B \u043D\u0435 \u0437\u0430\u043F\u0440\u0430\u0448\u0438\u0432\u0430\u043B\u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u2014 \u043F\u0440\u043E\u0441\u0442\u043E \u0438\u0433\u043D\u043E\u0440\u0438\u0440\u0443\u0439\u0442\u0435 \u044D\u0442\u043E \u043F\u0438\u0441\u044C\u043C\u043E.`;
+  if (await trySendViaSendGrid(toEmail, subject, text)) return true;
   if (await trySendViaBrevo(toEmail, subject, text)) return true;
   if (await trySendViaResend(toEmail, subject, text)) return true;
   const cfg = createTransportFromEnv();
@@ -245,6 +333,9 @@ async function trySendEmailVerificationCode(toEmail, code) {
   });
 }
 function isOutboundMailConfigured() {
+  if (sendgridApiKey()) {
+    return !!sendgridSender().email;
+  }
   if (brevoApiKey()) {
     return !!brevoSender().email;
   }
