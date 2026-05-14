@@ -47,21 +47,15 @@ npm start
 | `STORAGE_*` | для загрузок: **да** | S3-совместимое API (см. ниже). |
 | `PUBLIC_URL` / `MEDIA_CDN_BASE` | нет | База для публичных URL медиа в API (`server/db/media-url.js`). |
 | `GOOGLE_*` | нет | OAuth Google для пользователей. |
-| `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL` | нет | **[SendGrid](https://sendgrid.com)** Mail Send API v3 по HTTPS (успех **202**). Имя: `SENDGRID_FROM_NAME`. From = подтверждённый отправитель. EU: `SENDGRID_API_HOST=api.eu.sendgrid.com`. |
-| `RESEND_API_KEY`, `RESEND_FROM` | нет | Resend по HTTPS (см. `server/services/auth-mail.js`). |
-| `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` | нет, **удобно на Render** | Brevo (ex-Sendinblue): API v3 по HTTPS, без SMTP. Имя: `BREVO_SENDER_NAME`. Допускается `SENDINBLUE_API_KEY`. |
-| `SMTP_*` / `SMTP_URL` | нет | Fallback после SendGrid / Brevo / Resend. Для Brevo SMTP: `smtp-relay.brevo.com`, порт 587. |
+| `SMTP_*` / `SMTP_URL` | для писем: **да** (один из вариантов) | Исходящая почта: Nodemailer, см. `server/services/auth-mail.js`. |
 | `EMAIL_CODE_PEPPER` | нет | Доп. секрет для хеша кодов. |
 | `ADMIN_*` | только для bootstrap | Создание первого admin. |
 
 ### Почта на production
 
 1. Задайте **`APP_BASE_URL`** как публичный `https://ваш-домен` (ссылка в письме сброса пароля).
-2. **[SendGrid](https://sendgrid.com):** API key с правом **Mail Send**, переменные **`SENDGRID_API_KEY`** и **`SENDGRID_FROM_EMAIL`** (тот же адрес, что в [Sender Authentication](https://app.sendgrid.com/settings/sender_auth) — Single Sender или верифицированный домен). Запрос идёт на `https://api.sendgrid.com/v3/mail/send` (для EU-аккаунта: **`SENDGRID_API_HOST=api.eu.sendgrid.com`**), при успехе SendGrid отвечает **202 Accepted** (это нормально). Ограничение доступа API по IP — в Settings → **IP Access Management**; на Render без фиксированного egress удобнее не включать жёсткий whitelist.
-3. **Render / облако:** альтернатива — **[Brevo](https://www.brevo.com)** — в панели создайте **API key** (начинается с `xkeysib-`), в Render добавьте **`BREVO_API_KEY`** и **`BREVO_SENDER_EMAIL`** (тот же адрес, что подтверждён в Brevo как отправитель). Письма уходят через **HTTPS** на `api.brevo.com`, без SMTP и без проблем IPv6 (`ENETUNREACH` к `smtp.gmail.com`). Если в логах **`[mail] brevo HTTP 401`** с текстом про **неразрешённый IP**, откройте https://app.brevo.com/security/authorised_ips : для Render без статического egress надёжнее **отключить** ограничение API по IP для этого ключа; иначе добавляйте текущий egress-IP в whitelist (он может меняться при деплое). Если **`[mail] brevo HTTP 403`** с **`permission_denied`** и текстом про **неактивированный SMTP** — завершите активацию отправки в кабинете Brevo или напишите в **contact@brevo.com**; до этого и API, и SMTP Brevo могут отказывать, а следующий в цепочке SMTP-хост может давать **ETIMEDOUT**.
-4. Альтернатива: **[Resend](https://resend.com)** (`RESEND_API_KEY`, `RESEND_FROM`).
-5. **SMTP** используется только если нет успешной отправки через SendGrid / Brevo / Resend. Для Brevo: хост **`smtp-relay.brevo.com`**, не Gmail. При ошибках TLS смотрите логи `[mail]` и при необходимости `SMTP_TLS_REJECT_UNAUTHORIZED=false`.
-6. **Supabase + Render:** при ошибке `EMAXCONNSESSION` уменьшите параллелизм: задайте **`PG_POOL_MAX=2`** или `3` в переменных окружения (по умолчанию для Supabase в коде уже снижено до 4).
+2. **SMTP** (`server/services/auth-mail.js`): **`SMTP_URL`** + **`SMTP_FROM`** *или* **`SMTP_HOST`**, **`SMTP_PORT`**, **`SMTP_USER`**, **`SMTP_PASS`**, **`SMTP_FROM`**. Логи ошибок доставки смотрите по префиксу **`[mail]`**. На PaaS при ошибках подключения к IPv6 попробуйте оставить **`SMTP_FORCE_IPV4=true`** (значение по умолчанию). **`SMTP_TLS_REJECT_UNAUTHORIZED=false`** — только если осознанно нужно ослабить проверку TLS.
+3. **Supabase + Render:** при ошибке `EMAXCONNSESSION` уменьшите параллелизм: задайте **`PG_POOL_MAX=2`** или `3` в переменных окружения (по умолчанию для Supabase в коде уже снижено до 4).
 
 ## 4. Облако для изображений (S3-совместимое)
 
