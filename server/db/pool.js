@@ -1,5 +1,18 @@
 const { Pool } = require("pg");
 const isProduction = process.env.NODE_ENV === "production";
+function databaseUrlHostSuggestsSsl(connectionString) {
+  const raw = String(connectionString || "").trim();
+  if (!raw) return false;
+  try {
+    const u = new URL(raw.replace(/^postgres(ql)?:/i, "http:"));
+    const h = (u.hostname || "").toLowerCase();
+    if (h.includes("supabase.co")) return true;
+    if (h.includes("neon.tech")) return true;
+    if (h.includes("pooler.supabase.com")) return true;
+  } catch {
+  }
+  return false;
+}
 function warnIfDatabaseUrlHostLooksLikePlaceholder(connectionString) {
   const raw = String(connectionString || "").trim();
   if (!raw) return;
@@ -24,8 +37,19 @@ function buildPoolConfig() {
     connectionTimeoutMillis: 2e3
   };
   const sslMode = String(process.env.PGSSLMODE || "").toLowerCase();
-  const wantSsl = sslMode === "require" || String(process.env.PGSSL || "").toLowerCase() === "true" || isProduction && Boolean(process.env.DATABASE_URL);
-  const ssl = wantSsl ? { rejectUnauthorized: process.env.PGSSL_REJECT_UNAUTHORIZED !== "false" } : void 0;
+  const wantSsl =
+    sslMode === "require" ||
+    String(process.env.PGSSL || "").toLowerCase() === "true" ||
+    (process.env.DATABASE_URL && databaseUrlHostSuggestsSsl(process.env.DATABASE_URL)) ||
+    (isProduction && Boolean(process.env.DATABASE_URL));
+  function sslRejectUnauthorized() {
+    const v = String(process.env.PGSSL_REJECT_UNAUTHORIZED || "").toLowerCase();
+    if (v === "false" || v === "0") return false;
+    if (v === "true" || v === "1") return true;
+    if (process.env.DATABASE_URL && databaseUrlHostSuggestsSsl(process.env.DATABASE_URL)) return false;
+    return true;
+  }
+  const ssl = wantSsl ? { rejectUnauthorized: sslRejectUnauthorized() } : void 0;
   if (process.env.DATABASE_URL) {
     warnIfDatabaseUrlHostLooksLikePlaceholder(process.env.DATABASE_URL);
     return { connectionString: process.env.DATABASE_URL, ...common, ssl: wantSsl ? ssl : void 0 };

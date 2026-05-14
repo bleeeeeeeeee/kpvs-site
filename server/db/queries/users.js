@@ -44,6 +44,7 @@ async function verifyUser(db, username, password) {
   );
   const user = result.rows[0] || null;
   if (!user || !user.is_active) return null;
+  if (!user.password_hash) return null;
   const ok = await bcrypt.compare(String(password || ""), user.password_hash);
   if (!ok) return null;
   await db.query("UPDATE users SET last_login = NOW() WHERE id = $1", [user.id]);
@@ -68,6 +69,7 @@ async function verifyUserByLogin(db, login, password) {
     user = await findUserByEmail(db, eLower);
   }
   if (!user || !user.is_active) return null;
+  if (!user.password_hash) return null;
   const ok = await bcrypt.compare(password, user.password_hash);
   if (!ok) return null;
   await db.query("UPDATE users SET last_login = NOW() WHERE id = $1", [user.id]);
@@ -320,6 +322,7 @@ async function changeUserPassword(db, id, newPassword) {
 async function changeUserPasswordWithOld(db, id, oldPassword, newPassword) {
   const user = await findUserById(db, id);
   if (!user || !user.is_active) return { ok: false, error: "not_found" };
+  if (!user.password_hash) return { ok: false, error: "wrong_old" };
   const okOld = await bcrypt.compare(String(oldPassword || ""), user.password_hash);
   if (!okOld) return { ok: false, error: "wrong_old" };
   const hash = await bcrypt.hash(String(newPassword || ""), 12);

@@ -15,7 +15,11 @@ const {
   sha256Hex,
   readUserJwtToken
 } = require("../services/auth-helpers");
-const { trySendResetEmail, trySendEmailVerificationCode } = require("../services/auth-mail");
+const {
+  trySendResetEmail,
+  trySendEmailVerificationCode,
+  isOutboundMailConfigured
+} = require("../services/auth-mail");
 const MAX_LOGIN_USERNAME_LEN = 128;
 const MAX_PASSWORD_INPUT_LEN = 500;
 const MAX_EMAIL_LEN = 254;
@@ -169,16 +173,25 @@ function mountAuthRoutes(app, ctx) {
           return res.status(429).json({ error: "\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u0447\u0430\u0441\u0442\u043E. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0447\u0435\u0440\u0435\u0437 \u043C\u0438\u043D\u0443\u0442\u0443" });
         }
       }
+      if (!isOutboundMailConfigured()) {
+        return res.status(503).json({
+          error:
+            "\u041E\u0442\u043F\u0440\u0430\u0432\u043A\u0430 \u043F\u0438\u0441\u044C\u043C \u043D\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D\u0430 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435. \u0423\u043A\u0430\u0436\u0438\u0442\u0435 RESEND_API_KEY \u0438 RESEND_FROM (\u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u0442\u0441\u044F \u0434\u043B\u044F \u0445\u043E\u0441\u0442\u0438\u043D\u0433\u0430) \u0438\u043B\u0438 \u043F\u043E\u043B\u043D\u044B\u0439 \u043D\u0430\u0431\u043E\u0440 SMTP_*.",
+          code: "mail_not_configured"
+        });
+      }
       const code = makeSixDigitCode();
+      const sent = await trySendEmailVerificationCode(e, code);
+      if (!sent) {
+        return res.status(503).json({
+          error:
+            "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043F\u0438\u0441\u044C\u043C\u043E. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043B\u043E\u0433\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0438 \u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u043E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u044F (Resend \u0438\u043B\u0438 SMTP).",
+          code: "email_send_failed"
+        });
+      }
       const codeHashVal = emailCodeHash(e, p, code, JWT_SECRET);
       const expiresAt = new Date(Date.now() + 10 * 60 * 1e3);
       await db.insertEmailVerificationCode(e, p, codeHashVal, expiresAt);
-      try {
-        const sent = await trySendEmailVerificationCode(e, code);
-        if (!sent) console.warn("[email-verify] SMTP not configured \u2014 outbound email skipped");
-      } catch (mailErr) {
-        console.error("[email-verify] send failed:", mailErr && mailErr.message ? mailErr.message : mailErr);
-      }
       res.json({ ok: true });
     } catch (err) {
       console.error("POST /api/user/auth/email-code:", err);
@@ -411,10 +424,6 @@ function mountAuthRoutes(app, ctx) {
           code: "recover_role"
         });
       }
-      const rawToken = crypto.randomBytes(32).toString("hex");
-      const tokenHash = sha256Hex(rawToken);
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
-      await db.insertPasswordResetToken(Number(row.id), tokenHash, expiresAt);
       const base = trustedRecoverBaseUrl(process.env.APP_BASE_URL, PORT);
       if (!base) {
         return res.status(503).json({
@@ -422,22 +431,26 @@ function mountAuthRoutes(app, ctx) {
           code: "recover_base_misconfigured"
         });
       }
+      if (!isOutboundMailConfigured()) {
+        return res.status(503).json({
+          error:
+            "\u041E\u0442\u043F\u0440\u0430\u0432\u043A\u0430 \u043F\u0438\u0441\u044C\u043C \u043D\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D\u0430. \u0423\u043A\u0430\u0436\u0438\u0442\u0435 RESEND_API_KEY \u0438 RESEND_FROM \u0438\u043B\u0438 SMTP_* \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435.",
+          code: "recover_mail_disabled"
+        });
+      }
+      const rawToken = crypto.randomBytes(32).toString("hex");
       const link = base.replace(/\/+$/, "") + "/login.html?mode=user&reset=" + encodeURIComponent(rawToken);
-      try {
-        const sent = await trySendResetEmail(e, link);
-        if (!sent) {
-          return res.status(503).json({
-            error: "\u041E\u0442\u043F\u0440\u0430\u0432\u043A\u0430 \u043F\u0438\u0441\u044C\u043C\u0430 \u0441\u0435\u0439\u0447\u0430\u0441 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430 (\u043D\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043D\u0430 \u043F\u043E\u0447\u0442\u0430 \u043D\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0435). \u041E\u0431\u0440\u0430\u0442\u0438\u0442\u0435\u0441\u044C \u043A \u0430\u0434\u043C\u0438\u043D\u0438\u0441\u0442\u0440\u0430\u0442\u043E\u0440\u0443.",
-            code: "recover_mail_disabled"
-          });
-        }
-      } catch (mailErr) {
-        console.error("[password-recover] send failed:", mailErr && mailErr.message ? mailErr.message : mailErr);
-        return res.status(500).json({
-          error: "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043F\u0438\u0441\u044C\u043C\u043E. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u043F\u043E\u0437\u0436\u0435.",
+      const sent = await trySendResetEmail(e, link);
+      if (!sent) {
+        return res.status(503).json({
+          error:
+            "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043F\u0438\u0441\u044C\u043C\u043E. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043B\u043E\u0433\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0438 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 Resend/SMTP.",
           code: "recover_send_failed"
         });
       }
+      const tokenHash = sha256Hex(rawToken);
+      const expiresAt = new Date(Date.now() + 60 * 60 * 1e3);
+      await db.insertPasswordResetToken(Number(row.id), tokenHash, expiresAt);
       res.json({
         ok: true,
         message: "\u041D\u0430 \u0443\u043A\u0430\u0437\u0430\u043D\u043D\u044B\u0439 email \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E \u043F\u0438\u0441\u044C\u043C\u043E \u0441\u043E \u0441\u0441\u044B\u043B\u043A\u043E\u0439 \u0434\u043B\u044F \u0441\u0431\u0440\u043E\u0441\u0430 \u043F\u0430\u0440\u043E\u043B\u044F."
