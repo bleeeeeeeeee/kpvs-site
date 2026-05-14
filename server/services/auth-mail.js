@@ -95,19 +95,25 @@ async function trySendViaBrevo(toEmail, subject, text) {
     } catch {
     }
     console.error("[mail] brevo HTTP", res.status, body.slice(0, 1200));
+    let j = null;
+    try {
+      j = JSON.parse(body);
+    } catch {
+    }
+    const apiMsg = String((j && j.message) || body || "");
     if (res.status === 401) {
-      let j = null;
-      try {
-        j = JSON.parse(body);
-      } catch {
-      }
-      const apiMsg = String((j && j.message) || body || "");
       if (/unrecognised IP|unrecognized IP|IP address|unrecognised/i.test(apiMsg) || (j && j.code === "unauthorized" && /IP/i.test(apiMsg))) {
         throw new MailProviderError(
           "\u0412 Brevo \u0434\u043B\u044F API-\u043A\u043B\u044E\u0447\u0430 \u0432\u043A\u043B\u044E\u0447\u0451\u043D \u0441\u043F\u0438\u0441\u043E\u043A \u0440\u0430\u0437\u0440\u0451\u0448\u0451\u043D\u043D\u044B\u0445 IP, \u0430 IP \u0441\u0435\u0440\u0432\u0435\u0440\u0430 (Render) \u043D\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D \u0438\u043B\u0438 \u043C\u0435\u043D\u044F\u0435\u0442\u0441\u044F. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 https://app.brevo.com/security/authorised_ips \u0438 \u043E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u0435 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u0435 \u043F\u043E IP \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u043A\u043B\u044E\u0447\u0430 (\u0434\u043B\u044F Render \u044D\u0442\u043E \u043D\u0430\u0434\u0451\u0436\u043D\u0435\u0435, \u0447\u0435\u043C \u0431\u0435\u043B\u044B\u0439 \u0441\u043F\u0438\u0441\u043E\u043A IP).",
           { clientCode: "brevo_ip_not_allowed", httpStatus: 503 }
         );
       }
+    }
+    if (res.status === 403 && j && j.code === "permission_denied") {
+      throw new MailProviderError(
+        "\u0412 Brevo \u0435\u0449\u0451 \u043D\u0435 \u0430\u043A\u0442\u0438\u0432\u0438\u0440\u043E\u0432\u0430\u043D\u0430 \u043E\u0442\u043F\u0440\u0430\u0432\u043A\u0430 \u043F\u0438\u0441\u0435\u043C (\u043E\u0442\u0432\u0435\u0442 API: permission_denied). \u0417\u0430\u0432\u0435\u0440\u0448\u0438\u0442\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0443 \u0438 \u0432\u0435\u0440\u0438\u0444\u0438\u043A\u0430\u0446\u0438\u044E \u0432 \u043B\u0438\u0447\u043D\u043E\u043C \u043A\u0430\u0431\u0438\u043D\u0435\u0442\u0435 Brevo (\u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u0435\u043B\u044C, \u0434\u043E\u043C\u0435\u043D) \u0438\u043B\u0438 \u043D\u0430\u043F\u0438\u0448\u0438\u0442\u0435 \u0432 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0443 contact@brevo.com. \u041F\u043E\u043A\u0430 \u044D\u0442\u043E \u043D\u0435 \u0441\u0434\u0435\u043B\u0430\u043D\u043E, \u0440\u0435\u0437\u0435\u0440\u0432\u043D\u044B\u0439 SMTP \u043A Brevo \u0442\u043E\u0436\u0435 \u043C\u043E\u0436\u0435\u0442 \u043D\u0435 \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C.",
+        { clientCode: "brevo_smtp_not_activated", httpStatus: 503 }
+      );
     }
     return false;
   }
