@@ -19,7 +19,8 @@ const {
 const {
   trySendResetEmail,
   trySendEmailVerificationCode,
-  isOutboundMailConfigured
+  isOutboundMailConfigured,
+  MailProviderError
 } = require("../services/auth-mail");
 const MAX_LOGIN_USERNAME_LEN = 128;
 const MAX_PASSWORD_INPUT_LEN = 500;
@@ -187,7 +188,7 @@ function mountAuthRoutes(app, ctx) {
       if (!sent) {
         return res.status(503).json({
           error:
-            "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043F\u0438\u0441\u044C\u043C\u043E. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043B\u043E\u0433\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0438 \u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u043E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u044F (Resend \u0438\u043B\u0438 SMTP).",
+            "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043F\u0438\u0441\u044C\u043C\u043E. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043B\u043E\u0433\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0438 \u043F\u0435\u0440\u0435\u043C\u0435\u043D\u043D\u044B\u0435 \u043E\u043A\u0440\u0443\u0436\u0435\u043D\u0438\u044F (Brevo / Resend / SMTP).",
           code: "email_send_failed"
         });
       }
@@ -196,6 +197,9 @@ function mountAuthRoutes(app, ctx) {
       await db.insertEmailVerificationCode(e, p, codeHashVal, expiresAt);
       res.json({ ok: true });
     } catch (err) {
+      if (err instanceof MailProviderError) {
+        return res.status(err.httpStatus).json({ error: err.message, code: err.clientCode });
+      }
       console.error("POST /api/user/auth/email-code:", err);
       res.status(500).json({ error: "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430" });
     }
@@ -446,7 +450,7 @@ function mountAuthRoutes(app, ctx) {
       if (!sent) {
         return res.status(503).json({
           error:
-            "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043F\u0438\u0441\u044C\u043C\u043E. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043B\u043E\u0433\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0438 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 Resend/SMTP.",
+            "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0442\u043F\u0440\u0430\u0432\u0438\u0442\u044C \u043F\u0438\u0441\u044C\u043C\u043E. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043B\u043E\u0433\u0438 \u0441\u0435\u0440\u0432\u0435\u0440\u0430 \u0438 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0438 Brevo / Resend / SMTP.",
           code: "recover_send_failed"
         });
       }
@@ -458,6 +462,9 @@ function mountAuthRoutes(app, ctx) {
         message: "\u041D\u0430 \u0443\u043A\u0430\u0437\u0430\u043D\u043D\u044B\u0439 email \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u043E \u043F\u0438\u0441\u044C\u043C\u043E \u0441\u043E \u0441\u0441\u044B\u043B\u043A\u043E\u0439 \u0434\u043B\u044F \u0441\u0431\u0440\u043E\u0441\u0430 \u043F\u0430\u0440\u043E\u043B\u044F."
       });
     } catch (err) {
+      if (err instanceof MailProviderError) {
+        return res.status(err.httpStatus).json({ error: err.message, code: err.clientCode });
+      }
       console.error("POST /api/user/auth/recover:", err);
       res.status(500).json({ error: "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430" });
     }

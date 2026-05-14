@@ -29,6 +29,14 @@ function logMailError(context, err) {
   if (e.command) parts.push("command=" + e.command);
   console.error("[mail]", parts.join(" | "));
 }
+class MailProviderError extends Error {
+  constructor(message, { clientCode = "mail_provider_error", httpStatus = 503 } = {}) {
+    super(message);
+    this.name = "MailProviderError";
+    this.clientCode = clientCode;
+    this.httpStatus = httpStatus;
+  }
+}
 function brevoApiKey() {
   return String(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || "").trim();
 }
@@ -87,6 +95,20 @@ async function trySendViaBrevo(toEmail, subject, text) {
     } catch {
     }
     console.error("[mail] brevo HTTP", res.status, body.slice(0, 1200));
+    if (res.status === 401) {
+      let j = null;
+      try {
+        j = JSON.parse(body);
+      } catch {
+      }
+      const apiMsg = String((j && j.message) || body || "");
+      if (/unrecognised IP|unrecognized IP|IP address|unrecognised/i.test(apiMsg) || (j && j.code === "unauthorized" && /IP/i.test(apiMsg))) {
+        throw new MailProviderError(
+          "\u0412 Brevo \u0434\u043B\u044F API-\u043A\u043B\u044E\u0447\u0430 \u0432\u043A\u043B\u044E\u0447\u0451\u043D \u0441\u043F\u0438\u0441\u043E\u043A \u0440\u0430\u0437\u0440\u0451\u0448\u0451\u043D\u043D\u044B\u0445 IP, \u0430 IP \u0441\u0435\u0440\u0432\u0435\u0440\u0430 (Render) \u043D\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D \u0438\u043B\u0438 \u043C\u0435\u043D\u044F\u0435\u0442\u0441\u044F. \u041E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 https://app.brevo.com/security/authorised_ips \u0438 \u043E\u0442\u043A\u043B\u044E\u0447\u0438\u0442\u0435 \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0435\u043D\u0438\u0435 \u043F\u043E IP \u0434\u043B\u044F \u044D\u0442\u043E\u0433\u043E \u043A\u043B\u044E\u0447\u0430 (\u0434\u043B\u044F Render \u044D\u0442\u043E \u043D\u0430\u0434\u0451\u0436\u043D\u0435\u0435, \u0447\u0435\u043C \u0431\u0435\u043B\u044B\u0439 \u0441\u043F\u0438\u0441\u043E\u043A IP).",
+          { clientCode: "brevo_ip_not_allowed", httpStatus: 503 }
+        );
+      }
+    }
     return false;
   }
   return true;
@@ -226,4 +248,4 @@ function isOutboundMailConfigured() {
   }
   return !!createTransportFromEnv();
 }
-module.exports = { trySendResetEmail, trySendEmailVerificationCode, isOutboundMailConfigured };
+module.exports = { trySendResetEmail, trySendEmailVerificationCode, isOutboundMailConfigured, MailProviderError };

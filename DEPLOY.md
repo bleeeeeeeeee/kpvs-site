@@ -56,7 +56,7 @@ npm start
 ### Почта на production
 
 1. Задайте **`APP_BASE_URL`** как публичный `https://ваш-домен` (ссылка в письме сброса пароля).
-2. **Render / облако:** предпочтительно **[Brevo](https://www.brevo.com)** — в панели создайте **API key** (начинается с `xkeysib-`), в Render добавьте **`BREVO_API_KEY`** и **`BREVO_SENDER_EMAIL`** (тот же адрес, что подтверждён в Brevo как отправитель). Письма уходят через **HTTPS** на `api.brevo.com`, без SMTP и без проблем IPv6 (`ENETUNREACH` к `smtp.gmail.com`).
+2. **Render / облако:** предпочтительно **[Brevo](https://www.brevo.com)** — в панели создайте **API key** (начинается с `xkeysib-`), в Render добавьте **`BREVO_API_KEY`** и **`BREVO_SENDER_EMAIL`** (тот же адрес, что подтверждён в Brevo как отправитель). Письма уходят через **HTTPS** на `api.brevo.com`, без SMTP и без проблем IPv6 (`ENETUNREACH` к `smtp.gmail.com`). Если в логах **`[mail] brevo HTTP 401`** с текстом про **неразрешённый IP**, откройте https://app.brevo.com/security/authorised_ips : для Render без статического egress надёжнее **отключить** ограничение API по IP для этого ключа; иначе добавляйте текущий egress-IP в whitelist (он может меняться при деплое).
 3. Альтернатива: **[Resend](https://resend.com)** (`RESEND_API_KEY`, `RESEND_FROM`).
 4. **SMTP** используется только если нет успешной отправки через Brevo/Resend. Для Brevo: хост **`smtp-relay.brevo.com`**, не Gmail. При ошибках TLS смотрите логи `[mail]` и при необходимости `SMTP_TLS_REJECT_UNAUTHORIZED=false`.
 5. **Supabase + Render:** при ошибке `EMAXCONNSESSION` уменьшите параллелизм: задайте **`PG_POOL_MAX=2`** или `3` в переменных окружения (по умолчанию для Supabase в коде уже снижено до 4).
