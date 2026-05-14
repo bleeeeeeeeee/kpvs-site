@@ -7,6 +7,7 @@ const {
   sanitizeOAuthNextPath,
   assertSameOriginRelativeDest,
   userJwtCookieOptions,
+  userJwtCookieClearOptions,
   createJwtToken,
   emailForProfile,
   makeSixDigitCode,
@@ -76,6 +77,7 @@ function mountAuthRoutes(app, ctx) {
     db
   } = ctx;
   const cookieOpts = () => userJwtCookieOptions(COOKIE_SECURE);
+  const jwtClearOpts = () => userJwtCookieClearOptions(COOKIE_SECURE);
   app.post("/api/auth/login", async (req, res) => {
     try {
       const { username, password } = req.body || {};
@@ -281,17 +283,17 @@ function mountAuthRoutes(app, ctx) {
       try {
         payload = jwt.verify(token, JWT_SECRET);
       } catch {
-        res.clearCookie(JWT_COOKIE_NAME, cookieOpts());
+        res.clearCookie(JWT_COOKIE_NAME, jwtClearOpts());
         return res.json(null);
       }
       const id = Number(payload && payload.sub);
       if (!Number.isFinite(id) || id <= 0) {
-        res.clearCookie(JWT_COOKIE_NAME, cookieOpts());
+        res.clearCookie(JWT_COOKIE_NAME, jwtClearOpts());
         return res.json(null);
       }
       const row = await db.findUserById(id);
       if (!row || !row.is_active) {
-        res.clearCookie(JWT_COOKIE_NAME, cookieOpts());
+        res.clearCookie(JWT_COOKIE_NAME, jwtClearOpts());
         return res.json(null);
       }
       res.json({
@@ -376,7 +378,7 @@ function mountAuthRoutes(app, ctx) {
     }
   });
   app.post("/api/user/auth/logout", (req, res) => {
-    res.clearCookie(JWT_COOKIE_NAME, cookieOpts());
+    res.clearCookie(JWT_COOKIE_NAME, jwtClearOpts());
     const hasStaffSession = !!(req.session && req.session.user);
     if (hasStaffSession) {
       res.type("application/json").json({ ok: true });

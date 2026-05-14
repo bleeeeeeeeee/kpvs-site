@@ -13,6 +13,12 @@ function databaseUrlHostSuggestsSsl(connectionString) {
   }
   return false;
 }
+function resolvePoolMax() {
+  const raw = Number(process.env.PG_POOL_MAX);
+  if (Number.isFinite(raw) && raw >= 1) return Math.min(Math.floor(raw), 32);
+  if (process.env.DATABASE_URL && databaseUrlHostSuggestsSsl(process.env.DATABASE_URL)) return 4;
+  return 10;
+}
 function warnIfDatabaseUrlHostLooksLikePlaceholder(connectionString) {
   const raw = String(connectionString || "").trim();
   if (!raw) return;
@@ -32,7 +38,7 @@ function warnIfDatabaseUrlHostLooksLikePlaceholder(connectionString) {
 }
 function buildPoolConfig() {
   const common = {
-    max: 10,
+    max: resolvePoolMax(),
     idleTimeoutMillis: 3e4,
     connectionTimeoutMillis: 2e3
   };
@@ -73,5 +79,9 @@ function buildPoolConfig() {
     ssl: wantSsl ? ssl : void 0
   };
 }
-const pool = new Pool(buildPoolConfig());
+const _poolConfig = buildPoolConfig();
+const pool = new Pool(_poolConfig);
+if (!process.env.PG_POOL_MAX && _poolConfig.max === 4 && process.env.DATABASE_URL && databaseUrlHostSuggestsSsl(process.env.DATABASE_URL)) {
+  console.log("[db] pg pool max=4 (set PG_POOL_MAX to raise; lower default avoids Supabase session pooler EMAXCONNSESSION on Render).");
+}
 module.exports = { pool, buildPoolConfig, isProduction };

@@ -37,6 +37,7 @@ npm start
 | `NODE_ENV` | production: **да** | Режим production, проверки секретов. |
 | `PORT` | нет | Порт HTTP-сервера (по умолчанию 3000). |
 | `DATABASE_URL` | production: **да** | Строка подключения PostgreSQL. |
+| `PG_POOL_MAX` | нет | Верхняя граница пула `pg` (по умолчанию **4** для Supabase/Neon в URL — меньше риск `EMAXCONNSESSION` на Render). |
 | `PGSSLMODE` / `PGSSL` / `PGSSL_REJECT_UNAUTHORIZED` | по ситуации | SSL к облачной БД. |
 | `SESSION_SECRET` | production: **да** (≥24) | Сессии staff-админки и CSRF. |
 | `JWT_SECRET` | желательно | JWT пользователей магазина. |
@@ -46,16 +47,19 @@ npm start
 | `STORAGE_*` | для загрузок: **да** | S3-совместимое API (см. ниже). |
 | `PUBLIC_URL` / `MEDIA_CDN_BASE` | нет | База для публичных URL медиа в API (`server/db/media-url.js`). |
 | `GOOGLE_*` | нет | OAuth Google для пользователей. |
-| `RESEND_API_KEY`, `RESEND_FROM` | нет, **рекомендуется на хостинге** | Отправка писем через HTTPS (см. `server/services/auth-mail.js`). |
-| `SMTP_*` / `SMTP_URL` | нет | Альтернатива Resend; на части хостингов исходящие порты 587/465 заблокированы. |
+| `RESEND_API_KEY`, `RESEND_FROM` | нет | Отправка писем через HTTPS (см. `server/services/auth-mail.js`). |
+| `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` | нет, **удобно на Render** | Brevo (ex-Sendinblue): API v3 по HTTPS, без SMTP. Имя: `BREVO_SENDER_NAME`. Допускается `SENDINBLUE_API_KEY`. |
+| `SMTP_*` / `SMTP_URL` | нет | Fallback после Brevo/Resend. Для Brevo SMTP: `smtp-relay.brevo.com`, порт 587. |
 | `EMAIL_CODE_PEPPER` | нет | Доп. секрет для хеша кодов. |
 | `ADMIN_*` | только для bootstrap | Создание первого admin. |
 
 ### Почта на production
 
 1. Задайте **`APP_BASE_URL`** как публичный `https://ваш-домен` (ссылка в письме сброса пароля).
-2. Предпочтительно **[Resend](https://resend.com)**: `RESEND_API_KEY`, `RESEND_FROM` (отправитель должен быть разрешён в панели Resend).
-3. Если используете **SMTP**, проверьте логи сервера при ошибке: в лог пишется код и ответ провайдера (без пароля). При TLS-ошибках попробуйте `SMTP_TLS_REJECT_UNAUTHORIZED=false` только если провайдер требует.
+2. **Render / облако:** предпочтительно **[Brevo](https://www.brevo.com)** — в панели создайте **API key** (начинается с `xkeysib-`), в Render добавьте **`BREVO_API_KEY`** и **`BREVO_SENDER_EMAIL`** (тот же адрес, что подтверждён в Brevo как отправитель). Письма уходят через **HTTPS** на `api.brevo.com`, без SMTP и без проблем IPv6 (`ENETUNREACH` к `smtp.gmail.com`).
+3. Альтернатива: **[Resend](https://resend.com)** (`RESEND_API_KEY`, `RESEND_FROM`).
+4. **SMTP** используется только если нет успешной отправки через Brevo/Resend. Для Brevo: хост **`smtp-relay.brevo.com`**, не Gmail. При ошибках TLS смотрите логи `[mail]` и при необходимости `SMTP_TLS_REJECT_UNAUTHORIZED=false`.
+5. **Supabase + Render:** при ошибке `EMAXCONNSESSION` уменьшите параллелизм: задайте **`PG_POOL_MAX=2`** или `3` в переменных окружения (по умолчанию для Supabase в коде уже снижено до 4).
 
 ## 4. Облако для изображений (S3-совместимое)
 

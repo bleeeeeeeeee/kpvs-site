@@ -1,3 +1,4 @@
+const dns = require("dns");
 let nodemailer = null;
 try {
   nodemailer = require("nodemailer");
@@ -27,6 +28,68 @@ function logMailError(context, err) {
   if (e.response) parts.push("response=" + String(e.response).slice(0, 300));
   if (e.command) parts.push("command=" + e.command);
   console.error("[mail]", parts.join(" | "));
+}
+function brevoApiKey() {
+  return String(process.env.BREVO_API_KEY || process.env.SENDINBLUE_API_KEY || "").trim();
+}
+function parseNameEmailFromFromHeader(fromRaw) {
+  const s = stripOuterQuotes(fromRaw || "");
+  const m = s.match(/^(.+?)\s*<([^>]+)>$/);
+  if (m) {
+    return { name: m[1].trim().replace(/^["']|["']$/g, ""), email: m[2].trim() };
+  }
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return { name: "", email: s };
+  return { name: "", email: "" };
+}
+function brevoSender() {
+  const direct = String(process.env.BREVO_SENDER_EMAIL || process.env.SMTP_SENDER_EMAIL || "").trim();
+  if (direct && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(direct)) {
+    const name = String(process.env.BREVO_SENDER_NAME || process.env.SMTP_SENDER_NAME || "KPVS").trim() || "KPVS";
+    return { name, email: direct };
+  }
+  const from = stripOuterQuotes(process.env.SMTP_FROM || process.env.SMTP_USER || "");
+  const parsed = parseNameEmailFromFromHeader(from);
+  if (parsed.email) {
+    return { name: parsed.name || "KPVS", email: parsed.email };
+  }
+  const user = String(process.env.SMTP_USER || "").trim();
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(user)) return { name: "KPVS", email: user };
+  return { name: "", email: "" };
+}
+async function trySendViaBrevo(toEmail, subject, text) {
+  const apiKey = brevoApiKey();
+  const sender = brevoSender();
+  if (!apiKey || !sender.email) return false;
+  let res;
+  try {
+    res = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "api-key": apiKey
+      },
+      body: JSON.stringify({
+        sender: { email: sender.email, name: sender.name || "KPVS" },
+        to: [{ email: String(toEmail || "").trim() }],
+        subject: String(subject || ""),
+        textContent: String(text || "")
+      })
+    });
+  } catch (err) {
+    logMailError("brevo-fetch", err);
+    return false;
+  }
+  if (!res.ok) {
+    let body = "";
+    try {
+      body = await res.text();
+    } catch {
+    }
+    console.error("[mail] brevo HTTP", res.status, body.slice(0, 1200));
+    return false;
+  }
+  return true;
 }
 async function trySendViaResend(toEmail, subject, text) {
   const apiKey = String(process.env.RESEND_API_KEY || "").trim();
@@ -62,12 +125,19 @@ async function trySendViaResend(toEmail, subject, text) {
   }
   return true;
 }
+function smtpLookup(hostname, options, callback) {
+  const forceV4 = boolEnv("SMTP_FORCE_IPV4", true);
+  if (forceV4 && typeof dns.lookup === "function") {
+    return dns.lookup(hostname, { ...options, family: 4 }, callback);
+  }
+  return dns.lookup(hostname, options, callback);
+}
 function createTransportFromEnv() {
   if (!nodemailer) return null;
   const smtpUrl = String(process.env.SMTP_URL || "").trim();
   if (smtpUrl) {
     try {
-      const transporter = nodemailer.createTransport(smtpUrl);
+      const transporter = nodemailer.createTransport(smtpUrl, { lookup: smtpLookup });
       const from = stripOuterQuotes(process.env.SMTP_FROM || process.env.SMTP_USER || "");
       if (!from) return null;
       return { transporter, from };
@@ -91,6 +161,7 @@ function createTransportFromEnv() {
     port,
     secure,
     requireTLS,
+    lookup: smtpLookup,
     auth: { user, pass },
     connectionTimeout: numEnv("SMTP_CONNECTION_TIMEOUT_MS", 25e3),
     greetingTimeout: numEnv("SMTP_GREETING_TIMEOUT_MS", 15e3),
@@ -117,6 +188,7 @@ async function trySendResetEmail(toEmail, link) {
 ${link}
 
 \u0415\u0441\u043B\u0438 \u0432\u044B \u043D\u0435 \u0437\u0430\u043F\u0440\u0430\u0448\u0438\u0432\u0430\u043B\u0438 \u0432\u043E\u0441\u0441\u0442\u0430\u043D\u043E\u0432\u043B\u0435\u043D\u0438\u0435 \u2014 \u043F\u0440\u043E\u0441\u0442\u043E \u0438\u0433\u043D\u043E\u0440\u0438\u0440\u0443\u0439\u0442\u0435 \u044D\u0442\u043E \u043F\u0438\u0441\u044C\u043C\u043E.`;
+  if (await trySendViaBrevo(toEmail, subject, text)) return true;
   if (await trySendViaResend(toEmail, subject, text)) return true;
   const cfg = createTransportFromEnv();
   if (!cfg) return false;
@@ -133,6 +205,7 @@ async function trySendEmailVerificationCode(toEmail, code) {
 
 \u041A\u043E\u0434 \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u0435\u0442 10 \u043C\u0438\u043D\u0443\u0442.
 \u0415\u0441\u043B\u0438 \u0432\u044B \u043D\u0435 \u0437\u0430\u043F\u0440\u0430\u0448\u0438\u0432\u0430\u043B\u0438 \u043F\u043E\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043D\u0438\u0435 \u2014 \u043F\u0440\u043E\u0441\u0442\u043E \u0438\u0433\u043D\u043E\u0440\u0438\u0440\u0443\u0439\u0442\u0435 \u044D\u0442\u043E \u043F\u0438\u0441\u044C\u043C\u043E.`;
+  if (await trySendViaBrevo(toEmail, subject, text)) return true;
   if (await trySendViaResend(toEmail, subject, text)) return true;
   const cfg = createTransportFromEnv();
   if (!cfg) return false;
@@ -144,6 +217,9 @@ async function trySendEmailVerificationCode(toEmail, code) {
   });
 }
 function isOutboundMailConfigured() {
+  if (brevoApiKey()) {
+    return !!brevoSender().email;
+  }
   if (String(process.env.RESEND_API_KEY || "").trim()) {
     const from = stripOuterQuotes(process.env.RESEND_FROM || process.env.SMTP_FROM || process.env.SMTP_USER || "");
     return !!from;

@@ -49,6 +49,14 @@ function userJwtCookieOptions(secureFlag) {
     path: "/"
   };
 }
+function userJwtCookieClearOptions(secureFlag) {
+  return {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: secureFlag,
+    path: "/"
+  };
+}
 function createJwtToken(user, jwtSecret) {
   return jwt.sign(
     { sub: String(user.id), username: user.username || "", role: user.role || "user" },
@@ -241,6 +249,7 @@ module.exports = {
   sanitizeOAuthNextPath,
   assertSameOriginRelativeDest,
   userJwtCookieOptions,
+  userJwtCookieClearOptions,
   createJwtToken,
   getBearerToken,
   readUserJwtToken,
