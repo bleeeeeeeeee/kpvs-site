@@ -991,6 +991,56 @@ const Catalog = (() => {
     renderProducts();
     syncOpenModalCartToggleButtons();
   }
+  function siteOrigin() {
+    try {
+      if (typeof window === "undefined" || !window.location || !window.location.origin) return "";
+      return String(window.location.origin).replace(/\/$/, "");
+    } catch (_) {
+      return "";
+    }
+  }
+  function productPageAbsoluteUrl(product) {
+    var base = siteOrigin();
+    var path = "/product.html";
+    var slug = product && product.slug != null ? String(product.slug).trim() : "";
+    var id = product && product.id != null ? Number(product.id) : NaN;
+    if (slug) return base + path + "?slug=" + encodeURIComponent(slug);
+    if (Number.isFinite(id)) return base + path + "?id=" + encodeURIComponent(String(id));
+    return base + path;
+  }
+  function inquirePriceFromCart() {
+    var cart = getCart();
+    if (!cart.length) return;
+    getProductsByIds(cart.map(function(i) {
+      return i.id;
+    })).then(function(products) {
+      var list = products.filter(Boolean);
+      if (!list.length) return;
+      var host = typeof window !== "undefined" && window.location && window.location.hostname ? String(window.location.hostname) : "";
+      var siteRef = host || "\u0441\u0430\u0439\u0442 \u041A\u041F\u0412\u0421";
+      var blocks = list.map(function(p, idx) {
+        var n = idx + 1;
+        return [
+          n + ") " + (p.name != null && String(p.name).trim() ? String(p.name).trim() : "\u0422\u043E\u0432\u0430\u0440"),
+          "   \u0410\u0440\u0442\u0438\u043A\u0443\u043B: " + (p.art != null && String(p.art).trim() ? String(p.art).trim() : "\u2014"),
+          "   \u0421\u0441\u044B\u043B\u043A\u0430: " + productPageAbsoluteUrl(p)
+        ].join("\n");
+      });
+      var body = [
+        "\u0414\u043E\u0431\u0440\u044B\u0439 \u0434\u0435\u043D\u044C!",
+        "",
+        "\u041F\u0440\u043E\u0448\u0443 \u043A\u043E\u043C\u043C\u0435\u0440\u0447\u0435\u0441\u043A\u0438\u0435 \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u044F (\u0446\u0435\u043D\u044B) \u043F\u043E \u0442\u043E\u0432\u0430\u0440\u0430\u043C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B \u043D\u0430 " + siteRef + ".",
+        "",
+        "\u0421\u043F\u0438\u0441\u043E\u043A:",
+        "",
+        blocks.join("\n\n"),
+        "",
+        "\u0421\u043F\u0430\u0441\u0438\u0431\u043E!"
+      ].join("\n");
+      var subject = encodeURIComponent("\u041A\u041F\u0412\u0421 \u2014 \u0437\u0430\u043F\u0440\u043E\u0441 \u0446\u0435\u043D \u043F\u043E \u043A\u043E\u0440\u0437\u0438\u043D\u0435 (" + list.length + " \u043F\u043E\u0437.)");
+      window.location.href = "mailto:kpvssales@gmail.com?subject=" + subject + "&body=" + encodeURIComponent(body);
+    });
+  }
   async function getProductsByIds(ids) {
     const results = await Promise.all(ids.map(async function(id) {
       try {
@@ -1095,7 +1145,8 @@ const Catalog = (() => {
         const artHtml = artRaw ? '<p class="modal-item-art">' + escapeHtml(artRaw) + "</p>" : "";
         return '<div class="modal-item" data-product-id="' + p.id + '"><img src="' + escapeAttr(imgSrc) + '" alt="' + escapeHtml(p.name || "") + '" class="modal-item-img"><div class="modal-item-info"><h3>' + escapeHtml(p.name || "\u0422\u043E\u0432\u0430\u0440") + "</h3>" + artHtml + '<div class="modal-item-actions"><button type="button" class="btn btn--danger btn--small" data-action="remove-cart" data-product-id="' + p.id + '">\u0423\u0434\u0430\u043B\u0438\u0442\u044C</button></div></div></div>';
       }).join("") : "";
-      modal.innerHTML = '<div class="modal-content modal-content--cart-favorites"><div class="modal-header"><h2>\u041A\u043E\u0440\u0437\u0438\u043D\u0430</h2><button class="modal-close ui-xbtn" type="button" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div><div class="modal-body">' + (itemsHtml ? '<div class="modal-items">' + itemsHtml + "</div>" : "") + "</div></div>";
+      const cartMain = itemsHtml ? '<div class="modal-items">' + itemsHtml + '</div><div class="cart-actions"><button type="button" class="cart-inquire-btn" data-action="cart-inquire-all">\u0423\u0437\u043D\u0430\u0442\u044C \u0446\u0435\u043D\u0443 \u043D\u0430 \u0432\u0441\u0435 \u0442\u043E\u0432\u0430\u0440\u044B</button></div>' : "";
+      modal.innerHTML = '<div class="modal-content modal-content--cart-favorites"><div class="modal-header"><h2>\u041A\u043E\u0440\u0437\u0438\u043D\u0430</h2><button class="modal-close ui-xbtn" type="button" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div><div class="modal-body">' + cartMain + "</div></div>";
       document.body.appendChild(modal);
       if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
       setTimeout(function() {
@@ -1114,6 +1165,14 @@ const Catalog = (() => {
           }
         });
       });
+      var inquireAll = modal.querySelector('[data-action="cart-inquire-all"]');
+      if (inquireAll) {
+        inquireAll.addEventListener("click", function(e) {
+          e.stopPropagation();
+          window.kpvsDismissTopModal(modal);
+          inquirePriceFromCart();
+        });
+      }
     });
   }
   return {

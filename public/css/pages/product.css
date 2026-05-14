@@ -465,28 +465,31 @@
   filter: var(--btn-grad-filter-hover);
 }
 
+/* Та же палитра, что у градиентных CTA: приглушённый оливковый фон + акцентная обводка */
 .site-product-actions .btn.inquire-action-btn {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(244, 246, 243, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(238, 242, 228, 0.98) 0%, rgba(218, 226, 198, 0.92) 100%);
   color: var(--text-primary);
-  border: 1px solid rgba(59, 82, 35, 0.22);
-  box-shadow: 0 1px 3px rgba(36, 53, 42, 0.06);
+  border: 2px solid rgba(114, 123, 38, 0.42);
+  box-shadow: 0 1px 4px rgba(59, 82, 35, 0.12);
 }
 
 .site-product-actions .btn.inquire-action-btn:hover {
-  border-color: rgba(114, 123, 38, 0.45);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 1) 0%, rgba(238, 241, 235, 1) 100%);
-  filter: none;
+  border-color: rgba(91, 102, 32, 0.55);
+  background: linear-gradient(180deg, rgba(244, 247, 236, 1) 0%, rgba(226, 232, 206, 0.98) 100%);
+  filter: brightness(1.02);
 }
 
 [data-theme="dark"] .site-product-actions .btn.inquire-action-btn {
-  background: linear-gradient(180deg, rgba(46, 52, 48, 0.96) 0%, rgba(30, 35, 32, 0.99) 100%);
-  border-color: rgba(182, 197, 63, 0.22);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  background: linear-gradient(180deg, rgba(42, 50, 40, 0.96) 0%, rgba(28, 36, 30, 0.99) 100%);
+  color: var(--text-primary);
+  border-color: rgba(182, 197, 63, 0.4);
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
 }
 
 [data-theme="dark"] .site-product-actions .btn.inquire-action-btn:hover {
-  border-color: rgba(182, 197, 63, 0.42);
-  background: linear-gradient(180deg, rgba(52, 58, 54, 0.98) 0%, rgba(36, 42, 38, 1) 100%);
+  border-color: rgba(200, 214, 90, 0.55);
+  background: linear-gradient(180deg, rgba(50, 58, 46, 0.98) 0%, rgba(34, 42, 36, 1) 100%);
+  filter: brightness(1.04);
 }
 
 [data-theme="dark"] .account-theme-tab:not([aria-selected="true"]) {
