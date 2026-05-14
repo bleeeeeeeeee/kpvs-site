@@ -7,6 +7,10 @@ const Admin = (() => {
         return false;
       }
       const user = await r.json();
+      if (!user || !Number(user.id)) {
+        window.location.replace("/login.html?mode=admin&next=%2Fadmin.html");
+        return false;
+      }
       ui.currentUser = user;
       try {
         await fetch("/api/csrf-token", { credentials: "include" });
@@ -775,7 +779,8 @@ const Admin = (() => {
           const okBtn = document.getElementById("visibility-confirm-ok");
           if (okBtn) okBtn.disabled = false;
           visibilityConfirmPending = { kind: "delete-user", id };
-          openModal(ui.visibilityConfirmModal);
+          const pmVis = document.getElementById("product-modal");
+          openAdminOverlayModal(ui.visibilityConfirmModal, pmVis ? [pmVis] : null);
         }
       });
     }
@@ -1886,7 +1891,7 @@ const Admin = (() => {
       const checked = state.brands.indexOf(val) !== -1 ? "checked" : "";
       return '<label class="filter-option"><input type="checkbox" name="brand" value="' + escapeHtml(val) + '" ' + checked + "><span>" + escapeHtml(b.name) + "</span></label>";
     }).join("") : '<p class="filter-empty-hint">\u0411\u0440\u0435\u043D\u0434\u044B \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u044B</p>';
-    const seasons = ["\u0437\u0438\u043C\u0430", "\u043B\u0435\u0442\u043E", "\u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D", "\u0432\u0441\u0435\u0441\u0435\u0437\u043E\u043D\u043D\u044B\u0439"];
+    const seasons = ["\u0437\u0438\u043C\u0430", "\u043B\u0435\u0442\u043E", "\u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D"];
     const seasonHtml = seasons.map(function(s) {
       const checked = state.seasons.indexOf(s) !== -1 ? "checked" : "";
       const label = s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
@@ -2120,7 +2125,8 @@ const Admin = (() => {
     if (msgEl) msgEl.textContent = message;
     const okBtn = document.getElementById("visibility-confirm-ok");
     if (okBtn) okBtn.disabled = false;
-    openModal(ui.visibilityConfirmModal);
+    const pmVis = document.getElementById("product-modal");
+    openAdminOverlayModal(ui.visibilityConfirmModal, pmVis ? [pmVis] : null);
   }
   async function applyVisibilityConfirmFromConfirm() {
     const pending = visibilityConfirmPending;
@@ -2211,6 +2217,16 @@ const Admin = (() => {
       );
       if (focusable) focusable.focus();
     }, 120);
+  }
+  function openAdminOverlayModal(modal, extraRoots) {
+    if (!modal) return;
+    if (window.KpvsModalOverlay && typeof window.KpvsModalOverlay.dismissOpenModalsExcept === "function") {
+      try {
+        window.KpvsModalOverlay.dismissOpenModalsExcept(modal, extraRoots || null);
+      } catch (e) {
+      }
+    }
+    openModal(modal);
   }
   function closeModal(modal) {
     if (!modal) return;
@@ -2676,7 +2692,10 @@ const Admin = (() => {
       return;
     }
     const exitDraft = document.getElementById("product-exit-draft-modal");
-    if (exitDraft) openModal(exitDraft);
+    if (exitDraft) {
+      const pm = document.getElementById("product-modal");
+      openAdminOverlayModal(exitDraft, pm ? [pm] : null);
+    }
   }
   function renderVariantsList() {
     const container = ui.productVariantsContainer;
@@ -3421,8 +3440,34 @@ const Admin = (() => {
         if (e.target === visibilityModal) cancelVisibilityConfirm();
       });
     }
+    const adminLogoutModal = document.getElementById("admin-logout-confirm-modal");
+    if (adminLogoutModal) {
+      const lgClose = adminLogoutModal.querySelector(".admin-logout-confirm-close");
+      const lgCancel = document.getElementById("admin-logout-cancel");
+      const lgGo = document.getElementById("admin-logout-confirm-go");
+      function closeAdminLogoutModal() {
+        closeModal(adminLogoutModal);
+      }
+      if (lgClose) lgClose.onclick = closeAdminLogoutModal;
+      if (lgCancel) lgCancel.onclick = closeAdminLogoutModal;
+      if (lgGo) {
+        lgGo.onclick = function() {
+          closeAdminLogoutModal();
+          doLogout();
+        };
+      }
+      adminLogoutModal.addEventListener("click", function(e) {
+        if (e.target === adminLogoutModal) closeAdminLogoutModal();
+      });
+    }
     document.addEventListener("keydown", function(e) {
       if (e.key !== "Escape") return;
+      const adminLogout = document.getElementById("admin-logout-confirm-modal");
+      if (adminLogout && adminLogout.style.display !== "none" && adminLogout.classList.contains("show")) {
+        closeModal(adminLogout);
+        e.preventDefault();
+        return;
+      }
       const exitDraft = document.getElementById("product-exit-draft-modal");
       if (exitDraft && exitDraft.style.display !== "none" && exitDraft.classList.contains("show")) {
         closeModal(exitDraft);
@@ -3548,8 +3593,13 @@ const Admin = (() => {
     bindProductCategoryForVariantsOnce();
     bindBrandQuickModalOnce();
     ui.visibilityConfirmModal = document.getElementById("visibility-confirm-modal");
+    ui.adminLogoutModal = document.getElementById("admin-logout-confirm-modal");
     const logoutBtn = document.getElementById("logout-btn");
-    if (logoutBtn) logoutBtn.onclick = doLogout;
+    if (logoutBtn) {
+      logoutBtn.onclick = function() {
+        if (ui.adminLogoutModal) openModal(ui.adminLogoutModal);
+      };
+    }
     checkAuth().then(function(ok) {
       if (!ok) return;
       bindUsersEvents();

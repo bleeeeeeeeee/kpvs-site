@@ -74,8 +74,8 @@ installGoogleStrategy({
   callbackUrl: GOOGLE_CALLBACK_URL
 });
 app.use(passport.initialize());
-const csrfProtection = createCsrfProtection(COOKIE_SECURE);
-const applyCsrfWhenNeeded = createApplyCsrfWhenNeeded(csrfProtection);
+const csrfProtection = createCsrfProtection();
+const applyCsrfWhenNeeded = createApplyCsrfWhenNeeded();
 app.use(applyCsrfWhenNeeded);
 if (!isProduction) {
   app.use((req, res, next) => {
@@ -169,7 +169,9 @@ app.use((err, req, res, next) => {
 async function bootDatabase() {
   await db.connectDB();
   await db.ensureUserAuthSchema();
+  await db.ensureCoreCatalogTables();
   await db.ensureProductsEditorColumn();
+  await db.ensureProductSeasonAllseasonMerged();
   await db.ensureCollectionsSchema();
   await db.ensureCategorySizeTypesSchema();
   await db.ensureSizeGroupsSchema();
@@ -182,7 +184,19 @@ async function startServer() {
   try {
     await bootDatabase();
   } catch (err) {
-    console.error("Database startup failed:", err && err.message ? err.message : err);
+    const msg = err && err.message ? String(err.message) : String(err);
+    console.error("Database startup failed:", msg);
+    if (/ENOTFOUND/i.test(msg)) {
+      console.error(
+        "  Hint: the database host in DATABASE_URL could not be resolved. Replace a template host such as \"HOST\" with a real hostname (e.g. localhost). Until then, /api/* returns 503."
+      );
+    } else if (/ECONNREFUSED/i.test(msg)) {
+      console.error("  Hint: nothing is accepting connections on that host:port — start PostgreSQL or fix PGPORT.");
+    } else if (/does not exist/i.test(msg)) {
+      console.error(
+        "  Hint: if this is a new database, ensure `ensureUserAuthSchema` and `ensureCoreCatalogTables` ran; check earlier logs for SQL errors."
+      );
+    }
     appState.dbHealthy = false;
   }
   app.listen(PORT, () => {

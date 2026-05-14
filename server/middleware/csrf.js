@@ -1,4 +1,5 @@
-const csrf = require("csurf");
+const crypto = require("crypto");
+
 function skipPublicAuthMutations(req) {
   const p = (req.originalUrl || "").split("?")[0];
   const open = new Set([
@@ -18,21 +19,59 @@ function skipPublicAuthMutations(req) {
   if (p === "/api/__debug_ndjson") return true;
   return false;
 }
-function createCsrfProtection(cookieSecure) {
-  return csrf({
-    cookie: {
-      httpOnly: false,
-      sameSite: "lax",
-      secure: cookieSecure,
-      key: "_csrf"
-    }
-  });
+
+function timingSafeEqualStr(a, b) {
+  const x = Buffer.from(String(a || ""), "utf8");
+  const y = Buffer.from(String(b || ""), "utf8");
+  if (x.length !== y.length) return false;
+  if (x.length === 0) return false;
+  return crypto.timingSafeEqual(x, y);
 }
-function createApplyCsrfWhenNeeded(csrfProtection) {
+
+function ensureSessionCsrf(req) {
+  if (!req.session) return;
+  if (!req.session.csrfToken || typeof req.session.csrfToken !== "string" || req.session.csrfToken.length < 32) {
+    req.session.csrfToken = crypto.randomBytes(32).toString("hex");
+  }
+}
+
+/** Вызывается перед GET /api/csrf-token: создаёт токен в сессии и вешает req.csrfToken(). */
+function createCsrfProtection() {
+  return function csrfProtection(req, res, next) {
+    try {
+      ensureSessionCsrf(req);
+      req.csrfToken = function csrfToken() {
+        return req.session && req.session.csrfToken ? String(req.session.csrfToken) : "";
+      };
+      next();
+    } catch (e) {
+      next(e);
+    }
+  };
+}
+
+function badCsrfError() {
+  const err = new Error("EBADCSRFTOKEN");
+  err.code = "EBADCSRFTOKEN";
+  return err;
+}
+
+/**
+ * Для POST/PUT/PATCH/DELETE: cookie XSRF-TOKEN, заголовок X-XSRF-TOKEN и session.csrfToken
+ * должны совпадать (double-submit + привязка к сессии).
+ */
+function createApplyCsrfWhenNeeded() {
   return function applyCsrfWhenNeeded(req, res, next) {
     if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return next();
     if (skipPublicAuthMutations(req)) return next();
-    return csrfProtection(req, res, next);
+    const fromHeader = req.get("X-XSRF-TOKEN") || req.get("X-CSRF-Token") || "";
+    const fromCookie = req.cookies && req.cookies["XSRF-TOKEN"] != null ? String(req.cookies["XSRF-TOKEN"]) : "";
+    const sessionTok = req.session && req.session.csrfToken ? String(req.session.csrfToken) : "";
+    if (!timingSafeEqualStr(fromHeader, fromCookie) || !timingSafeEqualStr(fromHeader, sessionTok)) {
+      return next(badCsrfError());
+    }
+    next();
   };
 }
+
 module.exports = { createCsrfProtection, createApplyCsrfWhenNeeded, skipPublicAuthMutations };

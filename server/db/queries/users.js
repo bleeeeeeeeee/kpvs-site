@@ -391,6 +391,22 @@ async function deleteUserById(db, id) {
 async function ensureUserAuthSchema(db) {
   const client = await db.connect();
   try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'user',
+        last_login TIMESTAMPTZ,
+        email TEXT,
+        email_verified BOOLEAN,
+        oauth_provider TEXT,
+        oauth_id TEXT,
+        password_set BOOLEAN,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        is_active BOOLEAN DEFAULT TRUE
+      )
+    `);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN`);
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS oauth_provider TEXT`);

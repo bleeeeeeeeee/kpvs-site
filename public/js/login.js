@@ -406,14 +406,20 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (mode === "admin") {
       const r = await apiFetch("/api/auth/me", { credentials: "include" });
       if (r.ok) {
-        window.location.replace(next || "/admin.html");
-        return;
+        const staff = await r.json();
+        if (staff && Number(staff.id) > 0) {
+          window.location.replace(next || "/admin.html");
+          return;
+        }
       }
     } else {
       const r = await apiFetch("/api/user/auth/me");
       if (r.ok) {
-        window.location.replace(resolveReturnPath());
-        return;
+        const me = await r.json();
+        if (me && Number(me.id) > 0) {
+          window.location.replace(resolveReturnPath());
+          return;
+        }
       }
     }
   } catch {
@@ -506,8 +512,16 @@ document.addEventListener("DOMContentLoaded", async () => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username, password })
         });
+        const data2 = await readResponseJson(res2);
         if (!res2.ok) {
-          const data2 = await res2.json().catch(() => ({}));
+          showError(data2.error || "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043B\u043E\u0433\u0438\u043D \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C");
+          return;
+        }
+        if (data2.ok === false) {
+          showError(data2.error || "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043B\u043E\u0433\u0438\u043D \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C");
+          return;
+        }
+        if (data2.ok !== true && !Number(data2.id)) {
           showError(data2.error || "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043B\u043E\u0433\u0438\u043D \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C");
           return;
         }
@@ -588,7 +602,20 @@ document.addEventListener("DOMContentLoaded", async () => {
       const data = await readResponseJson(res);
       const loginCode = data && data.code || res.headers && res.headers.get && res.headers.get("x-login-code") || "";
       const errText = String(data && data.error || "");
-      const unknownUser = loginCode === "email_not_registered" || loginCode === "username_not_registered" || res.status === 401 && looksLikeLoginEmail(username) && (errText.indexOf("\u0422\u0430\u043A\u043E\u0433\u043E email") !== -1 || errText.indexOf("\u0422\u0430\u043A\u043E\u0433\u043E \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F") !== -1);
+      const unknownUser = loginCode === "email_not_registered" || loginCode === "username_not_registered" || looksLikeLoginEmail(username) && (errText.indexOf("\u0422\u0430\u043A\u043E\u0433\u043E email") !== -1 || errText.indexOf("\u0422\u0430\u043A\u043E\u0433\u043E \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F") !== -1);
+      if (data && data.ok === true && data.user && Number(data.user.id) > 0) {
+        window.location.replace(resolveReturnPath());
+        return;
+      }
+      if (data && data.ok === false) {
+        if (unknownUser) {
+          const kind = loginCode === "username_not_registered" ? "username" : looksLikeLoginEmail(username) ? "email" : "username";
+          showUnknownUserRegisterOffer(kind, username, password);
+          return;
+        }
+        showError(data.error || "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043B\u043E\u0433\u0438\u043D \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C");
+        return;
+      }
       if (!res.ok) {
         if (unknownUser) {
           const kind = loginCode === "username_not_registered" ? "username" : looksLikeLoginEmail(username) ? "email" : "username";
@@ -598,7 +625,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         showError(data && data.error || "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043B\u043E\u0433\u0438\u043D \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C");
         return;
       }
-      window.location.replace(resolveReturnPath());
+      if (data && data.user && Number(data.user.id) > 0) {
+        window.location.replace(resolveReturnPath());
+        return;
+      }
+      showError(data && data.error || "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043B\u043E\u0433\u0438\u043D \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C");
     } catch {
       showError("\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u043E\u0435\u0434\u0438\u043D\u0435\u043D\u0438\u044F \u0441 \u0441\u0435\u0440\u0432\u0435\u0440\u043E\u043C");
     } finally {

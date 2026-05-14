@@ -349,7 +349,6 @@
         return;
       }
       sel.dataset.prevValue = sel.value;
-      sel.dispatchEvent(new Event("change", { bubbles: true }));
     });
     const handle = {
       destroy: function() {

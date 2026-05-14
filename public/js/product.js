@@ -988,11 +988,20 @@ document.addEventListener("DOMContentLoaded", () => {
       const next = encodeURIComponent(window.location.pathname + window.location.search);
       el.setAttribute("href", "/login.html?mode=user&next=" + next);
       fetch("/api/user/auth/me", { credentials: "include" }).then((r) => {
-        if (r.ok) return;
-        el.className = "btn btn--primary site-account-login-btn";
-        el.removeAttribute("title");
-        el.setAttribute("aria-label", "\u0412\u043E\u0439\u0442\u0438");
-        el.textContent = "\u0412\u043E\u0439\u0442\u0438";
+        const showLoginBtn = () => {
+          el.className = "btn btn--primary site-account-login-btn";
+          el.removeAttribute("title");
+          el.setAttribute("aria-label", "\u0412\u043E\u0439\u0442\u0438");
+          el.textContent = "\u0412\u043E\u0439\u0442\u0438";
+        };
+        if (!r.ok) {
+          showLoginBtn();
+          return;
+        }
+        return r.json().then((me) => {
+          if (me && me.id) return;
+          showLoginBtn();
+        });
       }).catch(() => {
       });
     }

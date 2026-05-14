@@ -177,11 +177,138 @@ async function backfillCollectionIcons(pool) {
     client.release();
   }
 }
+async function ensureCoreCatalogTables(pool) {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS brands (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      logo_url TEXT
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS categories (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      parent_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS colors (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      hex_code TEXT
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS size_types (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS sizes (
+      id SERIAL PRIMARY KEY,
+      size_type_id INTEGER NOT NULL REFERENCES size_types(id) ON DELETE CASCADE,
+      value TEXT NOT NULL
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS products (
+      id SERIAL PRIMARY KEY,
+      art TEXT,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      description TEXT,
+      category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+      brand_id INTEGER REFERENCES brands(id) ON DELETE SET NULL,
+      materials TEXT,
+      season TEXT,
+      gender TEXT,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ,
+      updated_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS collections (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      slug TEXT NOT NULL,
+      icon TEXT,
+      section TEXT NOT NULL DEFAULT 'all',
+      sort_order INT NOT NULL DEFAULT 0
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS product_collections (
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
+      PRIMARY KEY (product_id, collection_id)
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS product_images (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      url TEXT NOT NULL,
+      alt_text TEXT,
+      is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+      sort_order INT NOT NULL DEFAULT 0
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS product_variants (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      size_id INTEGER REFERENCES sizes(id) ON DELETE SET NULL,
+      color_id INTEGER REFERENCES colors(id) ON DELETE SET NULL,
+      art TEXT NOT NULL,
+      is_active BOOLEAN NOT NULL DEFAULT TRUE
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS product_attributes (
+      id SERIAL PRIMARY KEY,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      value TEXT NOT NULL,
+      sort_order INT NOT NULL DEFAULT 0
+    )
+  `);
+  const idxStatements = [
+    "CREATE UNIQUE INDEX IF NOT EXISTS brands_slug_uq ON brands (lower(btrim(slug::text)))",
+    "CREATE UNIQUE INDEX IF NOT EXISTS categories_slug_uq ON categories (lower(btrim(slug::text)))",
+    "CREATE UNIQUE INDEX IF NOT EXISTS products_slug_uq ON products (lower(btrim(slug::text)))",
+    "CREATE UNIQUE INDEX IF NOT EXISTS collections_slug_uq ON collections (slug)",
+    "CREATE UNIQUE INDEX IF NOT EXISTS product_variants_art_uq ON product_variants (art)"
+  ];
+  for (let i = 0; i < idxStatements.length; i++) {
+    try {
+      await pool.query(idxStatements[i]);
+    } catch (e) {
+      console.warn("[schema] ensureCoreCatalogTables index:", e && e.message);
+    }
+  }
+}
 async function ensureProductsEditorColumn(pool) {
   await pool.query(`
     ALTER TABLE products
     ADD COLUMN IF NOT EXISTS updated_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
 `);
+}
+async function ensureProductSeasonAllseasonMerged(pool) {
+  const dem = "\u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D";
+  const legacy = ["\u0432\u0441\u0435\u0441\u0435\u0437\u043E\u043D\u043D\u044B\u0439", "\u0432\u0441\u0435\u0441\u0435\u0437\u043E\u043D"];
+  await pool.query(
+    `UPDATE products SET season = $1
+     WHERE lower(btrim(season)) = ANY (SELECT lower(btrim(x)) FROM unnest($2::text[]) AS t(x))`,
+    [dem, legacy]
+  );
 }
 async function ensureCollectionsSchema(pool) {
   await migrateTagsToCollectionsIfNeeded(pool);
@@ -858,7 +985,9 @@ module.exports.getCategories = getCategories;
 module.exports.getBrands = getBrands;
 module.exports.createBrand = createBrand;
 module.exports.getColors = getColors;
+module.exports.ensureCoreCatalogTables = ensureCoreCatalogTables;
 module.exports.ensureProductsEditorColumn = ensureProductsEditorColumn;
+module.exports.ensureProductSeasonAllseasonMerged = ensureProductSeasonAllseasonMerged;
 module.exports.ensureCollectionsSchema = ensureCollectionsSchema;
 module.exports.getCollections = getCollections;
 module.exports.getCollectionsAdmin = getCollectionsAdmin;

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
-const { createUser, findUserByUsername } = require("../server/db/index.js");
+const db = require("../server/db/index.js");
 async function main() {
   const email = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
   const password = String(process.env.ADMIN_PASSWORD || "");
@@ -10,12 +10,13 @@ async function main() {
     process.exit(1);
   }
   try {
-    const existing = await findUserByUsername(username);
+    await db.ensureUserAuthSchema();
+    const existing = await db.findUserByUsername(username);
     if (existing) {
       console.log("Administrator user already exists.");
       process.exit(0);
     }
-    await createUser(username, password, "admin", { email, email_verified: true });
+    await db.createUser(username, password, "admin", { email, email_verified: true });
     console.log("Administrator user created.");
     process.exit(0);
   } catch (e) {

@@ -1,4 +1,4 @@
-const SEASONS = ["\u0437\u0438\u043C\u0430", "\u043B\u0435\u0442\u043E", "\u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D", "\u0432\u0441\u0435\u0441\u0435\u0437\u043E\u043D\u043D\u044B\u0439"];
+const SEASONS = ["\u0437\u0438\u043C\u0430", "\u043B\u0435\u0442\u043E", "\u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D"];
 const CATALOG_GENDERS = new Set(["mens", "womens", "male", "female", "all", "unisex"]);
 const MAX_SEARCH_LEN = 500;
 const MAX_LIMIT = 500;

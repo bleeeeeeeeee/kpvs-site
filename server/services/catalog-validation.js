@@ -47,9 +47,9 @@ function validateProductPayload(payload) {
   }
   if (payload.season != null && String(payload.season).trim() !== "") {
     const sk = String(payload.season).trim().toLowerCase();
-    const allowedSeasons = new Set(["\u0437\u0438\u043C\u0430", "\u043B\u0435\u0442\u043E", "\u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D", "\u0432\u0441\u0435\u0441\u0435\u0437\u043E\u043D\u043D\u044B\u0439"]);
+    const allowedSeasons = new Set(["\u0437\u0438\u043C\u0430", "\u043B\u0435\u0442\u043E", "\u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D"]);
     if (!allowedSeasons.has(sk)) {
-      errors.push("\u041F\u043E\u043B\u0435 season: \u0437\u0438\u043C\u0430, \u043B\u0435\u0442\u043E, \u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D \u0438\u043B\u0438 \u0432\u0441\u0435\u0441\u0435\u0437\u043E\u043D\u043D\u044B\u0439");
+      errors.push("\u041F\u043E\u043B\u0435 season: \u0437\u0438\u043C\u0430, \u043B\u0435\u0442\u043E \u0438\u043B\u0438 \u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D");
     } else {
       payload.season = sk;
     }

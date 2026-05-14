@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
 const passport = require("passport");
 const {
   normalizeEmail,
@@ -11,7 +12,8 @@ const {
   makeSixDigitCode,
   emailCodeHash,
   resolveGoogleLoginEmail,
-  sha256Hex
+  sha256Hex,
+  readUserJwtToken
 } = require("../services/auth-helpers");
 const { trySendResetEmail, trySendEmailVerificationCode } = require("../services/auth-mail");
 const MAX_LOGIN_USERNAME_LEN = 128;
@@ -80,10 +82,16 @@ function mountAuthRoutes(app, ctx) {
         return res.status(400).json({ error: "\u0421\u043B\u0438\u0448\u043A\u043E\u043C \u0434\u043B\u0438\u043D\u043D\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435" });
       }
       const user = await db.verifyUser(u, p);
-      if (!user) return res.status(401).json({ error: "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043B\u043E\u0433\u0438\u043D \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C" });
-      if (user.role === "user") return res.status(403).json({ error: "\u0414\u043E\u0441\u0442\u0443\u043F \u0437\u0430\u043F\u0440\u0435\u0449\u0451\u043D" });
+      if (!user) return res.status(200).json({ ok: false, error: "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043B\u043E\u0433\u0438\u043D \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C" });
+      if (user.role === "user") {
+        return res.status(200).json({
+          ok: false,
+          error: "\u0414\u043E\u0441\u0442\u0443\u043F \u0437\u0430\u043F\u0440\u0435\u0449\u0451\u043D",
+          code: "shop_account_use_user_login"
+        });
+      }
       req.session.user = user;
-      res.json({ id: user.id, username: user.username, role: user.role });
+      res.json({ ok: true, id: user.id, username: user.username, role: user.role });
     } catch (err) {
       console.error("POST /api/auth/login:", err);
       res.status(500).json({ error: "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430" });
@@ -110,7 +118,7 @@ function mountAuthRoutes(app, ctx) {
       const pub = sessionUserPublicJson(req.session.user);
       if (pub) return res.json(pub);
     }
-    res.status(401).json({ error: "Not authenticated" });
+    res.json(null);
   });
   async function handleUserRegister(req, res) {
     try {
@@ -209,7 +217,8 @@ function mountAuthRoutes(app, ctx) {
             const pwdSet = byEmail.password_set === true || byEmail.password_set === 1;
             if (hasOauth && !pwdSet) {
               res.set("X-Login-Code", "oauth_password_not_set");
-              return res.status(401).json({
+              return res.status(200).json({
+                ok: false,
                 error: "\u042D\u0442\u043E\u0442 email \u043F\u0440\u0438\u0432\u044F\u0437\u0430\u043D \u043A \u0432\u0445\u043E\u0434\u0443 \u0447\u0435\u0440\u0435\u0437 Google. \u0412\u043E\u0439\u0434\u0438\u0442\u0435 \u0447\u0435\u0440\u0435\u0437 Google \u0438\u043B\u0438 \u0437\u0430\u0434\u0430\u0439\u0442\u0435 \u043F\u0430\u0440\u043E\u043B\u044C \u0432 \u0440\u0430\u0437\u0434\u0435\u043B\u0435 \xAB\u0410\u043A\u043A\u0430\u0443\u043D\u0442\xBB \u043F\u043E\u0441\u043B\u0435 \u0432\u0445\u043E\u0434\u0430.",
                 code: "oauth_password_not_set"
               });
@@ -217,7 +226,8 @@ function mountAuthRoutes(app, ctx) {
           }
           if (!byEmail && !byUsername) {
             res.set("X-Login-Code", "email_not_registered");
-            return res.status(401).json({
+            return res.status(200).json({
+              ok: false,
               error: "\u0422\u0430\u043A\u043E\u0433\u043E \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u0432 \u0441\u0438\u0441\u0442\u0435\u043C\u0435 \u043D\u0435\u0442. \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u0417\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C\u0441\u044F\xBB \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 \u0432\u0445\u043E\u0434\u0430.",
               code: "email_not_registered"
             });
@@ -226,29 +236,51 @@ function mountAuthRoutes(app, ctx) {
           const byUsernameOnly = await db.findUserByUsername(u);
           if (!byUsernameOnly) {
             res.set("X-Login-Code", "username_not_registered");
-            return res.status(401).json({
+            return res.status(200).json({
+              ok: false,
               error: "\u0422\u0430\u043A\u043E\u0433\u043E \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F \u0432 \u0441\u0438\u0441\u0442\u0435\u043C\u0435 \u043D\u0435\u0442. \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB\u0417\u0430\u0440\u0435\u0433\u0438\u0441\u0442\u0440\u0438\u0440\u043E\u0432\u0430\u0442\u044C\u0441\u044F\xBB \u043D\u0430 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435 \u0432\u0445\u043E\u0434\u0430.",
               code: "username_not_registered"
             });
           }
         }
-        return res.status(401).json({ error: "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043B\u043E\u0433\u0438\u043D \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C" });
+        return res.status(200).json({ ok: false, error: "\u041D\u0435\u0432\u0435\u0440\u043D\u044B\u0439 \u043B\u043E\u0433\u0438\u043D \u0438\u043B\u0438 \u043F\u0430\u0440\u043E\u043B\u044C" });
       }
-      if (user.role !== "user") return res.status(403).json({ error: "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0440\u0435\u0436\u0438\u043C \xAB\u0410\u0434\u043C\u0438\u043D\xBB" });
+      if (user.role !== "user") {
+        return res.status(200).json({
+          ok: false,
+          error: "\u0418\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0439\u0442\u0435 \u0440\u0435\u0436\u0438\u043C \xAB\u0410\u0434\u043C\u0438\u043D\xBB",
+          code: "staff_use_admin_login"
+        });
+      }
       const token = createJwtToken(user, JWT_SECRET);
       res.cookie(JWT_COOKIE_NAME, token, cookieOpts());
-      res.type("application/json").json({ user: { id: user.id, username: user.username, role: user.role } });
+      res.type("application/json").json({ ok: true, user: { id: user.id, username: user.username, role: user.role } });
     } catch (err) {
       console.error("POST /api/user/auth/login:", err);
       res.status(500).json({ error: "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430" });
     }
   });
-  app.get("/api/user/auth/me", requireUserJwt, async (req, res) => {
+  app.get("/api/user/auth/me", async (req, res) => {
     try {
-      const id = Number(req.userJwt.sub);
-      if (!Number.isFinite(id) || id <= 0) return res.status(401).json({ error: "Unauthorized" });
+      const token = readUserJwtToken(req, JWT_COOKIE_NAME);
+      if (!token) return res.json(null);
+      let payload;
+      try {
+        payload = jwt.verify(token, JWT_SECRET);
+      } catch {
+        res.clearCookie(JWT_COOKIE_NAME, cookieOpts());
+        return res.json(null);
+      }
+      const id = Number(payload && payload.sub);
+      if (!Number.isFinite(id) || id <= 0) {
+        res.clearCookie(JWT_COOKIE_NAME, cookieOpts());
+        return res.json(null);
+      }
       const row = await db.findUserById(id);
-      if (!row || !row.is_active) return res.status(401).json({ error: "Unauthorized" });
+      if (!row || !row.is_active) {
+        res.clearCookie(JWT_COOKIE_NAME, cookieOpts());
+        return res.json(null);
+      }
       res.json({
         id: Number(row.id),
         username: row.username,

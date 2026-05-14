@@ -182,7 +182,6 @@
                         <option value="зима">Зима</option>
                         <option value="лето">Лето</option>
                         <option value="демисезон">Демисезон</option>
-                        <option value="всесезонный">Всесезонный</option>
                     </select>
                 </div>
             </div>
@@ -241,7 +240,6 @@
                                 <option value="зима">Зима</option>
                                 <option value="лето">Лето</option>
                                 <option value="демисезон">Демисезон</option>
-                                <option value="всесезонный">Всесезонный</option>
                             </select>
                         </div>
                     </div>
@@ -528,6 +526,22 @@
                     <button type="button" id="product-exit-draft-discard" class="btn btn--danger">Выйти без сохранения</button>
                     <button type="button" id="product-exit-draft-save" class="btn btn--primary filter-apply-btn">Сохранить черновик и выйти</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal admin-modal" id="admin-logout-confirm-modal" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="admin-logout-confirm-title">
+        <div class="modal-content admin-modal-content admin-confirm-modal">
+            <div class="modal-header admin-modal-header">
+                <h2 id="admin-logout-confirm-title">Выйти из панели?</h2>
+                <button type="button" class="modal-close ui-xbtn admin-logout-confirm-close" aria-label="Закрыть">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p id="admin-logout-confirm-message" class="visibility-confirm-message">Сессия администратора будет завершена. Потребуется снова войти.</p>
+            </div>
+            <div class="modal-footer visibility-confirm-footer admin-modal-footer">
+                <button type="button" id="admin-logout-cancel" class="btn btn--secondary filter-clear-btn">Отмена</button>
+                <button type="button" id="admin-logout-confirm-go" class="btn btn--danger filter-apply-btn">Выйти</button>
             </div>
         </div>
     </div>

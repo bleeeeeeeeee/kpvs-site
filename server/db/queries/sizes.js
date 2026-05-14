@@ -96,7 +96,7 @@ async function getSizes(pool, categoryId) {
   if (inferredIds.length) {
     if (explicitIds.length) {
       const inter = inferredIds.filter((id) => explicitIds.includes(id));
-      filterIds = inter.length ? inter : inferredIds;
+      filterIds = inter.length ? inter : explicitIds;
     } else {
       filterIds = inferredIds;
     }
@@ -279,7 +279,7 @@ async function ensureCategorySizeTypesSchema(pool) {
   }
   const gridTypes = [
     { name: "\u041E\u0434\u0435\u0436\u0434\u0430 (EU, 2XS\u20133XL)", slug: "eu_clothing" },
-    { name: "\u041E\u0431\u0443\u0432\u044C (EU, 35\u201347)", slug: "eu_footwear" },
+    { name: "\u041E\u0431\u0443\u0432\u044C (EU, 35\u201347, \u0441 \u043F\u043E\u043B\u043E\u0432\u0438\u043D\u0430\u043C\u0438)", slug: "eu_footwear" },
     { name: "\u0410\u043A\u0441\u0435\u0441\u0441\u0443\u0430\u0440\u044B (EU, 2XS\u20133XL)", slug: "eu_accessories" },
     { name: "\u0423\u043D\u0438\u0432\u0435\u0440\u0441\u0430\u043B\u044C\u043D\u044B\u0439 \u0440\u0430\u0437\u043C\u0435\u0440", slug: "universal" }
   ];
@@ -297,7 +297,7 @@ async function ensureCategorySizeTypesSchema(pool) {
     FROM (
         VALUES
             ('eu_clothing', '\u041E\u0434\u0435\u0436\u0434\u0430 (EU, 2XS\u20133XL)'),
-            ('eu_footwear', '\u041E\u0431\u0443\u0432\u044C (EU, 35\u201347)'),
+            ('eu_footwear', '\u041E\u0431\u0443\u0432\u044C (EU, 35\u201347, \u0441 \u043F\u043E\u043B\u043E\u0432\u0438\u043D\u0430\u043C\u0438)'),
             ('eu_accessories', '\u0410\u043A\u0441\u0435\u0441\u0441\u0443\u0430\u0440\u044B (EU, 2XS\u20133XL)'),
             ('universal', '\u0423\u043D\u0438\u0432\u0435\u0440\u0441\u0430\u043B\u044C\u043D\u044B\u0439 \u0440\u0430\u0437\u043C\u0435\u0440')
     ) AS d(slug, name)
@@ -660,10 +660,14 @@ async function ensureReferenceSizesSeed(pool) {
   await deleteOrphanSizesNotInWhitelist(bySlug.eu_clothing, lettersLower);
   const shoeEu = [];
   const footLower = [];
-  for (let e = 35; e <= 47; e++) {
-    shoeEu.push(String(e));
-    footLower.push(String(e));
+  for (let n = 35; n <= 46; n += 1) {
+    shoeEu.push(String(n));
+    shoeEu.push(String(n) + ".5");
+    footLower.push(String(n).toLowerCase());
+    footLower.push(String(n).toLowerCase() + ".5");
   }
+  shoeEu.push("47");
+  footLower.push("47");
   await insertValues(bySlug.eu_footwear, shoeEu);
   await deleteOrphanSizesNotInWhitelist(bySlug.eu_footwear, footLower);
   await insertValues(bySlug.eu_accessories, EU_LETTERS_2XS_3XL);

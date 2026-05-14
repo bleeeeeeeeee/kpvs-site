@@ -2,15 +2,21 @@
 
 Магазин спецодежды: Node.js (Express), PostgreSQL, статические HTML/JS/CSS.
 
+**Деплой в production:** см. [DEPLOY.md](DEPLOY.md) и шаблон [.env.example](.env.example).
+
 ## Запуск
 
 1. PostgreSQL и переменные окружения (см. `.env.example` при наличии или раздел ниже).
 2. `npm install`
-3. `npm start` — сервер слушает `PORT` (по умолчанию 3000).
+3. `npm start` — сервер слушает `PORT` (по умолчанию 3000). Если в базе ещё нет таблиц каталога, при старте создаются минимальные таблицы (`users`, `products`, `categories`, размеры и т.д.); дальше схема доращивается существующими `ensure*`-шагами.
 
 Обязательно в production: `NODE_ENV=production`, `SESSION_SECRET` (не короче 24 символов), строка подключения к БД (`DATABASE_URL` или `PGHOST`/`PGUSER`/`PGPASSWORD`/`PGDATABASE`).
 
 ## Архитектурные решения
+
+### CSRF для API
+
+Для мутаций (`POST`/`PUT`/`PATCH`/`DELETE`) клиент после `GET /api/csrf-token` отправляет cookie **`XSRF-TOKEN`** и заголовок **`X-XSRF-TOKEN`**; на сервере значение сверяется с **`req.session.csrfToken`** (`server/middleware/csrf.js`). Пакет **`csurf`** не используется.
 
 ### После входа через Google (OAuth)
 

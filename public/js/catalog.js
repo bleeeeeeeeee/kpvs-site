@@ -15,23 +15,64 @@ const Catalog = (() => {
   let catalogCategories = [];
   let catalogCategoryRoots = [];
   const categorySlugToSection = Object.create(null);
+  const LEGACY_CATEGORY_FILTER_ALIASES = {
+    outerwear: "workwear",
+    underwear: "workwear",
+    accessories: "ppe"
+  };
+  function normalizeLegacyCategoryFilterToken(slug) {
+    const s = String(slug || "").trim();
+    const mapped = LEGACY_CATEGORY_FILTER_ALIASES[s];
+    return mapped || s;
+  }
+  function normalizeStoredCategoryFilters(list) {
+    if (!Array.isArray(list)) return [];
+    const out = [];
+    const seen = Object.create(null);
+    list.forEach(function(s) {
+      const n = normalizeLegacyCategoryFilterToken(s);
+      if (!n || seen[n]) return;
+      seen[n] = 1;
+      out.push(n);
+    });
+    return out;
+  }
+  function categoryRowMatchesActiveFilter(c, activeList) {
+    if (!c || !Array.isArray(activeList)) return false;
+    const rowKey = String(c.slug != null ? c.slug : c.id || "").trim();
+    if (!rowKey) return false;
+    let rowSec = null;
+    if (Object.prototype.hasOwnProperty.call(categorySlugToSection, rowKey)) {
+      rowSec = categorySlugToSection[rowKey];
+    } else {
+      rowSec = inferSectionFromSlugName(rowKey, c.name || "");
+    }
+    for (let i = 0; i < activeList.length; i++) {
+      const f = String(activeList[i] || "").trim();
+      if (!f) continue;
+      if (f === rowKey) return true;
+      const nf = normalizeLegacyCategoryFilterToken(f);
+      if (nf === rowKey) return true;
+      if (rowSec && (f === rowSec || nf === rowSec)) return true;
+    }
+    return false;
+  }
   let catalogBrands = [];
   let catalogSizes = [];
   let catalogColors = [];
   let catalogCollections = [];
   let sizeEquivalenceAdj = null;
   const sectionTitles = {
-    outerwear: "\u0412\u0435\u0440\u0445\u043D\u044F\u044F \u043E\u0434\u0435\u0436\u0434\u0430",
-    underwear: "\u041D\u0438\u0436\u043D\u044F\u044F \u043E\u0434\u0435\u0436\u0434\u0430",
-    accessories: "\u0410\u043A\u0441\u0435\u0441\u0441\u0443\u0430\u0440\u044B",
+    workwear: "\u0421\u043F\u0435\u0446\u043E\u0434\u0435\u0436\u0434\u0430",
+    footwear: "\u0421\u043F\u0435\u0446\u043E\u0431\u0443\u0432\u044C",
+    ppe: "\u0421\u0418\u0417",
     miscCat: "\u0414\u0440\u0443\u0433\u0438\u0435 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438",
     other: "\u0414\u0440\u0443\u0433\u0438\u0435 \u0442\u043E\u0432\u0430\u0440\u044B"
   };
   const seasonLabels = {
     "\u0437\u0438\u043C\u0430": "\u0417\u0438\u043C\u0430",
     "\u043B\u0435\u0442\u043E": "\u041B\u0435\u0442\u043E",
-    "\u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D": "\u0414\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D",
-    "\u0432\u0441\u0435\u0441\u0435\u0437\u043E\u043D\u043D\u044B\u0439": "\u0412\u0441\u0435\u0441\u0435\u0437\u043E\u043D\u043D\u044B\u0439"
+    "\u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D": "\u0414\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D"
   };
   function storageKey() {
     return "kpvs.catalogState.v1." + String(pageGender || "mens");
@@ -47,7 +88,7 @@ const Catalog = (() => {
       if (parsed.filters && typeof parsed.filters === "object") {
         const f = parsed.filters;
         activeFilters = {
-          categories: Array.isArray(f.categories) ? f.categories.slice() : [],
+          categories: normalizeStoredCategoryFilters(f.categories),
           brands: Array.isArray(f.brands) ? f.brands.slice() : [],
           seasons: Array.isArray(f.seasons) ? f.seasons.slice() : [],
           sizes: Array.isArray(f.sizes) ? f.sizes.slice() : [],
@@ -196,17 +237,86 @@ const Catalog = (() => {
     });
     return result;
   }
+  function tokenizeForSectionInfer(text) {
+    const raw = String(text || "").toLowerCase().replace(/[_-]+/g, " ");
+    let tokens = raw.split(/[^a-z0-9\u0400-\u04FF]+/i).filter(function(t) {
+      return t.length >= 2;
+    });
+    if (!tokens.length && raw.trim()) {
+      tokens = raw.trim().split(/\s+/).filter(function(t) {
+        return t.length >= 2;
+      });
+    }
+    return { raw, tokens };
+  }
   function inferSectionFromSlugName(slug, name) {
-    const s = String(slug || "").toLowerCase();
-    const n = String(name || "").toLowerCase();
-    const h = s + " " + n;
-    if (!s && !n) return null;
-    if (s.includes("accessories") || s.includes("acc_") || s === "accessories" || h.includes("\u0430\u043A\u0441\u0435\u0441\u0441\u0443\u0430\u0440")) return "accessories";
-    if (s.includes("outerwear") || s === "outerwear" || h.includes("\u0432\u0435\u0440\u0445\u043D") || h.includes("\u043A\u0443\u0440\u0442\u043A") || h.includes("\u043F\u0430\u043B\u044C\u0442\u043E") || h.includes("\u043F\u043B\u0430\u0449") || h.includes("\u0436\u0438\u043B\u0435\u0442") || h.includes("\u0430\u043D\u043E\u0440\u0430\u043A") || h.includes("\u043A\u043E\u0441\u0442\u044E\u043C")) return "outerwear";
-    if (s.includes("underwear") || s.includes("pants") || s === "pants" || h.includes("\u043D\u0438\u0436\u043D") || h.includes("\u0431\u0440\u044E\u043A") || h.includes("\u0448\u0442\u0430\u043D") || h.includes("\u0440\u0443\u0431\u0430\u0448")) return "underwear";
-    if (s.startsWith("outerwear")) return "outerwear";
-    if (s.startsWith("pants") || s.startsWith("underwear")) return "underwear";
-    if (s.startsWith("accessories") || s.startsWith("acc_")) return "accessories";
+    const slugStr = String(slug || "").toLowerCase();
+    const combined = `${String(name || "")} ${slugStr}`;
+    const tokenized = tokenizeForSectionInfer(combined);
+    const raw = tokenized.raw;
+    const tokens = tokenized.tokens;
+    const hay = " " + tokens.join(" ") + " ";
+    const haySlug = " " + raw.replace(/\s+/g, " ").trim() + " ";
+    if (!slugStr && !String(name || "").trim()) return null;
+
+    const gloveRe = /(?:^|\s)(?:перчат|рукавиц|gloves?)(?:[a-zа-яё]*)?(?:\s|$)/i;
+    const footRe = /(?:^|\s)(?:обувь|обуви|обувью|обувей|ботинк|сапог|кроссовк|тапочк|босоножк|валенк|мокасин|лофер|слипон|туфл|сабо|угг|эспадриль)(?:[a-zа-яё]*)?(?:\s|$)/i;
+    const slugSegs = slugStr.split(/[/_.-]+/).filter(Boolean);
+    const slugSegFoot = slugSegs.some(function(seg) {
+      return /^(obuv|footwear|shoe|boots?|sneakers?|tapoch|tapocek)$/i.test(seg);
+    });
+    const specFootwearCompound = /спецобув|specobuv|spec-?obuv|spec.?footwear/i.test(raw);
+    const hasFt = footRe.test(hay) || footRe.test(haySlug) || slugSegFoot || specFootwearCompound;
+    if (hasFt) return "footwear";
+
+    const slugSegPpe = slugSegs.some(function(seg) {
+      return /^(siz|ppe|epi|epi\-|respirator|kaska|kasok|zashchit|zashit|sredstva|kragi|schitok|schit|protivogaz|mask|safety)$/i.test(seg);
+    });
+    const ppeRe =
+      /(?:^|\s)(?:сиз\b|ср\.?\s*сз|средств\w*\s+защит|индивидуал\w*\s+защит|средств\w*\s+индивидуал|респиратор|противогаз|антишум|каска|наушник\w*\s+против|защитн\w*\s+очк|щиток|краг|нарукавник|напальчник|капюшон\w*\s+к\s+каск|подшлемник|визор|наплечник|наколенник|налокотник|страховочн\w*\s+пояс)/i.test(hay) ||
+      /(?:^|\s)(?:сиз\b|средств\w*\s+защит|индивидуал\w*\s+защит|респиратор|противогаз|каска)/i.test(haySlug) ||
+      slugSegPpe;
+    if (ppeRe) return "ppe";
+
+    if (gloveRe.test(hay) || gloveRe.test(haySlug)) return "ppe";
+
+    const accRe =
+      /(?:^|\s)(?:аксесс|сумк|рюкзак|кошел|клатч|портфел|портмон|ремен|галстук|шарф|шапк|кепк|бейсбол|панам|нарук|очк|зонт|платок|косынк|подтяжк|украшен|бижутер|часы|заколк|бусы|кольцо|браслет|серьг|цепочк|чехол|ремен|коврик|ременн|ремень|ремени|ременя)/i.test(hay) ||
+      /(?:^|\s)(?:аксесс|сумк|рюкзак|ремен|шарф|шапк|кепк|зонт)/i.test(" " + slugStr.replace(/[_-]+/g, " ") + " ");
+    const slugSegAcc = slugSegs.some(function(seg) {
+      return /^(aksess|accessories|bags|belt|scarf|hat|gloves|jewelry|sumki|ryukzak)$/i.test(seg);
+    });
+    if (accRe || slugSegAcc || slugStr.includes("accessories") || slugStr.includes("acc_") || slugStr === "accessories" || hay.includes("аксессуар")) return "ppe";
+
+    const appRe = /(?:^|\s)(?:спецодежд|одежд|костюм|куртк|брюк|рубашк|жилет|фартук|комбинезон|платье|юбк|свитер|поло|футболк|халат|трикотаж|пальто|пиджак|сорочк|шорт|трус|лифчик|пижам|худи|свитшот|кардиган|пончо|носк|колгот|легинс|манишк|торгов|вещев|одежн|форм)(?:[a-zа-яё]*)?(?:\s|$)/i;
+    const slugSegApp = slugSegs.some(function(seg) {
+      return (
+        /^(odezhda|odezda|cloth(?:ing)?|shirt|pants|jacket|apparel|specodezhd|trikotazh|rubashka|coat|vest|outerwear|underwear)$/i.test(seg) ||
+        /^kurtk/i.test(seg) ||
+        /^raboch/i.test(seg) ||
+        /^specodezhd/i.test(seg)
+      );
+    });
+    const hasApp = appRe.test(hay) || slugSegApp || /(?:^|\s)рабоч(?:[a-zа-яё]*)?(?:\s|$)/i.test(hay);
+    if (hasApp) return "workwear";
+
+    const h = slugStr + " " + String(name || "").toLowerCase();
+    if (slugStr.includes("outerwear") || slugStr === "outerwear" || slugStr.startsWith("outerwear")) return "workwear";
+    if (slugStr.includes("underwear") || slugStr.includes("pants") || slugStr === "pants" || slugStr.startsWith("pants") || slugStr.startsWith("underwear")) return "workwear";
+    if (
+      h.includes("\u0432\u0435\u0440\u0445\u043D") ||
+      h.includes("\u043A\u0443\u0440\u0442\u043A") ||
+      h.includes("\u043F\u0430\u043B\u044C\u0442\u043E") ||
+      h.includes("\u043F\u043B\u0430\u0449") ||
+      h.includes("\u0436\u0438\u043B\u0435\u0442") ||
+      h.includes("\u0430\u043D\u043E\u0440\u0430\u043A") ||
+      h.includes("\u043A\u043E\u0441\u0442\u044E\u043C")
+    ) {
+      return "workwear";
+    }
+    if (h.includes("\u0448\u0442\u0430\u043D") || h.includes("\u0431\u0440\u044E\u043A") || h.includes("\u0440\u0443\u0431\u0430\u0448") || h.includes("\u0441\u043E\u0440\u043E\u0447\u043A")) return "workwear";
+    if (h.includes("\u043D\u0438\u0436\u043D") && (h.includes("\u043E\u0434\u0435\u0436") || h.includes("\u0441\u043F\u0435\u0446"))) return "workwear";
+
     return null;
   }
   function rebuildCategorySlugToSectionIndex() {
@@ -322,7 +432,7 @@ const Catalog = (() => {
         container.appendChild(buildSection("coll-" + coll.id, title, items));
       });
     }
-    const sectionKeys = ["outerwear", "underwear", "accessories"];
+    const sectionKeys = ["workwear", "footwear", "ppe"];
     sectionKeys.forEach(function(key) {
       const items = filtered.filter(function(p) {
         return mapCategoryToSection(p) === key;
@@ -378,7 +488,9 @@ const Catalog = (() => {
     if (activeFilters.categories.length) {
       result = result.filter(function(p) {
         return activeFilters.categories.some(function(slug) {
-          return p.category_slug === slug || mapCategoryToSection(p) === slug;
+          const want = normalizeLegacyCategoryFilterToken(slug);
+          const sec = mapCategoryToSection(p);
+          return p.category_slug === slug || p.category_slug === want || sec === slug || sec === want;
         });
       });
     }
@@ -462,7 +574,8 @@ const Catalog = (() => {
       const cat = catalogCategories.find(function(c) {
         return c.slug === slug;
       });
-      const label = cat ? cat.name : slug;
+      const sectionLabel = slug === "workwear" || slug === "footwear" || slug === "ppe" ? sectionTitles[slug] : "";
+      const label = cat ? cat.name : sectionLabel || slug;
       tags.push({ label: "\u041A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044F: " + label, clear: function() {
         activeFilters.categories = activeFilters.categories.filter(function(s) {
           return s !== slug;
@@ -568,7 +681,7 @@ const Catalog = (() => {
     let catalogFilterSizeCascadeHandle = null;
     const catHtml = catalogCategories.length ? catalogCategories.map(function(c) {
       const value = c.slug || String(c.id);
-      const checked = activeFilters.categories.indexOf(value) !== -1 ? "checked" : "";
+      const checked = categoryRowMatchesActiveFilter(c, activeFilters.categories) ? "checked" : "";
       const padding = c.depth ? 'style="padding-left:' + (12 + c.depth * 12) + 'px;"' : "";
       return '<label class="filter-option"><input type="checkbox" name="category" value="' + escapeHtml(value) + '" ' + checked + "><span " + padding + ">" + escapeHtml(c.name) + "</span></label>";
     }).join("") : '<p class="filter-empty-hint">\u041A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438 \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u044B</p>';
@@ -578,7 +691,7 @@ const Catalog = (() => {
       const checked = activeFilters.brands.indexOf(val) !== -1 || activeFilters.brands.indexOf(b.slug || "") !== -1 ? "checked" : "";
       return '<label class="filter-option"><input type="checkbox" name="brand" value="' + val + '" ' + checked + "><span>" + escapeHtml(b.name) + "</span></label>";
     }).join("") : '<p class="filter-empty-hint">\u0411\u0440\u0435\u043D\u0434\u044B \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u044B</p>';
-    const seasons = ["\u0437\u0438\u043C\u0430", "\u043B\u0435\u0442\u043E", "\u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D", "\u0432\u0441\u0435\u0441\u0435\u0437\u043E\u043D\u043D\u044B\u0439"];
+    const seasons = ["\u0437\u0438\u043C\u0430", "\u043B\u0435\u0442\u043E", "\u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D"];
     const seasonHtml = seasons.map(function(s) {
       const checked = activeFilters.seasons.indexOf(s) !== -1 ? "checked" : "";
       return '<label class="filter-option"><input type="checkbox" name="season" value="' + s + '" ' + checked + "><span>" + (seasonLabels[s] || s) + "</span></label>";
@@ -1189,11 +1302,20 @@ document.addEventListener("DOMContentLoaded", function() {
       const next = encodeURIComponent(window.location.pathname + window.location.search);
       el.setAttribute("href", "/login.html?mode=user&next=" + next);
       fetch("/api/user/auth/me", { credentials: "include" }).then(function(r) {
-        if (r.ok) return;
-        el.className = "btn btn--primary site-account-login-btn";
-        el.removeAttribute("title");
-        el.setAttribute("aria-label", "\u0412\u043E\u0439\u0442\u0438");
-        el.textContent = "\u0412\u043E\u0439\u0442\u0438";
+        function showLoginBtn() {
+          el.className = "btn btn--primary site-account-login-btn";
+          el.removeAttribute("title");
+          el.setAttribute("aria-label", "\u0412\u043E\u0439\u0442\u0438");
+          el.textContent = "\u0412\u043E\u0439\u0442\u0438";
+        }
+        if (!r.ok) {
+          showLoginBtn();
+          return;
+        }
+        return r.json().then(function(me) {
+          if (me && me.id) return;
+          showLoginBtn();
+        });
       }).catch(function() {
       });
     }

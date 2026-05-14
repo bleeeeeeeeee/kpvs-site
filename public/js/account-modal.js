@@ -118,6 +118,9 @@
       window.__kpvsOauthPwdOnEscape = null;
     }
   }
+  window.KpvsDismissOauthPasswordPromptIfOpen = function() {
+    if (document.getElementById("oauth-password-prompt-modal")) dismissOauthPasswordPrompt();
+  };
   function buildAndShowOauthPasswordModal() {
     if (document.getElementById("oauth-password-prompt-modal")) return;
     var modal = ce("div", "modal oauth-password-modal");
@@ -307,6 +310,154 @@
       }
       buildAndShowOauthPasswordModal();
     });
+  }
+  function buildLogoutConfirmUI() {
+    var layer = ce("div", "account-logout-confirm");
+    layer.id = "account-logout-confirm";
+    layer.hidden = true;
+    layer.setAttribute("aria-hidden", "true");
+    layer.setAttribute("role", "presentation");
+    var card = ce("div", "account-logout-confirm__card");
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-modal", "true");
+    card.setAttribute("aria-labelledby", "account-logout-confirm-title");
+    var title = ce("p", "account-logout-confirm__title");
+    title.id = "account-logout-confirm-title";
+    title.textContent = "\u0412\u044B\u0439\u0442\u0438 \u0438\u0437 \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0430?";
+    var text = ce("p", "account-logout-confirm__text");
+    text.textContent =
+      "\u0412\u0430\u043C \u043F\u043E\u0442\u0440\u0435\u0431\u0443\u0435\u0442\u0441\u044F \u0441\u043D\u043E\u0432\u0430 \u0432\u043E\u0439\u0442\u0438, \u0447\u0442\u043E\u0431\u044B \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u044C\u0441\u044F \u043A\u043E\u0440\u0437\u0438\u043D\u043E\u0439 \u0438 \u043E\u0444\u043E\u0440\u043C\u043B\u0435\u043D\u0438\u0435\u043C \u0437\u0430\u043A\u0430\u0437\u0430.";
+    var actions = ce("div", "account-logout-confirm__actions");
+    var btnCancel = ce("button", "btn btn--outline account-logout-confirm__btn");
+    btnCancel.type = "button";
+    btnCancel.id = "account-logout-cancel";
+    btnCancel.textContent = "\u041E\u0442\u043C\u0435\u043D\u0430";
+    var btnGo = ce("button", "btn btn--danger account-logout-confirm__btn");
+    btnGo.type = "button";
+    btnGo.id = "account-logout-confirm-go";
+    btnGo.textContent = "\u0412\u044B\u0439\u0442\u0438";
+    actions.appendChild(btnCancel);
+    actions.appendChild(btnGo);
+    card.appendChild(title);
+    card.appendChild(text);
+    card.appendChild(actions);
+    layer.appendChild(card);
+    return { layer, btnCancel, btnGo, card };
+  }
+  function ensureLogoutConfirmAttached(built) {
+    if (!built || !built.modal) return;
+    if (built.logoutConfirmLayer && built.logoutConfirmLayer.isConnected) return;
+    var content = qs(".modal-content.modal-content--account", built.modal);
+    if (!content) return;
+    var existingLayer = qs("#account-logout-confirm", content);
+    if (existingLayer) {
+      built.logoutConfirmLayer = existingLayer;
+      built.btnLogoutConfirmCancel = qs("#account-logout-cancel", content);
+      built.btnLogoutConfirmGo = qs("#account-logout-confirm-go", content);
+      return;
+    }
+    var u = buildLogoutConfirmUI();
+    content.appendChild(u.layer);
+    built.logoutConfirmLayer = u.layer;
+    built.btnLogoutConfirmCancel = u.btnCancel;
+    built.btnLogoutConfirmGo = u.btnGo;
+  }
+  function hideLogoutConfirm(built) {
+    if (!built || !built.logoutConfirmLayer) return;
+    built.logoutConfirmLayer.classList.remove("is-visible");
+    built.logoutConfirmLayer.hidden = true;
+    built.logoutConfirmLayer.setAttribute("aria-hidden", "true");
+    built.__logoutConfirmOpen = false;
+    if (built.__logoutConfirmKeydown) {
+      document.removeEventListener("keydown", built.__logoutConfirmKeydown, true);
+    }
+  }
+  function showLogoutConfirm(built) {
+    ensureLogoutConfirmAttached(built);
+    if (!built.logoutConfirmLayer) return;
+    if (built.__logoutConfirmOpen) return;
+    if (window.KpvsModalOverlay && typeof window.KpvsModalOverlay.dismissOpenModalsExcept === "function") {
+      try {
+        window.KpvsModalOverlay.dismissOpenModalsExcept(built.modal);
+      } catch (_) {
+      }
+    }
+    built.logoutConfirmLayer.hidden = false;
+    built.logoutConfirmLayer.setAttribute("aria-hidden", "false");
+    built.logoutConfirmLayer.classList.add("is-visible");
+    built.__logoutConfirmOpen = true;
+    if (!built.__logoutConfirmKeydown) {
+      built.__logoutConfirmKeydown = function(ev) {
+        if (!built.__logoutConfirmOpen) return;
+        if (ev.key !== "Tab") return;
+        var ring = [built.btnLogoutConfirmCancel, built.btnLogoutConfirmGo].filter(function(el) {
+          return el && !el.disabled;
+        });
+        if (ring.length < 2) return;
+        var i = ring.indexOf(document.activeElement);
+        if (ev.shiftKey) {
+          if (i <= 0) {
+            ev.preventDefault();
+            ring[ring.length - 1].focus();
+          }
+        } else if (i >= ring.length - 1) {
+          ev.preventDefault();
+          ring[0].focus();
+        }
+      };
+    }
+    document.addEventListener("keydown", built.__logoutConfirmKeydown, true);
+    setTimeout(function() {
+      try {
+        if (built.btnLogoutConfirmCancel) built.btnLogoutConfirmCancel.focus();
+      } catch (_) {
+      }
+    }, 0);
+  }
+  function performLogout(built) {
+    if (!built || !built.btnLogout) return;
+    var lockBtns = [built.btnLogout, built.btnLogoutConfirmGo, built.btnLogoutConfirmCancel].filter(Boolean);
+    lockBtns.forEach(function(b) {
+      b.disabled = true;
+    });
+    if (built.hint) built.hint.textContent = "";
+    apiFetchAccount("/api/csrf-token", { method: "GET" })
+      .catch(function() {})
+      .then(function() {
+        return apiFetchAccount("/api/user/auth/logout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}"
+        });
+      })
+      .then(function(r) {
+        lockBtns.forEach(function(b) {
+          b.disabled = false;
+        });
+        if (r && r.ok) {
+          try {
+            localStorage.removeItem(TOKEN_KEY);
+          } catch (_) {}
+          hideLogoutConfirm(built);
+          closeAccountModalFully();
+          window.location.reload();
+          return;
+        }
+        hideLogoutConfirm(built);
+        if (built.hint) {
+          built.hint.textContent =
+            "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0432\u044B\u0439\u0442\u0438. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437.";
+        }
+      })
+      .catch(function() {
+        lockBtns.forEach(function(b) {
+          b.disabled = false;
+        });
+        hideLogoutConfirm(built);
+        if (built.hint) {
+          built.hint.textContent = "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0442\u0438.";
+        }
+      });
   }
   function buildModal() {
     var modal = ce("div", "modal");
@@ -529,6 +680,8 @@
     body.appendChild(shell);
     content.appendChild(header);
     content.appendChild(body);
+    var logoutConfirm = buildLogoutConfirmUI();
+    content.appendChild(logoutConfirm.layer);
     modal.appendChild(content);
     return {
       modal,
@@ -561,7 +714,10 @@
       inpNew,
       inpNew2,
       btnPwd,
-      btnPwdCancel
+      btnPwdCancel,
+      logoutConfirmLayer: logoutConfirm.layer,
+      btnLogoutConfirmCancel: logoutConfirm.btnCancel,
+      btnLogoutConfirmGo: logoutConfirm.btnGo
     };
   }
   function ensureModal() {
@@ -600,8 +756,12 @@
         inpNew2: qs("#account-pwd-new2", existing),
         btnPwd: qs("#account-password-save", existing),
         btnPwdCancel: qs("#account-password-cancel", existing),
+        logoutConfirmLayer: null,
+        btnLogoutConfirmCancel: null,
+        btnLogoutConfirmGo: null,
         __wired: false
       };
+      ensureLogoutConfirmAttached(modalState);
     } else {
       modalState = buildModal();
       document.body.appendChild(modalState.modal);
@@ -643,9 +803,10 @@
     var closeBtn = qs(".modal-close", modal);
     if (closeBtn) closeBtn.focus();
   }
-  function hideModal() {
+  function closeAccountModalFully() {
     var modal = qs("#account-modal");
     if (!modal) return;
+    if (modalState && modalState.__logoutConfirmOpen) hideLogoutConfirm(modalState);
     if (modalState && typeof modalState.__exitRenameUi === "function") {
       try {
         modalState.__exitRenameUi();
@@ -658,9 +819,22 @@
     setTimeout(function() {
     }, 0);
   }
+  function hideModal() {
+    var modal = qs("#account-modal");
+    if (!modal) return;
+    if (modalState && modalState.__logoutConfirmOpen) {
+      hideLogoutConfirm(modalState);
+      try {
+        if (modalState.btnLogout) modalState.btnLogout.focus();
+      } catch (_) {
+      }
+      return;
+    }
+    closeAccountModalFully();
+  }
   function wireModal(built) {
     var modal = built.modal;
-    built.close.addEventListener("click", hideModal);
+    built.close.addEventListener("click", closeAccountModalFully);
     modal.addEventListener("click", function(e) {
       if (e.target === modal) hideModal();
     });
@@ -670,39 +844,33 @@
         if (m && m.classList.contains("show")) hideModal();
       }
     });
-    built.btnLogout.addEventListener("click", function() {
-      built.btnLogout.disabled = true;
-      if (built.hint) built.hint.textContent = "";
-      apiFetchAccount("/api/csrf-token", { method: "GET" })
-        .catch(function() {})
-        .then(function() {
-          return apiFetchAccount("/api/user/auth/logout", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: "{}"
-          });
-        })
-        .then(function(r) {
-          built.btnLogout.disabled = false;
-          if (r && r.ok) {
-            try {
-              localStorage.removeItem(TOKEN_KEY);
-            } catch (_) {}
-            hideModal();
-            window.location.reload();
-            return;
-          }
-          if (built.hint) {
-            built.hint.textContent =
-              "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0432\u044B\u0439\u0442\u0438. \u041F\u043E\u043F\u0440\u043E\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437.";
-          }
-        })
-        .catch(function() {
-          built.btnLogout.disabled = false;
-          if (built.hint) {
-            built.hint.textContent = "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0442\u0438.";
-          }
+    ensureLogoutConfirmAttached(built);
+    if (!built.__logoutConfirmListeners) {
+      built.__logoutConfirmListeners = true;
+      function hideLogoutConfirmUi() {
+        hideLogoutConfirm(built);
+        try {
+          if (built.btnLogout) built.btnLogout.focus();
+        } catch (_) {
+        }
+      }
+      if (built.btnLogoutConfirmCancel) {
+        built.btnLogoutConfirmCancel.addEventListener("click", hideLogoutConfirmUi);
+      }
+      if (built.logoutConfirmLayer) {
+        built.logoutConfirmLayer.addEventListener("click", function(ev) {
+          if (ev.target === built.logoutConfirmLayer) hideLogoutConfirmUi();
         });
+      }
+      if (built.btnLogoutConfirmGo) {
+        built.btnLogoutConfirmGo.addEventListener("click", function() {
+          performLogout(built);
+        });
+      }
+    }
+    built.btnLogout.addEventListener("click", function() {
+      if (built.hint) built.hint.textContent = "";
+      showLogoutConfirm(built);
     });
     built.btnLogin.addEventListener("click", function() {
       hideModal();
