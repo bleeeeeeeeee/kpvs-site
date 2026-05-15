@@ -126,9 +126,6 @@ async function assertValidParentForCategory(pool, parentId, excludeId) {
   const r = await pool.query("SELECT id, slug, parent_id FROM categories WHERE id = $1", [pid]);
   if (!r.rows.length) throw new Error("Родительская категория не найдена");
   if (r.rows[0].slug === CATALOG_ROOT_SLUG) return pid;
-  if (r.rows[0].parent_id == null) {
-    await ensureCategoryHierarchy(pool);
-  }
   if (excludeId != null && pid === Number(excludeId)) {
     throw new Error("Категория не может быть родителем самой себе");
   }
@@ -149,7 +146,6 @@ async function assertValidParentForCategory(pool, parentId, excludeId) {
 }
 
 async function createCategory(pool, data, ctx = {}) {
-  await ensureCategoryHierarchy(pool);
   const name = String(data.name || "").trim();
   if (!name) throw new Error("Укажите название категории");
   let slug = String(data.slug || "").trim();

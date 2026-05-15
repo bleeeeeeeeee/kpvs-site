@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 const db = require("../server/db/index.js");
+const { runAllMigrations } = require("../server/db/migrate.js");
 
 const resetPassword = process.argv.includes("--reset-password");
 
@@ -9,7 +10,7 @@ async function main() {
   const password = String(process.env.ADMIN_PASSWORD || "");
   const username = String(process.env.ADMIN_USERNAME || "admin").trim();
 
-  await db.ensureUserAuthSchema();
+  await runAllMigrations();
 
   if (resetPassword) {
     if (!password || password.length < 6) {

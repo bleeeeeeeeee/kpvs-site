@@ -42,7 +42,6 @@ const Admin = (() => {
   }
   let categories = [];
   let brands = [];
-  let availableSizes = [];
   let productCategorySizesList = null;
   let productCategorySizesCatId = "";
   let availableColors = [];
@@ -927,16 +926,6 @@ const Admin = (() => {
       return Number.isFinite(s.id);
     }) : [];
   }
-  async function fetchSizes() {
-    try {
-      const r = await apiFetch("/api/sizes");
-      if (!r.ok) throw new Error();
-      const raw = await r.json();
-      availableSizes = mapSizesApiRows(raw);
-    } catch {
-      availableSizes = [];
-    }
-  }
   async function refreshProductCategorySizes() {
     const catEl = document.getElementById("product-category");
     const id = catEl && catEl.value ? String(catEl.value).trim() : "";
@@ -1503,7 +1492,7 @@ const Admin = (() => {
         if (cid) {
           productVariants.forEach(function(v) {
             if (v.size_id == null || !Number.isFinite(Number(v.size_id))) return;
-            const list = sizesForProductCategory(cid, v.size_id);
+            const list = sizesForProductCategory(cid);
             if (!list.some(function(s) {
               return Number(s.id) === Number(v.size_id);
             })) {
@@ -1600,11 +1589,6 @@ const Admin = (() => {
     (productCategorySizesList || []).forEach(function(s) {
       if (Number.isFinite(s.id)) m.set(Number(s.id), s.value != null ? String(s.value) : "");
     });
-    (availableSizes || []).forEach(function(s) {
-      if (Number.isFinite(s.id) && !m.has(Number(s.id))) {
-        m.set(Number(s.id), s.value != null ? String(s.value) : "");
-      }
-    });
     return m;
   }
   function compareVariantsSizeColorArt(a, b, idToValue) {
@@ -1627,43 +1611,22 @@ const Admin = (() => {
       return compareVariantsSizeColorArt(a, b, idToValue);
     });
   }
-  function sizesForProductCategory(categoryId, variantSizeId) {
-    const vs = Number(variantSizeId);
+  function sizesForProductCategory(categoryId) {
     const cid = categoryId != null && String(categoryId).trim() !== "" ? String(categoryId).trim() : "";
-    if (!cid) {
-      if (Number.isFinite(vs)) {
-        const extra = availableSizes.find(function(s) {
-          return Number(s.id) === vs;
-        });
-        return extra ? [extra] : [];
-      }
-      return [];
+    if (!cid) return [];
+    if (productCategorySizesCatId === cid && productCategorySizesList != null) {
+      return productCategorySizesList.slice();
     }
-    let base = productCategorySizesCatId === cid && productCategorySizesList != null ? productCategorySizesList.slice() : [];
-    if (Number.isFinite(vs)) {
-      if (base.some(function(s) {
-        return Number(s.id) === vs;
-      })) return base;
-      const extra = availableSizes.find(function(s) {
-        return Number(s.id) === vs;
-      });
-      return extra ? base.concat([extra]) : base;
-    }
-    return base;
+    return [];
   }
   function variantSizeDisplayLabel(categoryId, sizeId) {
     const sid = Number(sizeId);
     if (!Number.isFinite(sid) || sid <= 0) return "\u0420\u0430\u0437\u043C\u0435\u0440\u2026";
     const cid = categoryId != null && String(categoryId).trim() !== "" ? String(categoryId).trim() : "";
-    const list = sizesForProductCategory(cid, sid);
-    let row = list.find(function(s) {
+    const list = sizesForProductCategory(cid);
+    const row = list.find(function(s) {
       return Number(s.id) === sid;
     });
-    if (!row) {
-      row = availableSizes.find(function(s) {
-        return Number(s.id) === sid;
-      });
-    }
     if (!row) return "\u0420\u0430\u0437\u043C\u0435\u0440 #" + sid;
     const hint = row.equivalent_hint && String(row.equivalent_hint).trim() ? " \xB7 " + row.equivalent_hint : "";
     return String(row.value) + " (" + row.size_type + ")" + hint;
@@ -2968,10 +2931,9 @@ const Admin = (() => {
       const colorEl = item.querySelector(".variant-color");
       const artEl = item.querySelector(".variant-art");
       const activeEl = item.querySelector(".variant-active");
-      const reservedSize = window.KpvsSizeCascade && window.KpvsSizeCascade.NEW_SIZE_OPT ? String(window.KpvsSizeCascade.NEW_SIZE_OPT) : "__kpvs_new_size__";
       const sizeRaw = sizeEl && sizeEl.value != null ? String(sizeEl.value).trim() : "";
       let size_id = null;
-      if (sizeRaw && sizeRaw !== reservedSize) {
+      if (sizeRaw) {
         const n = Number(sizeRaw);
         if (Number.isFinite(n) && n > 0) size_id = n;
       }
@@ -3334,7 +3296,7 @@ const Admin = (() => {
         break;
       }
       if (hs && categoryIdNum && Number.isFinite(categoryIdNum)) {
-        const list = sizesForProductCategory(String(categoryIdNum), raw.size_id);
+        const list = sizesForProductCategory(String(categoryIdNum));
         if (!list.some(function(s) {
           return Number(s.id) === Number(raw.size_id);
         })) {
@@ -3812,7 +3774,6 @@ const Admin = (() => {
       Promise.all([
         fetchCategories(),
         fetchBrands(),
-        fetchSizes(),
         fetchColors(),
         fetchCollections(),
         fetchReferenceMaterials()

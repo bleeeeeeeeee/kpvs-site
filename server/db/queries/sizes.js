@@ -57,74 +57,30 @@ function classifyCategorySizeTypeSlugs(name, slug) {
 async function getSizes(pool, categoryId) {
   const cid = Number(categoryId);
   if (!Number.isFinite(cid) || cid <= 0) {
-    const result2 = await pool.query(`
-        SELECT s.id, s.value, s.size_type_id, st.name AS size_type,
-        COALESCE(NULLIF(btrim(st.slug::text), ''), '') AS size_type_slug,
-        ${otherScalesHintSqlColumn}
-        FROM sizes s
-        JOIN size_types st ON s.size_type_id = st.id
-        ORDER BY st.name, ${sizeRowDisplayOrderSql}, s.value
-    `);
-    return result2.rows;
-  }
-  const catRes = await pool.query("SELECT id, name, slug FROM categories WHERE id = $1", [cid]);
-  const cat = catRes.rows[0];
-  const inferredSlugs = cat ? classifyCategorySizeTypeSlugs(cat.name, cat.slug) : Array.from(SIZE_GRID_DEFAULT);
-  const slugRows = await pool.query(
-    `SELECT id FROM size_types
-     WHERE lower(btrim(slug::text)) = ANY(SELECT lower(btrim(x)) FROM unnest($1::text[]) AS t(x))`,
-    [inferredSlugs]
-  );
-  const inferredIds = slugRows.rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n) && n > 0);
-  const explicitRes = await pool.query(
-    `
-    WITH RECURSIVE ancestors AS (
-        SELECT id, parent_id FROM categories WHERE id = $1::int
-        UNION ALL
-        SELECT p.id, p.parent_id
-        FROM categories p
-        INNER JOIN ancestors a ON p.id = a.parent_id
-    )
-    SELECT DISTINCT cst.size_type_id AS id
-    FROM category_size_types cst
-    WHERE cst.category_id IN (SELECT id FROM ancestors)
-    `,
-    [cid]
-  );
-  const explicitIds = explicitRes.rows.map((r) => Number(r.id)).filter((n) => Number.isFinite(n) && n > 0);
-  let filterIds = [];
-  if (inferredIds.length) {
-    if (explicitIds.length) {
-      const inter = inferredIds.filter((id) => explicitIds.includes(id));
-      filterIds = inter.length ? inter : explicitIds;
-    } else {
-      filterIds = inferredIds;
-    }
-  } else {
-    filterIds = explicitIds;
-  }
-  if (!filterIds.length) {
-    const result2 = await pool.query(`
-        SELECT s.id, s.value, s.size_type_id, st.name AS size_type,
-        COALESCE(NULLIF(btrim(st.slug::text), ''), '') AS size_type_slug,
-        ${otherScalesHintSqlColumn}
-        FROM sizes s
-        JOIN size_types st ON s.size_type_id = st.id
-        ORDER BY st.name, ${sizeRowDisplayOrderSql}, s.value
-    `);
-    return result2.rows;
+    return [];
   }
   const result = await pool.query(
     `
+    WITH RECURSIVE ancestors AS (
+      SELECT id, parent_id FROM categories WHERE id = $1::int
+      UNION ALL
+      SELECT p.id, p.parent_id
+      FROM categories p
+      INNER JOIN ancestors a ON p.id = a.parent_id
+    )
     SELECT s.id, s.value, s.size_type_id, st.name AS size_type,
-    COALESCE(NULLIF(btrim(st.slug::text), ''), '') AS size_type_slug,
-    ${otherScalesHintSqlColumn}
+      COALESCE(NULLIF(btrim(st.slug::text), ''), '') AS size_type_slug,
+      ${otherScalesHintSqlColumn}
     FROM sizes s
     JOIN size_types st ON s.size_type_id = st.id
-    WHERE s.size_type_id = ANY($1::int[])
-    ORDER BY st.name, ${sizeRowDisplayOrderSql}, s.value
+    WHERE s.size_type_id IN (
+      SELECT cst.size_type_id
+      FROM category_size_types cst
+      WHERE cst.category_id IN (SELECT id FROM ancestors)
+    )
+    ORDER BY st.id, ${sizeRowDisplayOrderSql}, s.id
     `,
-    [filterIds]
+    [cid]
   );
   return result.rows;
 }

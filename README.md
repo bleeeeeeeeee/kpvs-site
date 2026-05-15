@@ -8,7 +8,7 @@
 |-------|------------|
 | Сервер | Node.js, Express 4, `pg`, `express-session` (хранилище сессий в PostgreSQL) |
 | Клиент | HTML, CSS, JavaScript без сборщика |
-| База | PostgreSQL (схема создаётся и доращивается при старте сервера) |
+| База | PostgreSQL (схема применяется командой `npm run migrate-db`, не при `npm start`) |
 | Медиа | S3-совместимое хранилище (Cloudflare R2 и аналоги) или локальная папка `public/img/uploads/` |
 | Почта | SMTP (`nodemailer`) — коды подтверждения и сброс пароля |
 | OAuth | Google (опционально) |
@@ -32,11 +32,12 @@ kpvs-site/
 ├── server/
 │   ├── app.js                # Express, маршруты, запуск
 │   ├── config/http-env.js    # PORT, секреты, OAuth
-│   ├── db/                   # пул PostgreSQL, запросы, ensure*-миграции
+│   ├── db/                   # пул PostgreSQL, запросы, migrate.js
 │   ├── routes/               # auth, catalog, admin, media
 │   ├── middleware/           # CSRF, requireAuth, JWT пользователя
 │   └── services/             # auth, storage, catalog-validation
 └── scripts/
+    ├── migrate-db.js         # схема и справочные данные БД
     ├── bootstrap-admin.js    # первый администратор
     └── seed-demo-catalog.js  # демо-товар в пустую БД
 ```
@@ -132,7 +133,19 @@ EMAIL_CODE_PEPPER=отдельный_секрет_для_хеша_кодов
 
 В **development** (`NODE_ENV` не `production`) допустимы значения по умолчанию для `SESSION_SECRET` и `JWT_SECRET` из кода; для **production** без `SESSION_SECRET`, `JWT_SECRET` и `DATABASE_URL` процесс завершится с ошибкой.
 
-### Шаг 4. Запуск сервера
+### Шаг 4. Миграция базы данных
+
+Один раз на пустой или обновляемой БД (и после изменений схемы в репозитории):
+
+```bash
+npm run migrate-db
+```
+
+Скрипт создаёт таблицы, индексы, корень каталога `catalog-root`, справочник размеров и материалов, таблицу сессий `session`. Повторный запуск безопасен (идемпотентен).
+
+`npm start` **не** меняет схему БД — только проверяет подключение.
+
+### Шаг 5. Запуск сервера
 
 ```bash
 npm start
@@ -143,15 +156,13 @@ npm start
 - `Connected to PostgreSQL`
 - `Server running on http://localhost:3000`
 
-Сервер выполняет `ensure*`-шаги: таблицы пользователей, каталога, категорий, размеров, коллекций, материалов и т.д. Отдельные SQL-миграции вручную не нужны.
-
 Проверка: откройте `http://localhost:3000/` (редирект на `/welcome.html`) или `GET http://localhost:3000/health` → `{"status":"ok"}`.
 
-Если БД недоступна, сервер всё равно слушает порт, но запросы к `/api/*` возвращают **503** («Сервис базы данных недоступен»).
+Если БД недоступна, сервер всё равно слушает порт, но запросы к `/api/*` возвращают **503** («Сервис базы данных недоступен»). Если таблиц нет — сначала выполните `npm run migrate-db`.
 
-### Шаг 5. Первый администратор
+### Шаг 6. Первый администратор
 
-После того как сервер хотя бы раз успешно подключился к БД (схема создана):
+После `npm run migrate-db`:
 
 ```bash
 npm run bootstrap-admin
@@ -167,7 +178,7 @@ npm run bootstrap-admin -- --reset-password
 
 Вход в админку: `/login.html` → вкладка **Админ** → `/admin.html`.
 
-### Шаг 6. Демо-каталог (по желанию)
+### Шаг 7. Демо-каталог (по желанию)
 
 Если в таблице `products` ещё нет строк:
 
@@ -307,11 +318,12 @@ npm run seed-demo-catalog
 1. `NODE_ENV=production`
 2. Уникальные длинные `SESSION_SECRET` и `JWT_SECRET`
 3. Рабочий `DATABASE_URL`
-4. `COOKIE_SECURE=true` при работе только по HTTPS
-5. `APP_BASE_URL=https://ваш-домен` (без завершающего `/`)
-6. За reverse proxy: `TRUST_PROXY=1`
-7. В Google Cloud Console — redirect URI = `GOOGLE_CALLBACK_URL`
-8. Настроить `STORAGE_*` (на production локальная папка uploads обычно не подходит)
+4. После деплоя кода с изменениями схемы: `npm run migrate-db` на сервере или в CI
+5. `COOKIE_SECURE=true` при работе только по HTTPS
+6. `APP_BASE_URL=https://ваш-домен` (без завершающего `/`)
+7. За reverse proxy: `TRUST_PROXY=1`
+8. В Google Cloud Console — redirect URI = `GOOGLE_CALLBACK_URL`
+9. Настроить `STORAGE_*` (на production локальная папка uploads обычно не подходит)
 
 Пример деплоя: Render, Fly.io, VPS с systemd + nginx. Статику отдаёт тот же Node-процесс из `public/`.
 
@@ -321,9 +333,10 @@ npm run seed-demo-catalog
 
 | Команда | Действие |
 |---------|----------|
-| `npm start` | Запуск `server.js` |
-| `npm run bootstrap-admin` | Создать admin или сбросить пароль (`-- --reset-password`) |
-| `npm run seed-demo-catalog` | Один демо-товар, если каталог пуст |
+| `npm start` | Запуск сервера (без изменений БД) |
+| `npm run migrate-db` | Создать/обновить схему и справочники в PostgreSQL |
+| `npm run bootstrap-admin` | Создать admin или сбросить пароль (`-- --reset-password`; вызывает migrate) |
+| `npm run seed-demo-catalog` | Один демо-товар, если каталог пуст (вызывает migrate) |
 
 ---
 
@@ -332,7 +345,8 @@ npm run seed-demo-catalog
 | Симптом | Что проверить |
 |---------|----------------|
 | `FATAL: Missing required environment variable` | В production заданы `SESSION_SECRET`, `JWT_SECRET`, `DATABASE_URL` |
-| `503` на `/api/*` | PostgreSQL недоступен или неверный `DATABASE_URL`; смотрите лог при старте |
+| `503` на `/api/*` | PostgreSQL недоступен, неверный `DATABASE_URL` или не выполнен `npm run migrate-db` |
+| `relation "users" does not exist` и похожие | Выполните `npm run migrate-db` |
 | `ENOTFOUND` в логе | В `DATABASE_URL` указан несуществующий хост |
 | `ECONNREFUSED` | PostgreSQL не запущен или неверный порт |
 | `EBADCSRFTOKEN` / 403 CSRF | Обновите страницу, запросите `/api/csrf-token`, используйте `apiFetch` |

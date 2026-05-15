@@ -9,6 +9,7 @@ const Catalog = (() => {
     brands: [],
     seasons: [],
     sizes: [],
+    sizeLabels: {},
     colors: [],
     collections: []
   };
@@ -61,7 +62,6 @@ const Catalog = (() => {
     return false;
   }
   let catalogBrands = [];
-  let catalogSizes = [];
   let catalogColors = [];
   let catalogCollections = [];
   let sizeEquivalenceAdj = null;
@@ -95,6 +95,7 @@ const Catalog = (() => {
           brands: Array.isArray(f.brands) ? f.brands.slice() : [],
           seasons: Array.isArray(f.seasons) ? f.seasons.slice() : [],
           sizes: Array.isArray(f.sizes) ? f.sizes.slice() : [],
+          sizeLabels: f.sizeLabels && typeof f.sizeLabels === "object" ? Object.assign({}, f.sizeLabels) : {},
           colors: Array.isArray(f.colors) ? f.colors.slice() : [],
           collections: Array.isArray(f.collections) ? f.collections.slice() : []
         };
@@ -193,10 +194,9 @@ const Catalog = (() => {
   }
   async function loadReferenceData() {
     try {
-      const [catRes, brandRes, sizeRes, colorRes, colRes, eqRes] = await Promise.all([
+      const [catRes, brandRes, colorRes, colRes, eqRes] = await Promise.all([
         fetch("/api/categories"),
         fetch("/api/brands"),
-        fetch("/api/sizes"),
         fetch("/api/colors"),
         fetch("/api/collections"),
         fetch("/api/size-equivalence-buckets")
@@ -207,7 +207,6 @@ const Catalog = (() => {
       buildCategoryMaps();
       rebuildCategorySlugToSectionIndex();
       catalogBrands = brandRes.ok ? await brandRes.json() : [];
-      catalogSizes = sizeRes.ok ? await sizeRes.json() : [];
       catalogColors = colorRes.ok ? await colorRes.json() : [];
       catalogCollections = colRes.ok ? await colRes.json() : [];
       if (!Array.isArray(catalogCollections)) catalogCollections = [];
@@ -225,7 +224,6 @@ const Catalog = (() => {
       catalogRootId = null;
       rebuildCategorySlugToSectionIndex();
       catalogBrands = [];
-      catalogSizes = [];
       catalogColors = [];
       catalogCollections = [];
       sizeEquivalenceAdj = null;
@@ -732,10 +730,10 @@ const Catalog = (() => {
       } });
     });
     activeFilters.sizes.forEach(function(id) {
-      const size = catalogSizes.find(function(s) {
-        return String(s.id) === id;
-      });
-      const label = size ? size.value : id;
+      const label =
+        (activeFilters.sizeLabels && activeFilters.sizeLabels[id]) ||
+        (activeFilters.sizeLabels && activeFilters.sizeLabels[String(id)]) ||
+        id;
       tags.push({ label: "\u0420\u0430\u0437\u043C\u0435\u0440: " + label, clear: function() {
         activeFilters.sizes = activeFilters.sizes.filter(function(x) {
           return x !== id;
@@ -923,9 +921,25 @@ const Catalog = (() => {
       activeFilters.seasons = Array.from(modal.querySelectorAll('input[name="season"]:checked')).map(function(i) {
         return i.value;
       });
-      activeFilters.sizes = catalogFilterSizeCascadeHandle && typeof catalogFilterSizeCascadeHandle.getCheckedIds === "function" ? catalogFilterSizeCascadeHandle.getCheckedIds() : Array.from(modal.querySelectorAll('input[name="size"]:checked')).map(function(i) {
-        return i.value;
+      const sizeLabels = {};
+      const sizeInputs = modal.querySelectorAll('input[name="size_id"]:checked, input[name="size"]:checked');
+      activeFilters.sizes = [];
+      sizeInputs.forEach(function(inp) {
+        const id = String(inp.value || "").trim();
+        if (!id) return;
+        activeFilters.sizes.push(id);
+        const span = inp.parentElement && inp.parentElement.querySelector("span");
+        if (span && span.textContent) sizeLabels[id] = span.textContent.trim();
       });
+      if (!activeFilters.sizes.length && catalogFilterSizeCascadeHandle && typeof catalogFilterSizeCascadeHandle.getCheckedIds === "function") {
+        activeFilters.sizes = catalogFilterSizeCascadeHandle.getCheckedIds();
+        activeFilters.sizes.forEach(function(id) {
+          const inp = modal.querySelector('input[name="size_id"][value="' + CSS.escape(String(id)) + '"]');
+          const span = inp && inp.parentElement && inp.parentElement.querySelector("span");
+          if (span && span.textContent) sizeLabels[id] = span.textContent.trim();
+        });
+      }
+      activeFilters.sizeLabels = sizeLabels;
       activeFilters.colors = Array.from(modal.querySelectorAll('input[name="color"]:checked')).map(function(i) {
         return i.value;
       });

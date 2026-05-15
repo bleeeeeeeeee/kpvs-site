@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 const db = require("../server/db/index.js");
+const { runAllMigrations } = require("../server/db/migrate.js");
 
 async function main() {
-  await db.ensureCoreCatalogTables();
-  await db.ensureUserAuthSchema();
+  await runAllMigrations();
   const c = await db.pool.query("SELECT COUNT(*)::int AS n FROM products");
   const n = c.rows[0] && c.rows[0].n;
   if (n > 0) {

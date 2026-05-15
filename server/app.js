@@ -53,7 +53,7 @@ app.use(
     store: new PgSession({
       pool: db.pool,
       tableName: "session",
-      createTableIfMissing: true
+      createTableIfMissing: false
     }),
     secret: SESSION_SECRET,
     resave: false,
@@ -177,16 +177,6 @@ app.use((err, req, res, next) => {
 });
 async function bootDatabase() {
   await db.connectDB();
-  await db.ensureUserAuthSchema();
-  await db.ensureCoreCatalogTables();
-  await db.ensureCategoryHierarchy();
-  await db.ensureProductsEditorColumn();
-  await db.ensureCollectionsSchema();
-  await db.ensureCategorySizeTypesSchema();
-  await db.ensureSizeGroupsSchema();
-  await db.ensureSizesUniqueValueIndex();
-  await db.ensureReferenceSizesSeed();
-  await db.ensureReferenceMaterialsSchema();
   appState.dbHealthy = true;
 }
 async function startServer() {
@@ -203,7 +193,7 @@ async function startServer() {
       console.error("  Hint: nothing is accepting connections on that host:port — start PostgreSQL or fix PGPORT.");
     } else if (/does not exist/i.test(msg)) {
       console.error(
-        "  Hint: if this is a new database, ensure `ensureUserAuthSchema` and `ensureCoreCatalogTables` ran; check earlier logs for SQL errors."
+        "  Hint: if this is a new database, run once: npm run migrate-db"
       );
     }
     appState.dbHealthy = false;
