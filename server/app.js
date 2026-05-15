@@ -191,7 +191,7 @@ async function startServer() {
       console.error("  Hint: nothing is accepting connections on that host:port — start PostgreSQL or fix PGPORT.");
     } else if (/does not exist/i.test(msg)) {
       console.error(
-        "  Hint: if this is a new database, run once: npm run migrate-db"
+        "  Hint: if this is a new database, prepare the schema in PostgreSQL or run once: npm run bootstrap-admin"
       );
     }
     appState.dbHealthy = false;

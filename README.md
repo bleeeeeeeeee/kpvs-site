@@ -8,7 +8,7 @@
 |-------|------------|
 | Сервер | Node.js, Express 4, `pg`, `express-session` (хранилище сессий в PostgreSQL) |
 | Клиент | HTML, CSS, JavaScript без сборщика |
-| База | PostgreSQL (схема применяется командой `npm run migrate-db`, не при `npm start`) |
+| База | PostgreSQL (схема вручную в БД или через `npm run bootstrap-admin`; при `npm start` схема не меняется) |
 | Медиа | S3-совместимое хранилище (Cloudflare R2 и аналоги) или локальная папка `public/img/uploads/` |
 | Почта | SMTP (`nodemailer`) — коды подтверждения и сброс пароля |
 | OAuth | Google (опционально) |
@@ -37,9 +37,7 @@ kpvs-site/
 │   ├── middleware/           # CSRF, requireAuth, JWT пользователя
 │   └── services/             # auth, storage, catalog-validation
 └── scripts/
-    ├── migrate-db.js         # схема и справочные данные БД
-    ├── bootstrap-admin.js    # первый администратор
-    └── seed-demo-catalog.js  # демо-товар в пустую БД
+    └── bootstrap-admin.js    # миграции схемы + первый администратор
 ```
 
 ---
@@ -133,17 +131,17 @@ EMAIL_CODE_PEPPER=отдельный_секрет_для_хеша_кодов
 
 В **development** (`NODE_ENV` не `production`) допустимы значения по умолчанию для `SESSION_SECRET` и `JWT_SECRET` из кода; для **production** без `SESSION_SECRET`, `JWT_SECRET` и `DATABASE_URL` процесс завершится с ошибкой.
 
-### Шаг 4. Миграция базы данных
+### Шаг 4. Схема базы данных
 
-Один раз на пустой или обновляемой БД (и после изменений схемы в репозитории):
+Схему (таблицы, индексы, справочники) подготовьте **в PostgreSQL вручную** или один раз выполните:
 
 ```bash
-npm run migrate-db
+npm run bootstrap-admin
 ```
 
-Скрипт создаёт таблицы, индексы, корень каталога `catalog-root`, справочник размеров и материалов, таблицу сессий `session`. Повторный запуск безопасен (идемпотентен).
+Скрипт перед созданием администратора вызывает `runAllMigrations` из `server/db/migrate.js` (идемпотентно). Если админ уже не нужен, а нужно только обновить схему после изменений в репозитории — достаточно накатить DDL в БД своими средствами.
 
-`npm start` **не** меняет схему БД — только проверяет подключение.
+`npm start` **не** меняет схему — только проверяет подключение.
 
 ### Шаг 5. Запуск сервера
 
@@ -158,11 +156,11 @@ npm start
 
 Проверка: откройте `http://localhost:3000/` (редирект на `/welcome.html`) или `GET http://localhost:3000/health` → `{"status":"ok"}`.
 
-Если БД недоступна, сервер всё равно слушает порт, но запросы к `/api/*` возвращают **503** («Сервис базы данных недоступен»). Если таблиц нет — сначала выполните `npm run migrate-db`.
+Если БД недоступна, сервер всё равно слушает порт, но запросы к `/api/*` возвращают **503** («Сервис базы данных недоступен»). Если таблиц нет — подготовьте схему в PostgreSQL или выполните `npm run bootstrap-admin`.
 
 ### Шаг 6. Первый администратор
 
-После `npm run migrate-db`:
+Если на шаге 4 вы ещё не запускали `bootstrap-admin`, выполните:
 
 ```bash
 npm run bootstrap-admin
@@ -176,17 +174,7 @@ npm run bootstrap-admin
 npm run bootstrap-admin -- --reset-password
 ```
 
-Вход в админку: `/login.html` → вкладка **Админ** → `/admin.html`.
-
-### Шаг 7. Демо-каталог (по желанию)
-
-Если в таблице `products` ещё нет строк:
-
-```bash
-npm run seed-demo-catalog
-```
-
-Добавляется один демонстрационный товар с категориями и вариантом. При наличии товаров скрипт завершается без изменений.
+Вход в админку: `/login.html` → вкладка **Админ** → `/admin.html`. Товары добавляйте в админ-панели или импортируйте в БД.
 
 ---
 
@@ -318,7 +306,7 @@ npm run seed-demo-catalog
 1. `NODE_ENV=production`
 2. Уникальные длинные `SESSION_SECRET` и `JWT_SECRET`
 3. Рабочий `DATABASE_URL`
-4. После деплоя кода с изменениями схемы: `npm run migrate-db` на сервере или в CI
+4. После деплоя кода с изменениями схемы: накатите DDL в PostgreSQL или `npm run bootstrap-admin` (применит миграции из `server/db/migrate.js`)
 5. `COOKIE_SECURE=true` при работе только по HTTPS
 6. `APP_BASE_URL=https://ваш-домен` (без завершающего `/`)
 7. За reverse proxy: `TRUST_PROXY=1`
@@ -334,9 +322,7 @@ npm run seed-demo-catalog
 | Команда | Действие |
 |---------|----------|
 | `npm start` | Запуск сервера (без изменений БД) |
-| `npm run migrate-db` | Создать/обновить схему и справочники в PostgreSQL |
-| `npm run bootstrap-admin` | Создать admin или сбросить пароль (`-- --reset-password`; вызывает migrate) |
-| `npm run seed-demo-catalog` | Один демо-товар, если каталог пуст (вызывает migrate) |
+| `npm run bootstrap-admin` | Миграции схемы + создать admin или сбросить пароль (`-- --reset-password`) |
 
 ---
 
@@ -345,8 +331,8 @@ npm run seed-demo-catalog
 | Симптом | Что проверить |
 |---------|----------------|
 | `FATAL: Missing required environment variable` | В production заданы `SESSION_SECRET`, `JWT_SECRET`, `DATABASE_URL` |
-| `503` на `/api/*` | PostgreSQL недоступен, неверный `DATABASE_URL` или не выполнен `npm run migrate-db` |
-| `relation "users" does not exist` и похожие | Выполните `npm run migrate-db` |
+| `503` на `/api/*` | PostgreSQL недоступен, неверный `DATABASE_URL` или схема не подготовлена |
+| `relation "users" does not exist` и похожие | Накатите схему в PostgreSQL или `npm run bootstrap-admin` |
 | `ENOTFOUND` в логе | В `DATABASE_URL` указан несуществующий хост |
 | `ECONNREFUSED` | PostgreSQL не запущен или неверный порт |
 | `EBADCSRFTOKEN` / 403 CSRF | Обновите страницу, запросите `/api/csrf-token`, используйте `apiFetch` |
