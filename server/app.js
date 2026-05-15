@@ -114,6 +114,15 @@ const routeCtx = {
   csrfProtection,
   publicMediaUrl: db.publicMediaUrl
 };
+const SITE_FAVICON = path.join(PUB_ROOT, "img", "logo-preview.png");
+app.get("/favicon.ico", (req, res) => {
+  res.type("image/png");
+  res.sendFile(SITE_FAVICON);
+});
+app.get("/apple-touch-icon.png", (req, res) => {
+  res.type("image/png");
+  res.sendFile(SITE_FAVICON);
+});
 app.get("/", (req, res) => res.redirect("/welcome.html"));
 mountMediaRoutes(app, routeCtx);
 app.use((req, res, next) => {

@@ -19,7 +19,7 @@ function renderErrorHtml(pubRoot, statusCode) {
   const meta = ERROR_PAGE_META[code];
   const errorPath = path.join(pubRoot, "error.html");
   if (!fs.existsSync(errorPath)) {
-    return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Error</title></head><body><p>\u041E\u0448\u0438\u0431\u043A\u0430</p></body></html>';
+    return '<!DOCTYPE html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="icon" href="/img/logo-preview.png" type="image/png"><link rel="shortcut icon" href="/favicon.ico"><link rel="apple-touch-icon" href="/img/logo-preview.png"><title>Error</title></head><body><p>\u041E\u0448\u0438\u0431\u043A\u0430</p></body></html>';
   }
   let html = fs.readFileSync(errorPath, "utf8");
   return html.replace(/\{\{CODE\}\}/g, String(code)).replace(/\{\{TITLE\}\}/g, meta.title).replace(/\{\{DESCRIPTION\}\}/g, meta.description);
