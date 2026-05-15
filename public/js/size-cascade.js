@@ -1,6 +1,5 @@
 (function(global) {
   "use strict";
-  var KPVS_NEW_SIZE_OPT = "__kpvs_new_size__";
   function escapeHtml(str) {
     if (str == null) return "";
     return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -93,26 +92,6 @@
       return String(a.size_type).localeCompare(String(b.size_type), "ru");
     });
   }
-  function orderTypeGroupsForCategoryName(groups, categoryName) {
-    if (!groups || groups.length < 2) return groups || [];
-    const n = String(categoryName || "").toLowerCase();
-    const leafLooksFoot = /ботин|сапог|кроссов|босонож|валенк|мокас|лофер|туфл|тапоч|обув|угг|эспадриль|specobuv|спецобув/i.test(
-      n
-    );
-    if (!leafLooksFoot) return groups;
-    const typeLooksFoot = function(t) {
-      const s = String(t || "").toLowerCase();
-      return /\((обувь|обуви)\)|\bобувь\b|европейск.*обув|eu.?foot|footwear|shoe|ботин|сапог|кроссов|стель|шнур|лофер|туфл|тапоч|валенк|мокас|угг/i.test(
-        s
-      ) && !/\(одежда\)|\(аксесс|одежд|рост\/|рубашк|куртк|брюк|пиджак|обхват.*одеж/i.test(s);
-    };
-    return groups.slice().sort(function(a, b) {
-      const af = typeLooksFoot(a.size_type) ? 0 : 1;
-      const bf = typeLooksFoot(b.size_type) ? 0 : 1;
-      if (af !== bf) return af - bf;
-      return String(a.size_type).localeCompare(String(b.size_type), "ru");
-    });
-  }
   function renderFlatSizeList(colSizes, groups, mode, inputName, checkedSet, opt) {
     colSizes.innerHTML = "";
     if (!groups || !groups.length) {
@@ -190,11 +169,7 @@
       }
       if (mySeq !== selectCategorySeq) return;
       const rows = cache.get(ck) || [];
-      const catMeta = categories.find(function(c) {
-        return String(c.id) === ck;
-      });
-      const catLabel = catMeta && catMeta.name ? String(catMeta.name) : "";
-      const groups = orderTypeGroupsForCategoryName(groupSizesByType(rows), catLabel);
+      const groups = groupSizesByType(rows);
       renderFlatSizeList(colSizes, groups, mode, inputName, checkedSet, { onChange: fireChange });
     }
     function renderCats() {
@@ -259,12 +234,6 @@
     const defaultCategoryId = opt.defaultCategoryId != null && String(opt.defaultCategoryId).trim() !== "" ? String(opt.defaultCategoryId).trim() : "";
     const initialId = opt.initialSizeId != null && opt.initialSizeId !== "" ? String(opt.initialSizeId) : "";
     const variantIndex = opt.variantIndex;
-    const onNewSize = opt.onNewSize;
-    const catLabel = typeof opt.categoryLabel === "string" ? opt.categoryLabel : (function() {
-      const el = document.getElementById("product-category");
-      if (el && el.options && el.selectedIndex >= 0) return String(el.options[el.selectedIndex].text || "");
-      return "";
-    })();
     wrap.classList.add("variant-size-cell--simple");
     wrap.innerHTML = '<select class="variant-size" data-variant-index="' + escapeHtml(String(variantIndex)) + '" data-prev-value="' + escapeHtml(initialId) + '"><option value="">\u0420\u0430\u0437\u043C\u0435\u0440\u2026</option></select>';
     const sel = wrap.querySelector(".variant-size");
@@ -296,7 +265,7 @@
       try {
         const rows = await loadSizes(defaultCategoryId);
         if (myRefill !== refillSeq) return;
-        const groups = orderTypeGroupsForCategoryName(groupSizesByType(Array.isArray(rows) ? rows : []), catLabel);
+        const groups = groupSizesByType(Array.isArray(rows) ? rows : []);
         groups.forEach(function(g) {
           if (!g.sizes.length) return;
           const og = document.createElement("optgroup");
@@ -318,13 +287,6 @@
         sel.appendChild(o);
       }
       if (myRefill !== refillSeq) return;
-      if (typeof onNewSize === "function" && defaultCategoryId) {
-        const act = document.createElement("option");
-        act.value = KPVS_NEW_SIZE_OPT;
-        act.textContent = "+ \u041D\u043E\u0432\u044B\u0439 \u0440\u0430\u0437\u043C\u0435\u0440\u2026";
-        act.title = "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u0432 \u0441\u043F\u0440\u0430\u0432\u043E\u0447\u043D\u0438\u043A \u0440\u0430\u0437\u043C\u0435\u0440\u043E\u0432";
-        sel.appendChild(act);
-      }
       if (initialId) {
         sel.value = String(initialId);
         if (sel.value !== String(initialId)) {
@@ -340,14 +302,6 @@
     refillPromise = refill().catch(function() {
     });
     sel.addEventListener("change", function() {
-      if (sel.value === KPVS_NEW_SIZE_OPT) {
-        const prev = sel.dataset.prevValue != null ? String(sel.dataset.prevValue) : "";
-        sel.value = prev;
-        if (typeof onNewSize === "function") {
-          onNewSize(sel);
-        }
-        return;
-      }
       sel.dataset.prevValue = sel.value;
     });
     const handle = {
@@ -384,7 +338,6 @@
     return handle;
   }
   global.KpvsSizeCascade = {
-    NEW_SIZE_OPT: KPVS_NEW_SIZE_OPT,
     mount,
     mountVariantCell,
     groupSizesByType,

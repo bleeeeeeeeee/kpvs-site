@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "migrate-db": "node scripts/migrate-db.js",
     "bootstrap-admin": "node scripts/bootstrap-admin.js",
     "seed-demo-catalog": "node scripts/seed-demo-catalog.js"
   },
