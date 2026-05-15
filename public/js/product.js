@@ -182,27 +182,96 @@ function teardownProductAdaptiveColorRows() {
     productAdaptiveColorsState = null;
   }
 }
-function productColorRowCountFit(track, wraps) {
-  const limit = track.clientWidth;
-  let fit = 0;
-  for (let i = 0; i < wraps.length; i++) {
-    const el = wraps[i];
-    const right = el.offsetLeft + el.offsetWidth;
-    if (right <= limit + 1) fit = i + 1;
-    else break;
+function productColorTrackClip(host) {
+  return host.querySelector(".product-size-colors-track-clip");
+}
+function productColorSetVisibleCount(wraps, count) {
+  wraps.forEach(function(w, i) {
+    if (i < count) w.removeAttribute("hidden");
+    else w.setAttribute("hidden", "");
+  });
+}
+function productColorRowCountFit(track, clip, wraps) {
+  const limit = clip ? clip.clientWidth : 0;
+  const n = wraps.length;
+  if (!limit || !n) return n;
+  let lo = 0;
+  let hi = n;
+  while (lo < hi) {
+    const mid = Math.ceil((lo + hi) / 2);
+    productColorSetVisibleCount(wraps, mid);
+    void track.offsetWidth;
+    if (track.scrollWidth <= limit) lo = mid;
+    else hi = mid - 1;
   }
-  return fit;
+  productColorSetVisibleCount(wraps, lo);
+  void track.offsetWidth;
+  return lo;
+}
+function productColorTightenRowFit(track, clip, wraps, fit) {
+  const limit = clip ? clip.clientWidth : 0;
+  const n = wraps.length;
+  if (!limit || !n) return fit;
+  let f = Math.min(Math.max(0, fit), n);
+  while (f > 0) {
+    productColorSetVisibleCount(wraps, f);
+    void track.offsetWidth;
+    if (track.scrollWidth <= limit) break;
+    f -= 1;
+  }
+  return f;
+}
+function swatchMetaFromWrap(w) {
+  return {
+    name: w.getAttribute("data-tip") || "",
+    hex: w.getAttribute("data-hex") || ""
+  };
+}
+function refreshMorePopover(moreWrap, wraps, fit, headingLine) {
+  if (!moreWrap) return;
+  const pop = moreWrap.querySelector(".product-color-more-popover");
+  if (!pop) return;
+  const hidden = wraps.slice(fit).map(swatchMetaFromWrap);
+  const rows = hidden.map(function(c) {
+    const st = swatchInlineStyle(c.hex);
+    const styleAttr = st ? ' style="' + escapeAttr(st) + '"' : "";
+    const dotCls = "product-color-more-pop-dot" + (st ? "" : " product-color-more-pop-dot--muted");
+    return '<div class="product-color-more-pop-row"><span class="' + dotCls + '"' + styleAttr + ' aria-hidden="true"></span><span class="product-color-more-pop-name">' + escapeHtml(c.name || "\u2014") + "</span></div>";
+  }).join("");
+  const head = headingLine && String(headingLine).trim() ? '<span class="product-color-more-pop-heading">' + escapeHtml(String(headingLine).trim()) + "</span>" : "";
+  pop.innerHTML = head + rows;
+}
+function alignProductSwatchTooltips(track, host) {
+  if (!track) return;
+  const row = host || track.closest(".product-size-colors-adaptive");
+  const bounds = row ? row.getBoundingClientRect() : track.getBoundingClientRect();
+  const tipHalf = 80;
+  track.querySelectorAll(".product-color-swatch-wrap").forEach(function(w) {
+    w.classList.remove("swatch-tip-left", "swatch-tip-right", "swatch-tip-center");
+    if (w.hasAttribute("hidden")) return;
+    const r = w.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    if (cx - tipHalf < bounds.left + 2) {
+      w.classList.add("swatch-tip-left");
+    } else if (cx + tipHalf > bounds.right - 2) {
+      w.classList.add("swatch-tip-right");
+    } else {
+      w.classList.add("swatch-tip-center");
+    }
+  });
 }
 function layoutOneAdaptiveColorRow(host) {
+  const clip = productColorTrackClip(host);
   const track = host.querySelector(".product-size-colors-track");
   const moreWrap = host.querySelector(".product-color-more-wrap");
-  const wraps = track ? track.querySelectorAll(".product-color-swatch-wrap") : [];
+  const wraps = track ? Array.from(track.querySelectorAll(".product-color-swatch-wrap")) : [];
   const btn = moreWrap ? moreWrap.querySelector(".product-color-more-circle") : null;
+  const headingLine = moreWrap ? moreWrap.getAttribute("data-heading") || "" : "";
   const n = wraps.length;
-  if (!track || !n) return;
-  wraps.forEach(function(w, i) {
+  if (!track || !clip || !n) return;
+  wraps.forEach(function(w) {
     w.removeAttribute("hidden");
-    w.style.zIndex = String(Math.max(1, 40 - i));
+    w.style.removeProperty("z-index");
   });
   if (moreWrap) {
     moreWrap.setAttribute("hidden", "");
@@ -211,30 +280,40 @@ function layoutOneAdaptiveColorRow(host) {
       btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430");
     }
   }
-  if (!moreWrap || n <= 1) return;
-  const fitWithMoreHidden = productColorRowCountFit(track, wraps);
-  if (fitWithMoreHidden >= n) return;
+  if (!moreWrap || n <= 1) {
+    alignProductSwatchTooltips(track, host);
+    return;
+  }
+  let fit = productColorRowCountFit(track, clip, wraps);
+  if (fit >= n) {
+    alignProductSwatchTooltips(track, host);
+    return;
+  }
   moreWrap.removeAttribute("hidden");
-  const fit2 = productColorRowCountFit(track, wraps);
-  const overflow = n - fit2;
+  void moreWrap.offsetWidth;
+  fit = productColorRowCountFit(track, clip, wraps);
+  fit = productColorTightenRowFit(track, clip, wraps, fit);
+  let overflow = n - fit;
   if (overflow <= 0) {
     moreWrap.setAttribute("hidden", "");
     if (btn) {
       btn.textContent = "+0";
       btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430");
     }
+    wraps.forEach(function(w) {
+      w.removeAttribute("hidden");
+    });
+    alignProductSwatchTooltips(track, host);
     return;
   }
-  for (let i = fit2; i < n; i++) {
-    wraps[i].setAttribute("hidden", "");
-  }
-  for (let i = 0; i < fit2; i++) {
-    wraps[i].style.zIndex = String(Math.max(1, 40 - i));
-  }
+  productColorSetVisibleCount(wraps, fit);
+  overflow = n - fit;
   if (btn) {
     btn.textContent = "+" + overflow;
     btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0435\u0449\u0451 " + overflow + " " + (overflow === 1 ? "\u0446\u0432\u0435\u0442" : overflow < 5 ? "\u0446\u0432\u0435\u0442\u0430" : "\u0446\u0432\u0435\u0442\u043E\u0432"));
   }
+  refreshMorePopover(moreWrap, wraps, fit, headingLine);
+  alignProductSwatchTooltips(track, host);
 }
 function layoutProductAdaptiveColorRows(root) {
   const scope = root && root.querySelectorAll ? root : document;
@@ -248,12 +327,18 @@ function setupProductAdaptiveColorRows(productMainEl) {
   };
   run();
   requestAnimationFrame(run);
+  requestAnimationFrame(function() {
+    run();
+  });
   let ro = null;
   if (typeof ResizeObserver !== "undefined") {
     ro = new ResizeObserver(function() {
       run();
     });
     ro.observe(productMainEl);
+    productMainEl.querySelectorAll(".product-size-colors-adaptive").forEach(function(row) {
+      ro.observe(row);
+    });
   }
   const onResize = function() {
     run();
@@ -559,7 +644,7 @@ function renderProductSwatchButton(c) {
   const st = swatchInlineStyle(c.hex);
   const styleAttr = st ? ' style="' + escapeAttr(st) + '"' : "";
   const cls = "product-color-swatch" + (st ? "" : " product-color-swatch--muted");
-  return '<span class="product-color-swatch-wrap" data-tip="' + escapeAttr(name) + '" title="' + escapeAttr(name) + '"><button type="button" class="' + cls + '"' + styleAttr + ' aria-label="' + escapeAttr(name) + '"></button></span>';
+  return '<span class="product-color-swatch-wrap" data-tip="' + escapeAttr(name) + '" data-hex="' + escapeAttr(c.hex || "") + '"><button type="button" class="' + cls + '"' + styleAttr + ' title="' + escapeAttr(name) + '" aria-label="' + escapeAttr(name) + '"></button></span>';
 }
 function renderProductColorOverflowPopover(allColors, headingLine) {
   const arr = Array.isArray(allColors) ? allColors : [];
@@ -571,7 +656,7 @@ function renderProductColorOverflowPopover(allColors, headingLine) {
     return '<div class="product-color-more-pop-row"><span class="' + dotCls + '"' + styleAttr + ' aria-hidden="true"></span><span class="product-color-more-pop-name">' + escapeHtml(c.name || "\u2014") + "</span></div>";
   }).join("");
   const head = headingLine && String(headingLine).trim() ? '<span class="product-color-more-pop-heading">' + escapeHtml(String(headingLine).trim()) + "</span>" : "";
-  return '<span class="product-color-more-wrap" hidden><button type="button" class="product-color-more-circle" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430">+0</button><span class="product-color-more-popover" role="tooltip">' + head + rows + "</span></span>";
+  return '<span class="product-color-more-wrap" hidden data-heading="' + escapeAttr(headingLine || "") + '"><button type="button" class="product-color-more-circle" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430">+0</button><span class="product-color-more-popover" role="tooltip">' + head + rows + "</span></span>";
 }
 function buildProductColorsAdaptiveRow(colors, headingLine) {
   const arr = Array.isArray(colors) ? colors : [];
@@ -582,7 +667,7 @@ function buildProductColorsAdaptiveRow(colors, headingLine) {
   });
   const overflow = renderProductColorOverflowPopover(arr, headingLine);
   const total = '<span class="product-size-colors-total" title="\u0412\u0441\u0435\u0433\u043E \u043E\u0442\u0442\u0435\u043D\u043A\u043E\u0432">' + escapeHtml(colorCountLabelRu(arr.length)) + "</span>";
-  return '<div class="product-size-colors-adaptive"><div class="product-size-colors-track">' + row + "</div>" + overflow + total + "</div>";
+  return '<div class="product-size-colors-adaptive"><div class="product-size-colors-track-clip"><div class="product-size-colors-track">' + row + "</div></div>" + overflow + total + "</div>";
 }
 function buildVariantsHtml(variants) {
   if (!Array.isArray(variants) || !variants.length) return "";
