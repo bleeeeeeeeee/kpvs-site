@@ -1,8 +1,4 @@
 #!/usr/bin/env node
-/**
- * One-time demo row so the storefront is not empty on a fresh DB (e.g. new Supabase project).
- * Skips if any product already exists. Safe to run multiple times.
- */
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 const db = require("../server/db/index.js");
 
@@ -31,8 +27,25 @@ async function main() {
     const br = await client.query(
       "INSERT INTO brands (name, slug) VALUES ('KPVS (демо)', 'kpvs-seed-demo') RETURNING id"
     );
+    let rootId = null;
+    const rootRow = await client.query(
+      "SELECT id FROM categories WHERE lower(btrim(slug::text)) = 'catalog-root' LIMIT 1"
+    );
+    if (rootRow.rows.length) {
+      rootId = rootRow.rows[0].id;
+    } else {
+      const rootIns = await client.query(
+        "INSERT INTO categories (name, slug, parent_id, sort_order) VALUES ('Каталог', 'catalog-root', NULL, 0) RETURNING id"
+      );
+      rootId = rootIns.rows[0].id;
+    }
+    const section = await client.query(
+      "INSERT INTO categories (name, slug, parent_id, sort_order) VALUES ('Спецодежда (демо)', 'specodezhda-seed-demo', $1, 0) RETURNING id",
+      [rootId]
+    );
     const cat = await client.query(
-      "INSERT INTO categories (name, slug, sort_order) VALUES ('Спецодежда (демо)', 'specodezhda-seed-demo', 0) RETURNING id"
+      "INSERT INTO categories (name, slug, parent_id, sort_order) VALUES ('Демо-подкатегория', 'specodezhda-seed-demo-leaf', $1, 0) RETURNING id",
+      [section.rows[0].id]
     );
     const pr = await client.query(
       `INSERT INTO products (art, name, slug, description, category_id, brand_id, season, gender, is_active)

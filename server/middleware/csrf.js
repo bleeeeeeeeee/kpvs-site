@@ -35,7 +35,6 @@ function ensureSessionCsrf(req) {
   }
 }
 
-/** Вызывается перед GET /api/csrf-token: создаёт токен в сессии и вешает req.csrfToken(). */
 function createCsrfProtection() {
   return function csrfProtection(req, res, next) {
     try {
@@ -56,10 +55,6 @@ function badCsrfError() {
   return err;
 }
 
-/**
- * Для POST/PUT/PATCH/DELETE: cookie XSRF-TOKEN, заголовок X-XSRF-TOKEN и session.csrfToken
- * должны совпадать (double-submit + привязка к сессии).
- */
 function createApplyCsrfWhenNeeded() {
   return function applyCsrfWhenNeeded(req, res, next) {
     if (!["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) return next();

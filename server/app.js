@@ -179,8 +179,8 @@ async function bootDatabase() {
   await db.connectDB();
   await db.ensureUserAuthSchema();
   await db.ensureCoreCatalogTables();
+  await db.ensureCategoryHierarchy();
   await db.ensureProductsEditorColumn();
-  await db.ensureProductSeasonAllseasonMerged();
   await db.ensureCollectionsSchema();
   await db.ensureCategorySizeTypesSchema();
   await db.ensureSizeGroupsSchema();

@@ -404,6 +404,47 @@
         </div>
     </div>
 
+    <div class="modal admin-modal" id="category-quick-modal" role="dialog" aria-modal="true" aria-labelledby="category-quick-modal-title" style="display:none;">
+        <div class="modal-content admin-modal-content">
+            <div class="modal-header admin-modal-header">
+                <h2 id="category-quick-modal-title">Новая категория</h2>
+                <button class="modal-close ui-xbtn category-quick-modal-close" type="button" aria-label="Закрыть">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="category-quick-form" class="admin-form" novalidate>
+                    <div class="form-row">
+                        <label for="category-quick-name">Название <span class="required">*</span></label>
+                        <input id="category-quick-name" type="text" autocomplete="off" placeholder="Например: Куртки зимние" />
+                        <span class="field-error" id="err-category-quick-name"></span>
+                    </div>
+                    <div class="form-row">
+                        <label for="category-quick-slug">Slug</label>
+                        <input id="category-quick-slug" type="text" autocomplete="off" placeholder="Латиница; пусто — из названия" />
+                        <span class="field-error" id="err-category-quick-slug"></span>
+                    </div>
+                    <div class="form-row category-quick-superadmin-only" id="category-quick-parent-mode-row" hidden>
+                        <label class="checkbox-label" for="category-quick-is-parent">
+                            <input id="category-quick-is-parent" type="checkbox" />
+                            <span class="checkbox-custom"></span>
+                            <span>Родительская категория раздела</span>
+                        </label>
+                        <span class="field-hint admin-field-hint">Раздел верхнего уровня (например «Спецодежда»). В него потом добавляют подкатегории и товары.</span>
+                    </div>
+                    <div class="form-row" id="category-quick-parent-row">
+                        <label for="category-quick-parent">Родительская категория <span class="required">*</span></label>
+                        <select id="category-quick-parent"></select>
+                        <span class="field-hint admin-field-hint" id="category-quick-parent-hint">Подкатегория для товаров. Выберите раздел или группу, внутри которой она будет.</span>
+                        <span class="field-error" id="err-category-quick-parent"></span>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer admin-modal-footer">
+                <button type="button" id="category-quick-cancel-btn" class="btn btn--secondary">Отмена</button>
+                <button type="button" id="category-quick-save-btn" class="btn btn--primary">Создать</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal admin-modal" id="brand-quick-modal" role="dialog" aria-modal="true" aria-labelledby="brand-quick-modal-title" style="display:none;">
         <div class="modal-content admin-modal-content">
             <div class="modal-header admin-modal-header">
@@ -427,6 +468,37 @@
             <div class="modal-footer admin-modal-footer">
                 <button type="button" id="brand-quick-cancel-btn" class="btn btn--secondary">Отмена</button>
                 <button type="button" id="brand-quick-save-btn" class="btn btn--primary">Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal admin-modal" id="color-quick-modal" role="dialog" aria-modal="true" aria-labelledby="color-quick-modal-title" style="display:none;">
+        <div class="modal-content admin-modal-content">
+            <div class="modal-header admin-modal-header">
+                <h2 id="color-quick-modal-title">Новый цвет</h2>
+                <button class="modal-close ui-xbtn color-quick-modal-close" type="button" aria-label="Закрыть">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="color-quick-form" class="admin-form" novalidate>
+                    <div class="form-row">
+                        <label for="color-quick-name">Название <span class="required">*</span></label>
+                        <input id="color-quick-name" type="text" autocomplete="off" placeholder="Например: Тёмно-синий" />
+                        <span class="field-error" id="err-color-quick-name"></span>
+                    </div>
+                    <div class="form-row">
+                        <label for="color-quick-hex">Код цвета (необязательно)</label>
+                        <div class="admin-color-hex-row" style="display:flex;gap:0.5rem;align-items:center;">
+                            <input id="color-quick-hex" type="text" autocomplete="off" placeholder="#1A2B3C" maxlength="7" />
+                            <input id="color-quick-hex-picker" type="color" value="#888888" aria-label="Выбрать цвет" />
+                        </div>
+                        <span class="field-hint admin-field-hint">Формат #RGB или #RRGGBB — для отображения на сайте.</span>
+                        <span class="field-error" id="err-color-quick-hex"></span>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer admin-modal-footer">
+                <button type="button" id="color-quick-cancel-btn" class="btn btn--secondary">Отмена</button>
+                <button type="button" id="color-quick-save-btn" class="btn btn--primary">Создать</button>
             </div>
         </div>
     </div>

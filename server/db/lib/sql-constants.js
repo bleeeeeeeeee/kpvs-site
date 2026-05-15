@@ -27,6 +27,9 @@ const allProductFields = `
         p.updated_at,
         c.name AS category_name,
         c.slug AS category_slug,
+        c.parent_id AS category_parent_id,
+        pc.name AS category_parent_name,
+        pc.slug AS category_parent_slug,
         b.name AS brand_name,
         b.slug AS brand_slug
 `.trim();

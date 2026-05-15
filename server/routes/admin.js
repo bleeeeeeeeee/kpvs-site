@@ -2,7 +2,7 @@ const path = require("path");
 const fs = require("fs");
 const storageService = require("../services/storage");
 const { normalizeEmail, isValidEmail } = require("../services/auth-helpers");
-const { validateProductPayload } = require("../services/catalog");
+const { validateProductPayload, validateCategoryPayload } = require("../services/catalog");
 const adminService = require("../services/admin");
 const MAX_ADMIN_QUERY_LEN = 200;
 const MAX_ADMIN_LIST_LIMIT = 500;
@@ -302,6 +302,66 @@ function mountAdminRoutes(app, ctx) {
     } catch (err) {
       console.error("GET /api/admin/category-size-types:", err);
       res.status(500).json({ error: "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0441\u0432\u044F\u0437\u0438 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0439 \u0441 \u0442\u0438\u043F\u0430\u043C\u0438 \u0440\u0430\u0437\u043C\u0435\u0440\u043E\u0432" });
+    }
+  });
+  app.post("/api/admin/categories", requireAuth, async (req, res) => {
+    try {
+      if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+        return res.status(400).json({ error: "\u041E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F JSON-\u043E\u0431\u044A\u0435\u043A\u0442" });
+      }
+      const isParent =
+        req.body.is_parent_category === true ||
+        req.body.is_parent_category === "true" ||
+        req.body.is_parent_category === 1;
+      if (isParent && req.session.user.role !== "superadmin") {
+        return res.status(403).json({ error: "Родительскую категорию раздела может создать только суперадмин" });
+      }
+      const valErrors = validateCategoryPayload(req.body);
+      if (valErrors.length) return res.status(400).json({ error: valErrors.join("; ") });
+      res.status(201).json(await db.createCategory(req.body, { role: req.session.user.role }));
+    } catch (err) {
+      console.error("POST /api/admin/categories:", err);
+      res.status(400).json({ error: err.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0437\u0434\u0430\u0442\u044C \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044E" });
+    }
+  });
+  app.put("/api/admin/categories/:id", requireAuth, async (req, res) => {
+    try {
+      if (req.session.user.role !== "superadmin") return res.status(403).json({ error: "Forbidden" });
+      const id = parsePositiveDbId(req.params.id);
+      if (!id) return res.status(400).json({ error: "\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 id" });
+      if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+        return res.status(400).json({ error: "\u041E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F JSON-\u043E\u0431\u044A\u0435\u043A\u0442" });
+      }
+      const row = await db.updateCategory(id, req.body);
+      if (!row) return res.status(404).json({ error: "\u041A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044F \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430" });
+      res.json(row);
+    } catch (err) {
+      console.error("PUT /api/admin/categories/:id:", err);
+      res.status(400).json({ error: err.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043E\u0431\u043D\u043E\u0432\u0438\u0442\u044C \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044E" });
+    }
+  });
+  app.delete("/api/admin/categories/:id", requireAuth, async (req, res) => {
+    try {
+      if (req.session.user.role !== "superadmin") return res.status(403).json({ error: "Forbidden" });
+      const id = parsePositiveDbId(req.params.id);
+      if (!id) return res.status(400).json({ error: "\u041D\u0435\u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u044B\u0439 id" });
+      const ok = await db.deleteCategory(id);
+      if (!ok) return res.status(404).json({ error: "\u041A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044F \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u0430" });
+      res.status(204).send();
+    } catch (err) {
+      console.error("DELETE /api/admin/categories/:id:", err);
+      res.status(400).json({ error: err.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0443\u0434\u0430\u043B\u0438\u0442\u044C \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044E" });
+    }
+  });
+  app.post("/api/admin/colors", requireAuth, async (req, res) => {
+    try {
+      if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+        return res.status(400).json({ error: "Ожидается JSON-объект" });
+      }
+      res.status(201).json(await db.createColor(req.body));
+    } catch (err) {
+      console.error("POST /api/admin/colors:", err);
+      res.status(400).json({ error: err.message || "Не удалось создать цвет" });
     }
   });
   app.post("/api/admin/brands", requireAuth, async (req, res) => {

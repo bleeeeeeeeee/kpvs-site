@@ -419,11 +419,6 @@ async function ensureUserAuthSchema(db) {
     await client.query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT TRUE`);
     await client.query(`UPDATE users SET is_active = TRUE WHERE is_active IS NULL`);
     try {
-      await client.query("DROP INDEX IF EXISTS users_email_uq");
-    } catch (e) {
-      console.warn("[schema] drop users_email_uq:", e && e.message);
-    }
-    try {
       await client.query(
         `CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_uq
                  ON users (lower(trim(email::text)))

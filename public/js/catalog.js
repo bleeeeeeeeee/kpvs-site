@@ -14,6 +14,9 @@ const Catalog = (() => {
   };
   let catalogCategories = [];
   let catalogCategoryRoots = [];
+  let categoryBySlug = Object.create(null);
+  let categoryById = Object.create(null);
+  let catalogRootId = null;
   const categorySlugToSection = Object.create(null);
   const LEGACY_CATEGORY_FILTER_ALIASES = {
     outerwear: "workwear",
@@ -201,6 +204,7 @@ const Catalog = (() => {
       const catJson = catRes.ok ? await catRes.json() : [];
       catalogCategoryRoots = Array.isArray(catJson) ? catJson : [];
       catalogCategories = flattenCategories(catalogCategoryRoots);
+      buildCategoryMaps();
       rebuildCategorySlugToSectionIndex();
       catalogBrands = brandRes.ok ? await brandRes.json() : [];
       catalogSizes = sizeRes.ok ? await sizeRes.json() : [];
@@ -216,6 +220,9 @@ const Catalog = (() => {
     } catch (e) {
       catalogCategories = [];
       catalogCategoryRoots = [];
+      categoryBySlug = Object.create(null);
+      categoryById = Object.create(null);
+      catalogRootId = null;
       rebuildCategorySlugToSectionIndex();
       catalogBrands = [];
       catalogSizes = [];
@@ -224,18 +231,108 @@ const Catalog = (() => {
       sizeEquivalenceAdj = null;
     }
   }
-  function flattenCategories(list, depth) {
+  function flattenCategories(list, depth, parentId) {
     depth = depth || 0;
+    parentId = parentId != null ? parentId : null;
     const result = [];
     if (!Array.isArray(list)) return result;
     list.forEach(function(item) {
       if (!item) return;
-      result.push({ id: item.id, name: item.name, slug: item.slug, depth });
+      const pid = item.parent_id != null && item.parent_id !== "" ? Number(item.parent_id) : parentId;
+      result.push({
+        id: item.id,
+        name: item.name,
+        slug: item.slug,
+        depth,
+        parent_id: pid,
+        sort_order: item.sort_order != null ? Number(item.sort_order) : 0,
+        is_leaf: item.is_leaf === true || !(Array.isArray(item.children) && item.children.length)
+      });
       if (Array.isArray(item.children) && item.children.length) {
-        result.push.apply(result, flattenCategories(item.children, depth + 1));
+        result.push.apply(result, flattenCategories(item.children, depth + 1, Number(item.id)));
       }
     });
     return result;
+  }
+  function buildCategoryMaps() {
+    categoryBySlug = Object.create(null);
+    categoryById = Object.create(null);
+    catalogRootId = null;
+    function walk(node, parentNode) {
+      if (!node) return;
+      const row = {
+        id: node.id,
+        name: node.name,
+        slug: node.slug,
+        parent_id: node.parent_id != null ? Number(node.parent_id) : parentNode ? Number(parentNode.id) : null,
+        sort_order: node.sort_order != null ? Number(node.sort_order) : 0,
+        children: node.children || [],
+        _parent: parentNode || null
+      };
+      categoryById[row.id] = row;
+      if (row.slug) categoryBySlug[String(row.slug)] = row;
+      if (row.slug === "catalog-root") catalogRootId = Number(row.id);
+      (node.children || []).forEach(function(ch) {
+        walk(ch, row);
+      });
+    }
+    catalogCategoryRoots.forEach(function(r) {
+      walk(r, null);
+    });
+  }
+  function getProductCatalogSection(product) {
+    if (!product) return null;
+    const parentSlug = product.category_parent_slug != null ? String(product.category_parent_slug).trim() : "";
+    const parentName = product.category_parent_name != null ? String(product.category_parent_name).trim() : "";
+    if (parentSlug && parentSlug !== "catalog-root" && parentName) {
+      const parent = categoryBySlug[parentSlug];
+      return {
+        key: "cat-" + parentSlug,
+        title: parentName,
+        sort_order: parent ? parent.sort_order || 0 : 0
+      };
+    }
+    const slug = product.category_slug != null ? String(product.category_slug).trim() : "";
+    if (!slug) return null;
+    const cat = categoryBySlug[slug];
+    if (!cat) return null;
+    const parent = cat._parent;
+    if (!parent || parent.slug === "catalog-root") {
+      return { key: "cat-" + slug, title: cat.name || slug, sort_order: cat.sort_order || 0 };
+    }
+    return { key: "cat-" + parent.slug, title: parent.name || parent.slug, sort_order: parent.sort_order || 0 };
+  }
+  function productMatchesCategoryFilter(product, filterSlug) {
+    const want = normalizeLegacyCategoryFilterToken(filterSlug);
+    if (!want) return false;
+    const slug = product.category_slug != null ? String(product.category_slug).trim() : "";
+    if (slug === want) return true;
+    const sec = getProductCatalogSection(product);
+    if (sec && sec.key === "cat-" + want) return true;
+    if (!slug) return false;
+    let node = categoryBySlug[slug];
+    let guard = 0;
+    while (node && guard < 24) {
+      if (node.slug === want) return true;
+      node = node._parent;
+      guard += 1;
+    }
+    return false;
+  }
+  function collectParentCategorySections(items) {
+    const map = new Map();
+    (items || []).forEach(function(p) {
+      const sec = getProductCatalogSection(p);
+      if (!sec) return;
+      if (!map.has(sec.key)) {
+        map.set(sec.key, { key: sec.key, title: sec.title, sort_order: sec.sort_order, items: [] });
+      }
+      map.get(sec.key).items.push(p);
+    });
+    return Array.from(map.values()).sort(function(a, b) {
+      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+      return String(a.title).localeCompare(String(b.title), "ru");
+    });
   }
   function tokenizeForSectionInfer(text) {
     const raw = String(text || "").toLowerCase().replace(/[_-]+/g, " ");
@@ -444,23 +541,41 @@ const Catalog = (() => {
         container.appendChild(buildSection("coll-" + coll.id, title, items));
       });
     }
+    const parentSections = collectParentCategorySections(filtered);
+    const sectionedProductIds = new Set();
+    parentSections.forEach(function(sec) {
+      if (!sec.items.length) return;
+      sec.items.forEach(function(p) {
+        if (p && p.id != null) sectionedProductIds.add(p.id);
+      });
+      container.appendChild(buildSection(sec.key, sec.title, sec.items));
+    });
+    const unsectioned = filtered.filter(function(p) {
+      return !p || p.id == null || !sectionedProductIds.has(p.id);
+    });
     const sectionKeys = ["workwear", "footwear", "ppe"];
     sectionKeys.forEach(function(key) {
-      const items = filtered.filter(function(p) {
+      const items = unsectioned.filter(function(p) {
         return mapCategoryToSection(p) === key;
       });
       if (items.length) {
+        items.forEach(function(p) {
+          if (p && p.id != null) sectionedProductIds.add(p.id);
+        });
         container.appendChild(buildSection(key, sectionTitles[key], items));
       }
     });
-    const unknownSection = filtered.filter(function(p) {
-      return productHasAssignedCategory(p) && !mapCategoryToSection(p);
+    const unknownSection = unsectioned.filter(function(p) {
+      return productHasAssignedCategory(p) && !mapCategoryToSection(p) && !sectionedProductIds.has(p.id);
     });
     if (unknownSection.length) {
+      unknownSection.forEach(function(p) {
+        if (p && p.id != null) sectionedProductIds.add(p.id);
+      });
       container.appendChild(buildSection("misc-cat", sectionTitles.miscCat, unknownSection));
     }
     const uncategorized = filtered.filter(function(p) {
-      return !productHasAssignedCategory(p);
+      return !productHasAssignedCategory(p) && !sectionedProductIds.has(p.id);
     });
     if (uncategorized.length) {
       container.appendChild(buildSection("other", sectionTitles.other, uncategorized));
@@ -500,9 +615,7 @@ const Catalog = (() => {
     if (activeFilters.categories.length) {
       result = result.filter(function(p) {
         return activeFilters.categories.some(function(slug) {
-          const want = normalizeLegacyCategoryFilterToken(slug);
-          const sec = mapCategoryToSection(p);
-          return p.category_slug === slug || p.category_slug === want || sec === slug || sec === want;
+          return productMatchesCategoryFilter(p, slug);
         });
       });
     }

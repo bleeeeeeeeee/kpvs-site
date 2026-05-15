@@ -1,8 +1,53 @@
-const { mapProductRowMedia, mapBrandRowMedia } = require("../media-url");
+const { mapProductRowMedia } = require("../media-url");
 const { slugify } = require("../lib/slugify");
 const { otherScalesHintSubquery, allProductFields } = require("../lib/sql-constants");
 const { buildProductListWhere } = require("../lib/product-list-filters");
 const { storedSizeIdForVariant } = require("./sizes");
+
+const CATALOG_ROOT_SLUG = "catalog-root";
+
+async function getCatalogRootId(pool) {
+  const r = await pool.query(
+    "SELECT id FROM categories WHERE lower(btrim(slug::text)) = lower(btrim($1::text)) LIMIT 1",
+    [CATALOG_ROOT_SLUG]
+  );
+  return r.rows.length ? Number(r.rows[0].id) : null;
+}
+
+async function ensureCategoryHierarchy(pool) {
+  let rootId = await getCatalogRootId(pool);
+  if (!rootId) {
+    const ins = await pool.query(
+      `INSERT INTO categories (name, slug, parent_id, sort_order)
+       VALUES ('Каталог', $1, NULL, 0)
+       RETURNING id`,
+      [CATALOG_ROOT_SLUG]
+    );
+    rootId = Number(ins.rows[0].id);
+  }
+  await pool.query(`UPDATE categories SET parent_id = $1 WHERE parent_id IS NULL AND id <> $1`, [rootId]);
+}
+
+function rollupCategoryProductCounts(node) {
+  const direct = Number(node.direct_products_count) || 0;
+  let childTotal = 0;
+  const children = Array.isArray(node.children) ? node.children : [];
+  children.forEach((ch) => {
+    childTotal += rollupCategoryProductCounts(ch);
+  });
+  node.products_count = direct + childTotal;
+  node.is_leaf = children.length === 0;
+  return node.products_count;
+}
+
+function publicCategoryRoots(forest) {
+  if (!Array.isArray(forest) || !forest.length) return [];
+  if (forest.length === 1 && forest[0].slug === CATALOG_ROOT_SLUG) {
+    return forest[0].children || [];
+  }
+  return forest.filter((r) => r.slug !== CATALOG_ROOT_SLUG);
+}
+
 async function getCategories(pool) {
   const result = await pool.query(`
     WITH RECURSIVE cat_tree AS (
@@ -21,30 +66,197 @@ async function getCategories(pool) {
         ct.parent_id,
         ct.sort_order,
         ct.depth,
-        COALESCE(pc.products_count, 0) AS products_count
+        COALESCE(pc.products_count, 0) AS direct_products_count
     FROM cat_tree ct
     LEFT JOIN (
-        SELECT category_id, COUNT(*) AS products_count
+        SELECT category_id, COUNT(*)::int AS products_count
         FROM products
         WHERE is_active = TRUE
         GROUP BY category_id
     ) pc ON pc.category_id = ct.id
     ORDER BY ct.depth, ct.sort_order, ct.id
-`);
+  `);
   const map = new Map();
   result.rows.forEach((row) => {
-    map.set(row.id, { ...row, products_count: Number(row.products_count), children: [] });
+    map.set(row.id, {
+      ...row,
+      direct_products_count: Number(row.direct_products_count) || 0,
+      products_count: Number(row.direct_products_count) || 0,
+      children: []
+    });
   });
   result.rows.forEach((row) => {
     if (row.parent_id && map.has(row.parent_id)) {
       map.get(row.parent_id).children.push(map.get(row.id));
     }
   });
-  return Array.from(map.values()).filter((r) => !r.parent_id);
+  const forest = Array.from(map.values()).filter((r) => !r.parent_id);
+  forest.forEach((root) => rollupCategoryProductCounts(root));
+  return publicCategoryRoots(forest);
+}
+
+async function categoryHasChildren(pool, categoryId) {
+  const r = await pool.query("SELECT 1 FROM categories WHERE parent_id = $1 LIMIT 1", [categoryId]);
+  return r.rows.length > 0;
+}
+
+async function validateCategoryIdForProduct(pool, categoryId) {
+  if (categoryId == null || categoryId === "") return null;
+  const id = Number(categoryId);
+  if (!Number.isFinite(id) || id <= 0) throw new Error("Некорректная категория");
+  const r = await pool.query(
+    `SELECT c.id, c.parent_id, c.slug,
+            (SELECT COUNT(*)::int FROM categories ch WHERE ch.parent_id = c.id) AS child_count
+     FROM categories c WHERE c.id = $1`,
+    [id]
+  );
+  if (!r.rows.length) throw new Error("Категория не найдена");
+  const row = r.rows[0];
+  const rootId = await getCatalogRootId(pool);
+  if (row.slug === CATALOG_ROOT_SLUG) throw new Error("Нельзя назначить товар на корневую категорию");
+  if (!row.parent_id) throw new Error("У каждой категории товара должна быть родительская категория");
+  if (Number(row.child_count) > 0) throw new Error("Товар можно назначить только конечной подкатегории");
+  if (rootId && Number(row.id) === rootId) throw new Error("Нельзя назначить товар на корневую категорию");
+  return id;
+}
+
+async function assertValidParentForCategory(pool, parentId, excludeId) {
+  const pid = Number(parentId);
+  if (!Number.isFinite(pid) || pid <= 0) throw new Error("Укажите родительскую категорию");
+  const r = await pool.query("SELECT id, slug FROM categories WHERE id = $1", [pid]);
+  if (!r.rows.length) throw new Error("Родительская категория не найдена");
+  if (r.rows[0].slug === CATALOG_ROOT_SLUG) return pid;
+  const parentRow = await pool.query("SELECT parent_id FROM categories WHERE id = $1", [pid]);
+  if (!parentRow.rows.length || parentRow.rows[0].parent_id == null) {
+    throw new Error("Родительская категория должна быть в иерархии каталога");
+  }
+  if (excludeId != null && pid === Number(excludeId)) {
+    throw new Error("Категория не может быть родителем самой себе");
+  }
+  if (excludeId != null) {
+    const cycle = await pool.query(
+      `WITH RECURSIVE anc AS (
+          SELECT id, parent_id FROM categories WHERE id = $1
+          UNION ALL
+          SELECT c.id, c.parent_id FROM categories c
+          INNER JOIN anc ON c.id = anc.parent_id
+       )
+       SELECT 1 FROM anc WHERE id = $2 LIMIT 1`,
+      [pid, Number(excludeId)]
+    );
+    if (cycle.rows.length) throw new Error("Недопустимый родитель: получится цикл в иерархии");
+  }
+  return pid;
+}
+
+async function createCategory(pool, data, ctx = {}) {
+  const name = String(data.name || "").trim();
+  if (!name) throw new Error("Укажите название категории");
+  let slug = String(data.slug || "").trim();
+  if (!slug) slug = slugify(name);
+  if (!slug) throw new Error("Укажите slug или более говорящее название");
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    throw new Error("Slug может содержать только строчные латинские буквы, цифры и дефисы");
+  }
+  const isParent = data.is_parent_category === true || data.is_parent_category === "true" || data.is_parent_category === 1;
+  let parentId;
+  if (isParent) {
+    if (ctx.role !== "superadmin") {
+      throw new Error("Создавать родительскую категорию раздела может только суперадмин");
+    }
+    const rootId = await getCatalogRootId(pool);
+    if (!rootId) throw new Error("Корневая категория каталога не найдена");
+    parentId = rootId;
+  } else {
+    parentId = await assertValidParentForCategory(pool, data.parent_id, null);
+  }
+  const sort_order = Number.isFinite(Number(data.sort_order)) ? Number(data.sort_order) : 0;
+  try {
+    const ins = await pool.query(
+      `INSERT INTO categories (name, slug, parent_id, sort_order)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, name, slug, parent_id, sort_order`,
+      [name, slug, parentId, sort_order]
+    );
+    return ins.rows[0];
+  } catch (e) {
+    if (String(e.code) === "23505") throw new Error("Категория с таким slug уже есть");
+    throw e;
+  }
+}
+
+async function updateCategory(pool, id, data) {
+  const catId = Number(id);
+  if (!Number.isFinite(catId) || catId <= 0) return null;
+  const existing = await pool.query("SELECT id, slug FROM categories WHERE id = $1", [catId]);
+  if (!existing.rows.length) return null;
+  if (existing.rows[0].slug === CATALOG_ROOT_SLUG) throw new Error("Корневую категорию каталога нельзя изменить");
+  const fields = [];
+  const vals = [];
+  let idx = 1;
+  if (data.name !== void 0) {
+    const name = String(data.name || "").trim();
+    if (!name) throw new Error("Название не может быть пустым");
+    fields.push(`name = $${idx++}`);
+    vals.push(name);
+  }
+  if (data.slug !== void 0) {
+    let slug = String(data.slug || "").trim();
+    if (!slug && data.name !== void 0) slug = slugify(String(data.name || "").trim());
+    if (!slug) throw new Error("Slug не может быть пустым");
+    if (!/^[a-z0-9-]+$/.test(slug)) {
+      throw new Error("Slug может содержать только строчные латинские буквы, цифры и дефисы");
+    }
+    fields.push(`slug = $${idx++}`);
+    vals.push(slug);
+  }
+  if (data.parent_id !== void 0) {
+    const parentId = await assertValidParentForCategory(pool, data.parent_id, catId);
+    fields.push(`parent_id = $${idx++}`);
+    vals.push(parentId);
+  }
+  if (data.sort_order !== void 0 && Number.isFinite(Number(data.sort_order))) {
+    fields.push(`sort_order = $${idx++}`);
+    vals.push(Number(data.sort_order));
+  }
+  if (!fields.length) {
+    const cur = await pool.query(
+      "SELECT id, name, slug, parent_id, sort_order FROM categories WHERE id = $1",
+      [catId]
+    );
+    return cur.rows[0] || null;
+  }
+  vals.push(catId);
+  try {
+    const r = await pool.query(
+      `UPDATE categories SET ${fields.join(", ")} WHERE id = $${idx}
+       RETURNING id, name, slug, parent_id, sort_order`,
+      vals
+    );
+    return r.rows[0] || null;
+  } catch (e) {
+    if (String(e.code) === "23505") throw new Error("Категория с таким slug уже есть");
+    throw e;
+  }
+}
+
+async function deleteCategory(pool, id) {
+  const catId = Number(id);
+  if (!Number.isFinite(catId) || catId <= 0) return false;
+  const existing = await pool.query("SELECT id, slug FROM categories WHERE id = $1", [catId]);
+  if (!existing.rows.length) return false;
+  if (existing.rows[0].slug === CATALOG_ROOT_SLUG) throw new Error("Корневую категорию каталога нельзя удалить");
+  if (await categoryHasChildren(pool, catId)) {
+    throw new Error("Сначала удалите или перенесите дочерние категории");
+  }
+  const prod = await pool.query("SELECT 1 FROM products WHERE category_id = $1 LIMIT 1", [catId]);
+  if (prod.rows.length) throw new Error("В категории есть товары — переназначьте их или удалите");
+  await pool.query("DELETE FROM categories WHERE id = $1", [catId]);
+  return true;
 }
 async function getBrands(pool) {
-  const result = await pool.query("SELECT id, name, slug, logo_url FROM brands ORDER BY name");
-  return result.rows.map(mapBrandRowMedia);
+  const result = await pool.query("SELECT id, name, slug FROM brands ORDER BY name");
+  return result.rows;
 }
 async function createBrand(pool, data) {
   const name = String(data.name || "").trim();
@@ -54,12 +266,10 @@ async function createBrand(pool, data) {
   if (!slug) throw new Error("\u0423\u043A\u0430\u0436\u0438\u0442\u0435 slug \u0438\u043B\u0438 \u0431\u043E\u043B\u0435\u0435 \u0433\u043E\u0432\u043E\u0440\u044F\u0449\u0435\u0435 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435");
   try {
     const ins = await pool.query(
-      `INSERT INTO brands (name, slug, logo_url)
-         VALUES ($1, $2, $3)
-         RETURNING id, name, slug, logo_url`,
-      [name, slug, null]
+      `INSERT INTO brands (name, slug) VALUES ($1, $2) RETURNING id, name, slug`,
+      [name, slug]
     );
-    return mapBrandRowMedia(ins.rows[0]);
+    return ins.rows[0];
   } catch (e) {
     if (String(e.code) === "23505") throw new Error("\u0411\u0440\u0435\u043D\u0434 \u0441 \u0442\u0430\u043A\u0438\u043C slug \u0443\u0436\u0435 \u0435\u0441\u0442\u044C");
     throw e;
@@ -69,27 +279,63 @@ async function getColors(pool) {
   const result = await pool.query("SELECT id, name, hex_code FROM colors ORDER BY name");
   return result.rows;
 }
+
+function normalizeColorHex(raw) {
+  if (raw == null || String(raw).trim() === "") return null;
+  let h = String(raw).trim();
+  if (!h.startsWith("#")) h = "#" + h;
+  if (!/^#[0-9A-Fa-f]{3}$/.test(h) && !/^#[0-9A-Fa-f]{6}$/.test(h)) {
+    throw new Error("hex_code: укажите цвет в формате #RGB или #RRGGBB");
+  }
+  if (h.length === 4) {
+    h = "#" + h[1] + h[1] + h[2] + h[2] + h[3] + h[3];
+  }
+  return h.toUpperCase();
+}
+
+async function createColor(pool, data) {
+  const name = String(data.name || "").trim();
+  if (!name) throw new Error("Укажите название цвета");
+  if (name.length > 120) throw new Error("Слишком длинное название цвета");
+  let hex_code = null;
+  if (data.hex_code !== void 0 && data.hex_code !== null && String(data.hex_code).trim() !== "") {
+    hex_code = normalizeColorHex(data.hex_code);
+  }
+  const dup = await pool.query(
+    "SELECT id, name, hex_code FROM colors WHERE lower(btrim(name)) = lower(btrim($1)) LIMIT 1",
+    [name]
+  );
+  if (dup.rows.length) {
+    const row = dup.rows[0];
+    if (hex_code && (!row.hex_code || String(row.hex_code).trim() === "")) {
+      const upd = await pool.query(
+        "UPDATE colors SET hex_code = $1 WHERE id = $2 RETURNING id, name, hex_code",
+        [hex_code, row.id]
+      );
+      return upd.rows[0];
+    }
+    return row;
+  }
+  try {
+    const ins = await pool.query(
+      "INSERT INTO colors (name, hex_code) VALUES ($1, $2) RETURNING id, name, hex_code",
+      [name, hex_code]
+    );
+    return ins.rows[0];
+  } catch (e) {
+    if (String(e.code) === "23505") throw new Error("Такой цвет уже есть");
+    throw e;
+  }
+}
 async function migrateTagsToCollectionsIfNeeded(pool) {
   const r = await pool.query(`
-    SELECT
-        EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'tags') AS has_tags,
-        EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'collections') AS has_coll
+    SELECT EXISTS (
+      SELECT 1 FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = 'collections'
+    ) AS has_coll
 `);
   const row = r.rows[0];
-  if (row.has_tags && !row.has_coll) {
-    await pool.query("ALTER TABLE tags RENAME TO collections");
-    await pool.query("ALTER TABLE product_tags RENAME TO product_collections");
-    await pool.query("ALTER TABLE product_collections RENAME COLUMN tag_id TO collection_id");
-    try {
-      await pool.query("ALTER INDEX tags_slug_uq RENAME TO collections_slug_uq");
-    } catch (e) {
-      try {
-        await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS collections_slug_uq ON collections (slug)");
-      } catch (e2) {
-        console.warn("[schema] collections_slug_uq:", e2 && e2.message);
-      }
-    }
-  } else if (!row.has_coll) {
+  if (!row.has_coll) {
     await pool.query(`
         CREATE TABLE collections (
             id SERIAL PRIMARY KEY,
@@ -182,8 +428,7 @@ async function ensureCoreCatalogTables(pool) {
     CREATE TABLE IF NOT EXISTS brands (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
-      slug TEXT NOT NULL,
-      logo_url TEXT
+      slug TEXT NOT NULL
     )
   `);
   await pool.query(`
@@ -300,15 +545,6 @@ async function ensureProductsEditorColumn(pool) {
     ALTER TABLE products
     ADD COLUMN IF NOT EXISTS updated_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
 `);
-}
-async function ensureProductSeasonAllseasonMerged(pool) {
-  const dem = "\u0434\u0435\u043C\u0438\u0441\u0435\u0437\u043E\u043D";
-  const legacy = ["\u0432\u0441\u0435\u0441\u0435\u0437\u043E\u043D\u043D\u044B\u0439", "\u0432\u0441\u0435\u0441\u0435\u0437\u043E\u043D"];
-  await pool.query(
-    `UPDATE products SET season = $1
-     WHERE lower(btrim(season)) = ANY (SELECT lower(btrim(x)) FROM unnest($2::text[]) AS t(x))`,
-    [dem, legacy]
-  );
 }
 async function ensureCollectionsSchema(pool) {
   await migrateTagsToCollectionsIfNeeded(pool);
@@ -558,6 +794,7 @@ async function getProducts(pool, genderParam, options = {}) {
         ) AS collections
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE ${conditions.length ? conditions.join(" AND ") : "TRUE"}
     ORDER BY ${sortField} ${direction}
@@ -597,9 +834,10 @@ async function getProduct(pool, identifier, options) {
         c.name AS category_name,
         c.slug AS category_slug,
         c.parent_id AS category_parent_id,
+        pc.name AS category_parent_name,
+        pc.slug AS category_parent_slug,
         b.name AS brand_name,
         b.slug AS brand_slug,
-        b.logo_url AS brand_logo,
         (
             SELECT json_agg(json_build_object(
                 'id', pi.id, 'url', pi.url, 'alt_text', pi.alt_text,
@@ -634,6 +872,7 @@ async function getProduct(pool, identifier, options) {
         ) AS attributes
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN categories pc ON c.parent_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
     LEFT JOIN users uu ON p.updated_by_user_id = uu.id
     WHERE (${whereClause}) AND (${activeClause})
@@ -656,6 +895,7 @@ async function createProduct(pool, data, ctx = {}) {
         throw new Error("\u0410\u0440\u0442\u0438\u043A\u0443\u043B \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442");
       }
     }
+    const categoryId = await validateCategoryIdForProduct(pool, data.category_id);
     const res = await client.query(`
         INSERT INTO products (art, name, slug, description, category_id, brand_id, materials, season, gender, is_active, updated_by_user_id)
         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -665,7 +905,7 @@ async function createProduct(pool, data, ctx = {}) {
       data.name,
       slug,
       data.description || null,
-      data.category_id || null,
+      categoryId,
       data.brand_id || null,
       data.materials || null,
       data.season || null,
@@ -711,6 +951,7 @@ async function updateProduct(pool, id, data, ctx = {}) {
         throw new Error("\u0410\u0440\u0442\u0438\u043A\u0443\u043B \u0443\u0436\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442");
       }
     }
+    const categoryId = await validateCategoryIdForProduct(pool, data.category_id);
     const res = await client.query(`
         UPDATE products
         SET art = $1, name = $2, slug = $3, description = $4,
@@ -724,7 +965,7 @@ async function updateProduct(pool, id, data, ctx = {}) {
       data.name,
       slug,
       data.description || null,
-      data.category_id || null,
+      categoryId,
       data.brand_id || null,
       data.materials || null,
       data.season || null,
@@ -981,13 +1222,20 @@ async function searchProducts(pool, q, gender, category, limit = 20, offset = 0)
     offset: Number(offset) || 0
   });
 }
+module.exports.CATALOG_ROOT_SLUG = CATALOG_ROOT_SLUG;
+module.exports.getCatalogRootId = getCatalogRootId;
+module.exports.ensureCategoryHierarchy = ensureCategoryHierarchy;
 module.exports.getCategories = getCategories;
+module.exports.createCategory = createCategory;
+module.exports.updateCategory = updateCategory;
+module.exports.deleteCategory = deleteCategory;
+module.exports.validateCategoryIdForProduct = validateCategoryIdForProduct;
 module.exports.getBrands = getBrands;
 module.exports.createBrand = createBrand;
 module.exports.getColors = getColors;
+module.exports.createColor = createColor;
 module.exports.ensureCoreCatalogTables = ensureCoreCatalogTables;
 module.exports.ensureProductsEditorColumn = ensureProductsEditorColumn;
-module.exports.ensureProductSeasonAllseasonMerged = ensureProductSeasonAllseasonMerged;
 module.exports.ensureCollectionsSchema = ensureCollectionsSchema;
 module.exports.getCollections = getCollections;
 module.exports.getCollectionsAdmin = getCollectionsAdmin;

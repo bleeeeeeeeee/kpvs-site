@@ -318,9 +318,13 @@ async function ensureCategorySizeTypesSchema(pool) {
   slugRows.rows.forEach((r) => {
     bySlug[r.slug] = Number(r.id);
   });
-  const cats = await pool.query(
-    "SELECT id, name, slug FROM categories WHERE parent_id IS NULL ORDER BY id"
-  );
+  const cats = await pool.query(`
+    SELECT c.id, c.name, c.slug
+    FROM categories c
+    WHERE c.parent_id = (SELECT id FROM categories WHERE lower(btrim(slug::text)) = 'catalog-root' LIMIT 1)
+       OR (NOT EXISTS (SELECT 1 FROM categories WHERE lower(btrim(slug::text)) = 'catalog-root') AND c.parent_id IS NULL)
+    ORDER BY c.id
+  `);
   const pairs = [];
   for (const c of cats.rows) {
     const slugs = classifyCategorySizeTypeSlugs(c.name, c.slug);

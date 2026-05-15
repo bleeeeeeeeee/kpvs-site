@@ -25,14 +25,16 @@ function applyCategory(state, category) {
   if (!cats.length) return;
   const placeholders = cats.map(() => `$${state.idx++}`).join(", ");
   cats.forEach((c) => state.values.push(c));
+  const slugPlaceholders = placeholders;
   state.conditions.push(`(
                 p.category_id IN (
-                    SELECT id FROM categories WHERE slug IN (${placeholders})
-                )
-                OR p.category_id IN (
-                    SELECT c.id FROM categories c
-                    JOIN categories parent ON c.parent_id = parent.id
-                    WHERE parent.slug IN (${placeholders})
+                    WITH RECURSIVE subcats AS (
+                        SELECT id FROM categories WHERE slug IN (${slugPlaceholders})
+                        UNION ALL
+                        SELECT c.id FROM categories c
+                        INNER JOIN subcats s ON c.parent_id = s.id
+                    )
+                    SELECT id FROM subcats
                 )
             )`);
 }

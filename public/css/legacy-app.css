@@ -536,7 +536,6 @@
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Карточка каталога: те же семантические градиенты, что на странице товара */
 .card-hover-btn.card-favorite-btn {
     background: var(--btn-gradient-primary);
     background-size: 200% 200%;
@@ -1772,7 +1771,6 @@ html.modal-open body .notification * {
     line-height: 1.2;
 }
 
-/* .btn sets display:inline-flex; keep toggle hidden while password panel is open */
 .account-settings--security>#account-password-toggle.btn[hidden] {
     display: none !important;
 }
@@ -2660,6 +2658,24 @@ html.modal-open body .notification * {
     filter: invert(1) brightness(1.08);
 }
 
+[data-theme="dark"] .welcome-all-btn.welcome-glass.btn--secondary {
+    --btn-bg: rgba(192, 192, 192, 0.5);
+    --btn-color: #25362B;
+    --btn-border: 1px solid rgba(36, 53, 42, 0.10);
+    background: rgba(192, 192, 192, 0.5);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #25362B;
+    border: 1px solid rgba(36, 53, 42, 0.10);
+    box-shadow: 0 2px 10px rgba(36, 53, 42, 0.10);
+}
+
+[data-theme="dark"] .welcome-all-btn.welcome-glass.btn--secondary:hover {
+    background: rgba(182, 197, 63, 0.32);
+    border-color: rgba(36, 53, 42, 0.16);
+    box-shadow: 0 6px 18px rgba(36, 53, 42, 0.14);
+}
+
 .welcome-all-btn {
     width: 100%;
     border: 0;
@@ -3306,8 +3322,11 @@ html.modal-open body .notification * {
     margin-top: 0.85rem;
 }
 
-/* Секция пользователей только для superadmin (дублирует hidden: надёжнее чем .admin-data-panel { display:block }) */
 .admin-page.admin-no-users-panel #admin-users-panel {
+    display: none !important;
+}
+
+body.admin-no-users-panel #category-quick-parent-mode-row {
     display: none !important;
 }
 

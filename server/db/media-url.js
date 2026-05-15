@@ -10,7 +10,6 @@ function publicMediaUrl(url) {
 function mapProductRowMedia(row) {
   if (!row || typeof row !== "object") return row;
   if (row.image != null && String(row.image).trim() !== "") row.image = publicMediaUrl(row.image);
-  if (row.brand_logo != null && String(row.brand_logo).trim() !== "") row.brand_logo = publicMediaUrl(row.brand_logo);
   if (row.collections != null && typeof row.collections === "string") {
     try {
       const parsed = JSON.parse(row.collections);
@@ -29,13 +28,7 @@ function mapProductRowMedia(row) {
   }
   return row;
 }
-function mapBrandRowMedia(row) {
-  if (!row || typeof row !== "object") return row;
-  if (row.logo_url != null && String(row.logo_url).trim() !== "") row.logo_url = publicMediaUrl(row.logo_url);
-  return row;
-}
 module.exports = {
   publicMediaUrl,
-  mapProductRowMedia,
-  mapBrandRowMedia
+  mapProductRowMedia
 };

@@ -50,6 +50,8 @@ const Admin = (() => {
   let availableSizeTypes = [];
   let sizeQuickRevert = null;
   let brandQuickRevert = null;
+  let categoryQuickRevert = null;
+  let colorQuickRevert = null;
   let products = [];
   let editingProductId = null;
   let productImages = [];
@@ -1232,6 +1234,152 @@ const Admin = (() => {
       notify(e.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0437\u0434\u0430\u0442\u044C \u0440\u0430\u0437\u043C\u0435\u0440", "error");
     }
   }
+  function buildVariantColorOptionsHtml(selectedId) {
+    let html = '<option value="">\u0426\u0432\u0435\u0442</option>';
+    availableColors.forEach(function(c) {
+      const sel = selectedId != null && Number(c.id) === Number(selectedId) ? " selected" : "";
+      const hex = c.hex_code && String(c.hex_code).trim() ? String(c.hex_code).trim() : "";
+      const label = hex ? c.name + " (" + hex + ")" : c.name;
+      html += '<option value="' + escapeHtml(String(c.id)) + '"' + sel + ">" + escapeHtml(label) + "</option>";
+    });
+    html += '<option value="__new_color__" class="admin-select-action-option">+ \u041D\u043E\u0432\u044B\u0439 \u0446\u0432\u0435\u0442\u2026</option>';
+    return html;
+  }
+  function syncColorQuickHexFields(fromPicker) {
+    const text = document.getElementById("color-quick-hex");
+    const picker = document.getElementById("color-quick-hex-picker");
+    if (!text || !picker) return;
+    if (fromPicker) {
+      text.value = picker.value ? picker.value.toUpperCase() : "";
+    } else if (text.value.trim()) {
+      let h = text.value.trim();
+      if (!h.startsWith("#")) h = "#" + h;
+      if (/^#[0-9A-Fa-f]{6}$/.test(h) || /^#[0-9A-Fa-f]{3}$/.test(h)) {
+        picker.value = h.length === 4 ? "#" + h[1] + h[1] + h[2] + h[2] + h[3] + h[3] : h;
+      }
+    }
+  }
+  function openColorQuickModal(colorSelectEl, prevValue) {
+    const modal = document.getElementById("color-quick-modal");
+    if (!modal) return;
+    const row = colorSelectEl && colorSelectEl.closest(".admin-variant-row");
+    const idx = row && row.parentElement ? Array.prototype.indexOf.call(row.parentElement.children, row) : -1;
+    colorQuickRevert = colorSelectEl ? {
+      sel: colorSelectEl,
+      val: prevValue != null ? String(prevValue) : "",
+      variantIndex: idx >= 0 ? idx : null
+    } : null;
+    if (colorSelectEl) colorSelectEl.value = colorQuickRevert.val;
+    const n = document.getElementById("color-quick-name");
+    const h = document.getElementById("color-quick-hex");
+    const p = document.getElementById("color-quick-hex-picker");
+    ["err-color-quick-name", "err-color-quick-hex"].forEach(function(id) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = "";
+    });
+    if (n) n.value = "";
+    if (h) h.value = "";
+    if (p) p.value = "#888888";
+    openModal(modal);
+  }
+  function dismissColorQuickModal() {
+    if (colorQuickRevert && colorQuickRevert.sel) {
+      colorQuickRevert.sel.value = colorQuickRevert.val || "";
+    }
+    colorQuickRevert = null;
+    const m = document.getElementById("color-quick-modal");
+    if (m) closeModal(m);
+  }
+  async function saveColorQuickFromModal() {
+    const nEl = document.getElementById("color-quick-name");
+    const hEl = document.getElementById("color-quick-hex");
+    const en = document.getElementById("err-color-quick-name");
+    const eh = document.getElementById("err-color-quick-hex");
+    const name = nEl ? nEl.value.trim() : "";
+    if (!name) {
+      if (en) en.textContent = "\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435";
+      return;
+    }
+    if (en) en.textContent = "";
+    if (eh) eh.textContent = "";
+    const body = { name };
+    syncColorQuickHexFields(false);
+    const hex = hEl && hEl.value.trim();
+    if (hex) body.hex_code = hex;
+    const rev = colorQuickRevert;
+    try {
+      const r = await apiFetch("/api/admin/colors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (!r.ok) {
+        let msg = "\u041A\u043E\u0434 " + r.status;
+        try {
+          const j = await r.json();
+          if (j.error) msg = j.error;
+        } catch (e2) {
+        }
+        throw new Error(msg);
+      }
+      const row = await r.json();
+      const newId = Number(row.id);
+      await fetchColors();
+      const idx = rev != null ? Number(rev.variantIndex) : NaN;
+      if (Number.isFinite(idx) && productVariants[idx]) {
+        productVariants[idx].color_id = newId;
+      }
+      colorQuickRevert = null;
+      dismissColorQuickModal();
+      await renderVariantsList();
+      notify("\u0426\u0432\u0435\u0442 \xAB" + name + "\xBB \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D", "success");
+    } catch (e) {
+      if (eh && e.message && String(e.message).toLowerCase().includes("hex")) {
+        eh.textContent = e.message;
+      } else {
+        notify(e.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0437\u0434\u0430\u0442\u044C \u0446\u0432\u0435\u0442", "error");
+      }
+    }
+  }
+  function bindColorQuickModalOnce() {
+    const cm = document.getElementById("color-quick-modal");
+    if (cm && !cm.dataset.bound) {
+      cm.dataset.bound = "1";
+      const x = cm.querySelector(".color-quick-modal-close");
+      const c = document.getElementById("color-quick-cancel-btn");
+      const s = document.getElementById("color-quick-save-btn");
+      const hex = document.getElementById("color-quick-hex");
+      const picker = document.getElementById("color-quick-hex-picker");
+      if (x) x.onclick = dismissColorQuickModal;
+      if (c) c.onclick = dismissColorQuickModal;
+      if (s) s.onclick = saveColorQuickFromModal;
+      if (hex) hex.addEventListener("input", function() {
+        syncColorQuickHexFields(false);
+      });
+      if (picker) picker.addEventListener("input", function() {
+        syncColorQuickHexFields(true);
+      });
+      cm.addEventListener("click", function(e) {
+        if (e.target === cm) dismissColorQuickModal();
+      });
+    }
+  }
+  function bindVariantColorNewOptionOnce() {
+    const c = ui.productVariantsContainer;
+    if (!c || c.dataset.colorNewDeleg) return;
+    c.dataset.colorNewDeleg = "1";
+    c.addEventListener("change", function(ev) {
+      const sel = ev.target.closest(".variant-color");
+      if (!sel || !c.contains(sel)) return;
+      if (sel.value === "__new_color__") {
+        const prev = sel.dataset.prevColor != null ? sel.dataset.prevColor : "";
+        sel.value = prev || "";
+        openColorQuickModal(sel, prev);
+      } else {
+        sel.dataset.prevColor = sel.value;
+      }
+    });
+  }
   function bindSizeQuickModalOnce() {
     const sm = document.getElementById("size-quick-modal");
     if (sm && !sm.dataset.bound) {
@@ -1322,6 +1470,141 @@ const Admin = (() => {
         if (e.target === bm) dismissBrandQuickModal();
       });
     }
+  }
+  function openCategoryQuickModal(preferredParentId) {
+    const modal = document.getElementById("category-quick-modal");
+    if (!modal) return;
+    const n = document.getElementById("category-quick-name");
+    const s = document.getElementById("category-quick-slug");
+    const p = document.getElementById("category-quick-parent");
+    const isParentChk = document.getElementById("category-quick-is-parent");
+    ["err-category-quick-name", "err-category-quick-slug", "err-category-quick-parent"].forEach(function(id) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = "";
+    });
+    if (n) n.value = "";
+    if (s) s.value = "";
+    if (isParentChk) isParentChk.checked = false;
+    let parentPreset = preferredParentId;
+    if (parentPreset == null || parentPreset === "") {
+      const catSel = document.getElementById("product-category");
+      const cid = catSel && catSel.value ? Number(catSel.value) : NaN;
+      if (Number.isFinite(cid) && cid > 0) {
+        const cur = categories.find(function(c) {
+          return Number(c.id) === cid;
+        });
+        if (cur && cur.parent_id != null) parentPreset = cur.parent_id;
+      }
+    }
+    populateCategoryParentSelect(p, parentPreset);
+    updateCategoryQuickModalUi();
+    openModal(modal);
+  }
+  function dismissCategoryQuickModal() {
+    if (categoryQuickRevert && categoryQuickRevert.sel) {
+      categoryQuickRevert.sel.value = categoryQuickRevert.val || "";
+    }
+    categoryQuickRevert = null;
+    const isParentChk = document.getElementById("category-quick-is-parent");
+    if (isParentChk) isParentChk.checked = false;
+    const m = document.getElementById("category-quick-modal");
+    if (m) closeModal(m);
+  }
+  async function saveCategoryQuickFromModal() {
+    const nEl = document.getElementById("category-quick-name");
+    const sEl = document.getElementById("category-quick-slug");
+    const pEl = document.getElementById("category-quick-parent");
+    const isParentChk = document.getElementById("category-quick-is-parent");
+    const en = document.getElementById("err-category-quick-name");
+    const ep = document.getElementById("err-category-quick-parent");
+    const name = nEl ? nEl.value.trim() : "";
+    const isParent = !!(isParentChk && isParentChk.checked && isSuperadminSession());
+    const parentId = pEl ? pEl.value.trim() : "";
+    if (!name) {
+      if (en) en.textContent = "\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u0435";
+      return;
+    }
+    if (en) en.textContent = "";
+    if (!isParent && !parentId) {
+      if (ep) ep.textContent = "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0440\u043E\u0434\u0438\u0442\u0435\u043B\u044C\u0441\u043A\u0443\u044E \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044E";
+      return;
+    }
+    if (ep) ep.textContent = "";
+    const body = { name };
+    if (isParent) body.is_parent_category = true;
+    else body.parent_id = Number(parentId);
+    const slug = sEl && sEl.value.trim();
+    if (slug) body.slug = slug;
+    try {
+      const r = await apiFetch("/api/admin/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      if (!r.ok) {
+        let msg = "\u041A\u043E\u0434 " + r.status;
+        try {
+          const j = await r.json();
+          if (j.error) msg = j.error;
+        } catch (e2) {
+        }
+        throw new Error(msg);
+      }
+      const row = await r.json();
+      const newId = Number(row.id);
+      await fetchCategories();
+      populateFilterCategoryDropdown();
+      const catSel = document.getElementById("product-category");
+      if (catSel && !isParent) {
+        populateCategorySelect(catSel, newId);
+        catSel.dataset.prevCategory = String(newId);
+        await refreshProductCategorySizes();
+      } else if (catSel) {
+        populateCategorySelect(catSel, catSel.dataset.prevCategory || "");
+      }
+      categoryQuickRevert = null;
+      dismissCategoryQuickModal();
+      notify(
+        isParent
+          ? "\u0420\u0430\u0437\u0434\u0435\u043B \xAB" + name + "\xBB \u0441\u043E\u0437\u0434\u0430\u043D"
+          : "\u041F\u043E\u0434\u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044F \xAB" + name + "\xBB \u0441\u043E\u0437\u0434\u0430\u043D\u0430",
+        "success"
+      );
+    } catch (e) {
+      notify(e.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0437\u0434\u0430\u0442\u044C \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044E", "error");
+    }
+  }
+  function bindCategoryQuickModalOnce() {
+    const cm = document.getElementById("category-quick-modal");
+    if (cm && !cm.dataset.bound) {
+      cm.dataset.bound = "1";
+      const x = cm.querySelector(".category-quick-modal-close");
+      const c = document.getElementById("category-quick-cancel-btn");
+      const s = document.getElementById("category-quick-save-btn");
+      if (x) x.onclick = dismissCategoryQuickModal;
+      if (c) c.onclick = dismissCategoryQuickModal;
+      if (s) s.onclick = saveCategoryQuickFromModal;
+      const isParentChk = document.getElementById("category-quick-is-parent");
+      if (isParentChk) isParentChk.addEventListener("change", updateCategoryQuickModalUi);
+      cm.addEventListener("click", function(e) {
+        if (e.target === cm) dismissCategoryQuickModal();
+      });
+    }
+  }
+  function bindProductCategoryNewOptionOnce() {
+    const cat = document.getElementById("product-category");
+    if (!cat || cat.dataset.catNewDeleg) return;
+    cat.dataset.catNewDeleg = "1";
+    cat.addEventListener("change", function() {
+      if (cat.value === "__new_category__") {
+        const prev = cat.dataset.prevCategory != null ? cat.dataset.prevCategory : "";
+        cat.value = prev || "";
+        categoryQuickRevert = { sel: cat, val: prev || "" };
+        openCategoryQuickModal();
+      } else {
+        cat.dataset.prevCategory = cat.value;
+      }
+    });
   }
   function bindVariantSizeSelectDelegationOnce() {
     const c = ui.productVariantsContainer;
@@ -1434,7 +1717,9 @@ const Admin = (() => {
         name: item.name,
         slug: item.slug,
         depth,
-        parent_id: item.parent_id != null && item.parent_id !== "" ? Number(item.parent_id) : null
+        parent_id: item.parent_id != null && item.parent_id !== "" ? Number(item.parent_id) : null,
+        is_leaf: item.is_leaf === true || !(Array.isArray(item.children) && item.children.length),
+        sort_order: item.sort_order != null ? Number(item.sort_order) : 0
       });
       if (Array.isArray(item.children) && item.children.length) {
         result.push.apply(result, flattenCategories(item.children, depth + 1));
@@ -1534,6 +1819,67 @@ const Admin = (() => {
     });
     return set;
   }
+  function categoryPathLabel(cat) {
+    if (!cat) return "";
+    const names = [cat.name || ""];
+    let pid = cat.parent_id;
+    let guard = 0;
+    while (pid != null && guard < 24) {
+      const p = categories.find(function(c) {
+        return Number(c.id) === Number(pid);
+      });
+      if (!p) break;
+      if (p.slug === "catalog-root") break;
+      names.unshift(p.name || "");
+      pid = p.parent_id;
+      guard += 1;
+    }
+    return names.filter(Boolean).join(" \u2192 ");
+  }
+  function categoryLeafRows() {
+    const parentIds = categoryParentIdsWithChildren();
+    return categories.filter(function(c) {
+      return c.slug !== "catalog-root" && !parentIds.has(Number(c.id));
+    });
+  }
+  function populateCategoryParentSelect(selectEl, selectedId) {
+    if (!selectEl) return;
+    const parentIds = categoryParentIdsWithChildren();
+    selectEl.innerHTML = '<option value="">\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0440\u043E\u0434\u0438\u0442\u0435\u043B\u044F</option>';
+    categories.forEach(function(cat) {
+      if (!cat || cat.slug === "catalog-root") return;
+      const canBeParent = parentIds.has(Number(cat.id)) || (cat.depth === 0);
+      if (!canBeParent) return;
+      const prefix = "\xA0\xA0".repeat(cat.depth);
+      const opt = document.createElement("option");
+      opt.value = cat.id;
+      opt.textContent = prefix + (cat.name || cat.slug || cat.id);
+      if (selectedId != null && Number(cat.id) === Number(selectedId)) opt.selected = true;
+      selectEl.appendChild(opt);
+    });
+  }
+  function updateCategoryQuickModalUi() {
+    const modeRow = document.getElementById("category-quick-parent-mode-row");
+    const parentRow = document.getElementById("category-quick-parent-row");
+    const isParentChk = document.getElementById("category-quick-is-parent");
+    const parentSel = document.getElementById("category-quick-parent");
+    const superadmin = isSuperadminSession();
+    if (!superadmin && isParentChk) isParentChk.checked = false;
+    if (modeRow) {
+      modeRow.hidden = !superadmin;
+      modeRow.style.display = superadmin ? "" : "none";
+    }
+    const isParent = superadmin && !!(isParentChk && isParentChk.checked);
+    if (parentRow) {
+      parentRow.hidden = isParent;
+      parentRow.style.display = isParent ? "none" : "";
+    }
+    if (parentSel) parentSel.required = !isParent;
+    const title = document.getElementById("category-quick-modal-title");
+    if (title) {
+      title.textContent = isParent ? "\u041D\u043E\u0432\u044B\u0439 \u0440\u0430\u0437\u0434\u0435\u043B \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430" : "\u041D\u043E\u0432\u0430\u044F \u043F\u043E\u0434\u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044F";
+    }
+  }
   function pruneStateCategoryParents() {
     if (!Array.isArray(state.categories) || !state.categories.length || !categories.length) return;
     const parentIds = categoryParentIdsWithChildren();
@@ -1551,19 +1897,18 @@ const Admin = (() => {
   function populateCategorySelect(selectEl, selectedId) {
     if (!selectEl) return;
     selectEl.innerHTML = '<option value="">\u041A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044F</option>';
-    const parentIds = categoryParentIdsWithChildren();
-    categories.forEach(function(cat) {
-      const prefix = "\xA0\xA0".repeat(cat.depth);
+    categoryLeafRows().forEach(function(cat) {
       const opt = document.createElement("option");
       opt.value = cat.id;
-      opt.textContent = prefix + cat.name;
+      opt.textContent = categoryPathLabel(cat);
       if (selectedId != null && Number(cat.id) === Number(selectedId)) opt.selected = true;
-      if (parentIds.has(Number(cat.id))) {
-        opt.disabled = true;
-        opt.title = "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043A\u043E\u043D\u0435\u0447\u043D\u0443\u044E \u043F\u043E\u0434\u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044E";
-      }
       selectEl.appendChild(opt);
     });
+    const oa = document.createElement("option");
+    oa.value = "__new_category__";
+    oa.textContent = "+ \u041D\u043E\u0432\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044F\u2026";
+    oa.className = "admin-select-action-option";
+    selectEl.appendChild(oa);
   }
   function populateBrandSelect(selectEl, selectedId) {
     if (!selectEl) return;
@@ -1593,7 +1938,8 @@ const Admin = (() => {
       const prefix = "\xA0\xA0".repeat(cat.depth);
       const label = document.createElement("label");
       label.className = "admin-multiselect-option";
-      label.innerHTML = '<input type="checkbox" value="' + escapeHtml(String(cat.id)) + '" /><span>' + prefix + escapeHtml(cat.name) + "</span>";
+      const slugVal = cat.slug || String(cat.id);
+      label.innerHTML = '<input type="checkbox" value="' + escapeHtml(slugVal) + '" /><span>' + prefix + escapeHtml(cat.name) + "</span>";
       if (parentIds.has(Number(cat.id))) {
         label.classList.add("admin-multiselect-option--disabled");
         label.title = "\u0420\u043E\u0434\u0438\u0442\u0435\u043B\u044C\u0441\u043A\u0430\u044F \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044F \u2014 \u043E\u0442\u043C\u0435\u0442\u044C\u0442\u0435 \u0432\u043B\u043E\u0436\u0435\u043D\u043D\u0443\u044E";
@@ -2723,9 +3069,7 @@ const Admin = (() => {
     productVariants.forEach(function(v, i) {
       const div = document.createElement("div");
       div.className = "admin-variant-row";
-      const colorOptions = '<option value="">\u0426\u0432\u0435\u0442</option>' + availableColors.map(function(c) {
-        return '<option value="' + c.id + '"' + (Number(v.color_id) === Number(c.id) ? " selected" : "") + ">" + escapeHtml(c.name) + "</option>";
-      }).join("");
+      const colorOptions = buildVariantColorOptionsHtml(v.color_id);
       div.innerHTML = '<div class="variant-size-cell"></div><select class="variant-color">' + colorOptions + '</select><input type="text" class="variant-art" placeholder="\u0410\u0440\u0442\u0438\u043A\u0443\u043B SKU; \u043F\u0443\u0441\u0442\u043E \u2014 \u0430\u0432\u0442\u043E" value="' + escapeHtml(v.art || "") + '" /><button type="button" class="btn btn--primary btn--small btn-variant-same-color" data-index="' + i + '" title="\u0422\u043E\u0442 \u0436\u0435 \u0446\u0432\u0435\u0442 \u2014 \u043D\u043E\u0432\u0430\u044F \u0441\u0442\u0440\u043E\u043A\u0430 \u0441 \u0434\u0440\u0443\u0433\u0438\u043C \u0440\u0430\u0437\u043C\u0435\u0440\u043E\u043C">+ \u0432\u0430\u0440\u0438\u0430\u043D\u0442</button><label class="checkbox-label variant-active-label"><input type="checkbox" class="variant-active" ' + (v.is_active !== false ? "checked" : "") + ' /><span class="checkbox-custom"></span><span>\u0412\u0438\u0434\u0438\u043C\u043E\u0441\u0442\u044C</span></label><button type="button" class="btn-row-remove" data-index="' + i + '" title="\u0423\u0434\u0430\u043B\u0438\u0442\u044C" aria-label="\u0423\u0434\u0430\u043B\u0438\u0442\u044C"><img src="/img/disagree.svg" alt="" class="admin-remove-row-icon" decoding="async"></button>';
       const sizeCell = div.querySelector(".variant-size-cell");
       const h = SC.mountVariantCell(sizeCell, {
@@ -3592,6 +3936,10 @@ const Admin = (() => {
     bindProductBrandNewOptionOnce();
     bindProductCategoryForVariantsOnce();
     bindBrandQuickModalOnce();
+    bindColorQuickModalOnce();
+    bindVariantColorNewOptionOnce();
+    bindCategoryQuickModalOnce();
+    bindProductCategoryNewOptionOnce();
     ui.visibilityConfirmModal = document.getElementById("visibility-confirm-modal");
     ui.adminLogoutModal = document.getElementById("admin-logout-confirm-modal");
     const logoutBtn = document.getElementById("logout-btn");
