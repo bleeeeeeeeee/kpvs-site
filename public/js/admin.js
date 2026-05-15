@@ -926,21 +926,32 @@ const Admin = (() => {
       return Number.isFinite(s.id);
     }) : [];
   }
+  function isValidProductCategoryIdForSizes(raw) {
+    const id = String(raw || "").trim();
+    if (!id || id === "__new_category__") return false;
+    const n = Number(id);
+    return Number.isFinite(n) && n > 0;
+  }
+  async function fetchSizesForCategoryId(categoryId) {
+    const id = String(categoryId || "").trim();
+    if (!isValidProductCategoryIdForSizes(id)) return [];
+    const r = await apiFetch("/api/sizes?category_id=" + encodeURIComponent(id));
+    if (!r.ok) throw new Error("sizes_fetch_failed");
+    return mapSizesApiRows(await r.json());
+  }
   async function refreshProductCategorySizes() {
     const catEl = document.getElementById("product-category");
     const id = catEl && catEl.value ? String(catEl.value).trim() : "";
-    if (!id) {
+    if (!isValidProductCategoryIdForSizes(id)) {
       productCategorySizesList = [];
       productCategorySizesCatId = "";
       return;
     }
     try {
-      const r = await apiFetch("/api/sizes?category_id=" + encodeURIComponent(id));
-      if (!r.ok) throw new Error();
-      const raw = await r.json();
-      const catNow = catEl.value ? String(catEl.value).trim() : "";
+      const rows = await fetchSizesForCategoryId(id);
+      const catNow = catEl && catEl.value ? String(catEl.value).trim() : "";
       if (catNow !== id) return;
-      productCategorySizesList = mapSizesApiRows(raw);
+      productCategorySizesList = rows;
       productCategorySizesCatId = id;
     } catch {
       const catNow = catEl && catEl.value ? String(catEl.value).trim() : "";
@@ -1518,7 +1529,7 @@ const Admin = (() => {
       const src = productVariants[i];
       const colorId = src && src.color_id != null ? src.color_id : null;
       productVariants.splice(i + 1, 0, { size_id: null, color_id: colorId, art: "", is_active: true });
-      renderVariantsList();
+      void renderVariantsList();
     });
   }
   function normalizeVariantArtsForSave(baseArt, variants) {
@@ -1628,7 +1639,7 @@ const Admin = (() => {
       return Number(s.id) === sid;
     });
     if (!row) return "\u0420\u0430\u0437\u043C\u0435\u0440 #" + sid;
-    const hint = row.equivalent_hint && String(row.equivalent_hint).trim() ? " \xB7 " + row.equivalent_hint : "";
+    const hint = row.equivalent_hint && String(row.equivalent_hint).trim() ? " \u2014 " + row.equivalent_hint : "";
     return String(row.value) + " (" + row.size_type + ")" + hint;
   }
   function categoryParentIdsWithChildren() {
@@ -2160,9 +2171,7 @@ const Admin = (() => {
       adminFilterSizeCascadeHandle = window.KpvsSizeCascade.mount(sizeCascadeEl, {
         categories,
         loadSizes: function(id) {
-          return apiFetch("/api/sizes?category_id=" + encodeURIComponent(id)).then(function(r) {
-            return r.ok ? r.json() : [];
-          });
+          return fetchSizesForCategoryId(id);
         },
         mode: "multi",
         inputName: "size_id",
@@ -2865,9 +2874,9 @@ const Admin = (() => {
       openAdminOverlayModal(exitDraft, pm ? [pm] : null);
     }
   }
-  function renderVariantsList() {
+  async function renderVariantsList() {
     const container = ui.productVariantsContainer;
-    if (!container) return Promise.resolve();
+    if (!container) return;
     Array.from(container.querySelectorAll(".variant-size-cell")).forEach(function(w) {
       if (w._sizeCascadeHandle && typeof w._sizeCascadeHandle.destroy === "function") {
         w._sizeCascadeHandle.destroy();
@@ -2876,16 +2885,25 @@ const Admin = (() => {
     container.innerHTML = "";
     if (!productVariants.length) {
       container.innerHTML = '<p class="admin-empty-hint">\u041D\u0435\u0442 \u0432\u0430\u0440\u0438\u0430\u043D\u0442\u043E\u0432. \u041D\u0430\u0436\u043C\u0438\u0442\u0435 \xAB+ \u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432\u0430\u0440\u0438\u0430\u043D\u0442\xBB.</p>';
-      return Promise.resolve();
+      return;
     }
     sortProductVariantsInPlace();
     const catEl = document.getElementById("product-category");
-    const catId = catEl && catEl.value ? catEl.value : "";
-    const catLabel = catEl && catEl.options && catEl.selectedIndex >= 0 ? String(catEl.options[catEl.selectedIndex].text || "") : "";
+    const catId = catEl && catEl.value ? String(catEl.value).trim() : "";
+    if (isValidProductCategoryIdForSizes(catId)) {
+      await refreshProductCategorySizes();
+    } else {
+      productCategorySizesList = [];
+      productCategorySizesCatId = "";
+    }
+    const sizeRows =
+      productCategorySizesCatId === catId && Array.isArray(productCategorySizesList)
+        ? productCategorySizesList.slice()
+        : [];
     const SC = window.KpvsSizeCascade;
     if (!SC || typeof SC.mountVariantCell !== "function") {
       container.innerHTML = '<p class="admin-empty-hint">\u041F\u043E\u0434\u043A\u043B\u044E\u0447\u0438\u0442\u0435 /js/size-cascade.js</p>';
-      return Promise.resolve();
+      return;
     }
     const sizeCellReadyPromises = [];
     productVariants.forEach(function(v, i) {
@@ -2897,12 +2915,9 @@ const Admin = (() => {
       const h = SC.mountVariantCell(sizeCell, {
         variantIndex: i,
         defaultCategoryId: catId,
-        categoryLabel: catLabel,
         initialSizeId: v.size_id,
-        loadSizes: function(id) {
-          return apiFetch("/api/sizes?category_id=" + encodeURIComponent(id)).then(function(r) {
-            return r.ok ? r.json() : [];
-          });
+        loadSizes: function() {
+          return Promise.resolve(sizeRows);
         }
       });
       if (h && typeof h.whenReady === "function") {
@@ -3489,7 +3504,7 @@ const Admin = (() => {
       addVariantBtn.onclick = function() {
         collectVariants();
         productVariants.push({ size_id: null, color_id: null, art: "", is_active: true });
-        renderVariantsList();
+        void renderVariantsList();
       };
     }
     if (addAttributeBtn) {

@@ -31,8 +31,7 @@ const {
   COOKIE_SECURE,
   GOOGLE_CLIENT_ID,
   GOOGLE_CLIENT_SECRET,
-  GOOGLE_CALLBACK_URL,
-  allowDebugNdjsonRoute
+  GOOGLE_CALLBACK_URL
 } = httpEnv;
 const app = express();
 const appState = { dbHealthy: false };
@@ -110,7 +109,6 @@ const routeCtx = {
   requireUserJwt,
   upload,
   PUB_ROOT,
-  allowDebugNdjsonRoute,
   csrfProtection,
   publicMediaUrl: db.publicMediaUrl
 };
@@ -126,7 +124,7 @@ app.get("/apple-touch-icon.png", (req, res) => {
 app.get("/", (req, res) => res.redirect("/welcome.html"));
 mountMediaRoutes(app, routeCtx);
 app.use((req, res, next) => {
-  if (req.path === "/health" || req.path === "/api/__debug_ndjson") return next();
+  if (req.path === "/health") return next();
   if (!appState.dbHealthy && typeof req.path === "string" && req.path.startsWith("/api")) {
     return res.status(503).type("application/json").json({ error: "\u0421\u0435\u0440\u0432\u0438\u0441 \u0431\u0430\u0437\u044B \u0434\u0430\u043D\u043D\u044B\u0445 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D" });
   }

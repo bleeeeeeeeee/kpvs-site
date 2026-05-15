@@ -4,6 +4,13 @@
     if (str == null) return "";
     return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
+  function sizeOptionTitle(value, equivalentHint) {
+    const v = String(value != null ? value : "").trim();
+    const h = equivalentHint != null ? String(equivalentHint).trim() : "";
+    if (!h) return v;
+    const full = v + " \u2014 " + h;
+    return full.length > 220 ? full.slice(0, 217) + "\u2026" : full;
+  }
   function euLetterClothingRank(raw) {
     const v = String(raw != null ? raw : "").trim().toLowerCase().replace(/\s+/g, "");
     if (v === "2xs" || v === "xxs") return 1;
@@ -106,12 +113,13 @@
       colSizes.appendChild(h);
       g.sizes.forEach(function(s) {
         const id = String(s.id);
-        const hint = s.equivalent_hint && String(s.equivalent_hint).trim() ? ' <span class="size-cascade-hint-inline">(' + escapeHtml(String(s.equivalent_hint)) + ")</span>" : "";
+        const title = sizeOptionTitle(s.value, s.equivalent_hint);
         if (mode === "multi") {
           const lab = document.createElement("label");
           lab.className = "size-cascade-check";
+          lab.title = title;
           const ck = checkedSet.has(id);
-          lab.innerHTML = '<input type="checkbox" name="' + escapeHtml(inputName) + '" value="' + escapeHtml(id) + '"' + (ck ? " checked" : "") + " /><span>" + escapeHtml(String(s.value)) + hint + "</span>";
+          lab.innerHTML = '<input type="checkbox" name="' + escapeHtml(inputName) + '" value="' + escapeHtml(id) + '"' + (ck ? " checked" : "") + " /><span>" + escapeHtml(String(s.value)) + "</span>";
           const inp = lab.querySelector("input");
           inp.addEventListener("change", function() {
             if (inp.checked) checkedSet.add(id);
@@ -124,7 +132,8 @@
           btn.type = "button";
           btn.className = "size-cascade-item size-cascade-size";
           btn.dataset.sizeId = id;
-          btn.innerHTML = escapeHtml(String(s.value)) + hint;
+          btn.title = title;
+          btn.textContent = String(s.value);
           colSizes.appendChild(btn);
         }
       });
@@ -239,9 +248,10 @@
     const sel = wrap.querySelector(".variant-size");
     let refillPromise = Promise.resolve();
     let refillSeq = 0;
-    function hintSuffix(s) {
-      if (!s.equivalent_hint || !String(s.equivalent_hint).trim()) return "";
-      return " (" + String(s.equivalent_hint).trim() + ")";
+    function applySizeOptionEl(o, s) {
+      const title = sizeOptionTitle(s.value, s.equivalent_hint);
+      o.textContent = String(s.value);
+      o.title = title;
     }
     async function refill() {
       if (!sel) return;
@@ -273,7 +283,7 @@
           g.sizes.forEach(function(s) {
             const o = document.createElement("option");
             o.value = String(s.id);
-            o.textContent = String(s.value) + hintSuffix(s);
+            applySizeOptionEl(o, s);
             og.appendChild(o);
           });
           sel.appendChild(og);

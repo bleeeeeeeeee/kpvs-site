@@ -786,7 +786,7 @@ const Catalog = (() => {
     if (clearAll) {
       clearAll.addEventListener("click", function() {
         currentSearch = "";
-        activeFilters = { categories: [], brands: [], seasons: [], sizes: [], colors: [], collections: [] };
+        activeFilters = { categories: [], brands: [], seasons: [], sizes: [], sizeLabels: {}, colors: [], collections: [] };
         const inp = document.getElementById("catalog-search");
         if (inp) inp.value = "";
         updateSearchClear();
@@ -951,7 +951,7 @@ const Catalog = (() => {
       renderProducts();
     });
     modal.querySelector(".catalog-filter-clear-btn").addEventListener("click", function() {
-      activeFilters = { categories: [], brands: [], seasons: [], sizes: [], colors: [], collections: [] };
+      activeFilters = { categories: [], brands: [], seasons: [], sizes: [], sizeLabels: {}, colors: [], collections: [] };
       window.kpvsDismissTopModal(modal);
       saveCatalogStateToStorage();
       renderProducts();

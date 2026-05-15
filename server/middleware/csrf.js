@@ -16,7 +16,6 @@ function skipPublicAuthMutations(req) {
   ]);
   if (open.has(p)) return true;
   if (p.startsWith("/api/user/oauth/")) return true;
-  if (p === "/api/__debug_ndjson") return true;
   return false;
 }
 

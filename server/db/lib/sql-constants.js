@@ -1,15 +1,15 @@
 const otherScalesHintSubquery = `
     (
-        SELECT string_agg(partner_label, ' \xB7 ' ORDER BY partner_label)
-        FROM (
-            SELECT DISTINCT ste.name || ': ' || sp.value AS partner_label
-            FROM size_group_members m_self
-            JOIN size_group_members m_other
-              ON m_other.group_id = m_self.group_id AND m_other.size_id <> m_self.size_id
-            JOIN sizes sp ON sp.id = m_other.size_id
-            JOIN size_types ste ON ste.id = sp.size_type_id
-            WHERE m_self.size_id = s.id
-        ) eqs
+        SELECT string_agg(sm2.value, ', ' ORDER BY sm2.value)
+        FROM size_group_members sgm2
+        JOIN sizes sm2 ON sgm2.size_id = sm2.id
+        WHERE sgm2.group_id = (
+            SELECT sgm.group_id
+            FROM size_group_members sgm
+            WHERE sgm.size_id = s.id
+            LIMIT 1
+        )
+        AND sm2.id <> s.id
     )
 `;
 const otherScalesHintSqlColumn = `${otherScalesHintSubquery} AS equivalent_hint`;
