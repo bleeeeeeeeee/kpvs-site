@@ -47,8 +47,6 @@ const Admin = (() => {
   let productCategorySizesCatId = "";
   let availableColors = [];
   let availableCollections = [];
-  let availableSizeTypes = [];
-  let sizeQuickRevert = null;
   let brandQuickRevert = null;
   let categoryQuickRevert = null;
   let colorQuickRevert = null;
@@ -963,15 +961,6 @@ const Admin = (() => {
       }
     }
   }
-  function allowedSizeTypeIdsForProductForm() {
-    const set = new Set();
-    (productCategorySizesList || []).forEach(function(s) {
-      if (s.size_type_id != null && Number.isFinite(Number(s.size_type_id))) {
-        set.add(Number(s.size_type_id));
-      }
-    });
-    return set;
-  }
   async function fetchColors() {
     try {
       const r = await apiFetch("/api/colors");
@@ -1026,26 +1015,6 @@ const Admin = (() => {
     } catch (e) {
       availableCollections = [];
       notify("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u043F\u043E\u0434\u0431\u043E\u0440\u043A\u0438", "error");
-    }
-  }
-  async function fetchSizeTypes() {
-    try {
-      const r = await apiFetch("/api/admin/size-types");
-      if (!r.ok) throw new Error();
-      const raw = await r.json();
-      availableSizeTypes = Array.isArray(raw) ? raw.map(function(t) {
-        return {
-          id: Number(t.id),
-          name: t.name || "",
-          slug: t.slug != null ? String(t.slug) : ""
-        };
-      }).filter(function(t) {
-        return Number.isFinite(t.id);
-      }) : [];
-      if (!availableSizeTypes.length) notify("\u0422\u0438\u043F\u044B \u0440\u0430\u0437\u043C\u0435\u0440\u043E\u0432 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B \u0432 \u0431\u0430\u0437\u0435", "error");
-    } catch {
-      availableSizeTypes = [];
-      notify("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0442\u0438\u043F\u044B \u0440\u0430\u0437\u043C\u0435\u0440\u043E\u0432", "error");
     }
   }
   function openCollectionModal(row) {
@@ -1137,101 +1106,6 @@ const Admin = (() => {
       cm.addEventListener("click", function(e) {
         if (e.target === cm) closeCollectionModal();
       });
-    }
-  }
-  function populateSizeQuickTypeSelect(allowedTypeIds) {
-    const sel = document.getElementById("size-quick-type");
-    const hint = document.getElementById("size-quick-type-hint");
-    if (!sel) return;
-    let list = availableSizeTypes.slice();
-    if (allowedTypeIds && allowedTypeIds.size) {
-      list = list.filter(function(t) {
-        return allowedTypeIds.has(Number(t.id));
-      });
-    }
-    if (!list.length) {
-      sel.innerHTML = '<option value="">(\u043D\u0435\u0442 \u0442\u0438\u043F\u043E\u0432)</option>';
-      if (hint) {
-        hint.textContent = "\u0422\u0438\u043F\u044B \u0440\u0430\u0437\u043C\u0435\u0440\u043E\u0432 \u043D\u0435 \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u044B \u0438\u043B\u0438 \u043D\u0435 \u0441\u043E\u043F\u043E\u0441\u0442\u0430\u0432\u043B\u0435\u043D\u044B \u0441 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0435\u0439. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443 \u043F\u043E\u0441\u043B\u0435 \u043F\u0440\u0430\u0432\u043E\u043A \u0432 \u0431\u0430\u0437\u0435.";
-      }
-      return;
-    }
-    sel.innerHTML = list.map(function(t) {
-      return '<option value="' + escapeHtml(String(t.id)) + '">' + escapeHtml(t.name) + "</option>";
-    }).join("");
-    if (hint) {
-      hint.textContent = allowedTypeIds && allowedTypeIds.size ? "\u0422\u043E\u043B\u044C\u043A\u043E \u0442\u0438\u043F\u044B, \u0434\u043E\u043F\u0443\u0441\u0442\u0438\u043C\u044B\u0435 \u0434\u043B\u044F \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u043E\u0439 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0438 \u0442\u043E\u0432\u0430\u0440\u0430 (\u0438 \u0435\u0451 \u0440\u043E\u0434\u0438\u0442\u0435\u043B\u0435\u0439)." : "\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0442\u0438\u043F, \u043A \u043A\u043E\u0442\u043E\u0440\u043E\u043C\u0443 \u043E\u0442\u043D\u043E\u0441\u0438\u0442\u0441\u044F \u043E\u0431\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 (\u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 \u043E\u0434\u0435\u0436\u0434\u0430 \u0438\u043B\u0438 \u043E\u0431\u0443\u0432\u044C).";
-    }
-  }
-  function openSizeQuickModal(sizeSelectEl, prevValue) {
-    const modal = document.getElementById("size-quick-modal");
-    if (!modal) return;
-    const vi = sizeSelectEl && sizeSelectEl.dataset.variantIndex != null ? Number(sizeSelectEl.dataset.variantIndex) : NaN;
-    sizeQuickRevert = sizeSelectEl ? {
-      sel: sizeSelectEl,
-      val: prevValue != null ? String(prevValue) : "",
-      variantIndex: Number.isFinite(vi) ? vi : null
-    } : null;
-    if (sizeSelectEl) sizeSelectEl.value = sizeQuickRevert.val;
-    const allowed = allowedSizeTypeIdsForProductForm();
-    populateSizeQuickTypeSelect(allowed.size ? allowed : null);
-    const v = document.getElementById("size-quick-value");
-    const e = document.getElementById("err-size-quick");
-    if (v) v.value = "";
-    if (e) e.textContent = "";
-    openModal(modal);
-  }
-  function dismissSizeQuickModal() {
-    if (sizeQuickRevert && sizeQuickRevert.sel) {
-      sizeQuickRevert.sel.value = sizeQuickRevert.val || "";
-    }
-    sizeQuickRevert = null;
-    const m = document.getElementById("size-quick-modal");
-    if (m) closeModal(m);
-  }
-  async function saveSizeQuickFromModal() {
-    const vEl = document.getElementById("size-quick-value");
-    const tEl = document.getElementById("size-quick-type");
-    const err = document.getElementById("err-size-quick");
-    const val = vEl ? vEl.value.trim() : "";
-    if (!val) {
-      if (err) err.textContent = "\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u0440\u0430\u0437\u043C\u0435\u0440";
-      return;
-    }
-    if (err) err.textContent = "";
-    const body = { value: val };
-    if (tEl && tEl.value) body.size_type_id = Number(tEl.value);
-    const rev = sizeQuickRevert;
-    try {
-      const r = await apiFetch("/api/admin/sizes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body)
-      });
-      if (!r.ok) {
-        let msg = "\u041A\u043E\u0434 " + r.status;
-        try {
-          const j = await r.json();
-          if (j.error) msg = j.error;
-        } catch (e2) {
-        }
-        throw new Error(msg);
-      }
-      const inserted = await r.json();
-      const newId = Number(inserted.id);
-      await fetchSizes();
-      await refreshProductCategorySizes();
-      const idx = rev != null ? Number(rev.variantIndex) : NaN;
-      if (Number.isFinite(idx) && productVariants[idx]) {
-        productVariants[idx].size_id = newId;
-      }
-      sizeQuickRevert = null;
-      const m = document.getElementById("size-quick-modal");
-      if (m) closeModal(m);
-      await renderVariantsList();
-      notify("\u0420\u0430\u0437\u043C\u0435\u0440 \xAB" + val + "\xBB \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D", "success");
-    } catch (e) {
-      notify(e.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0437\u0434\u0430\u0442\u044C \u0440\u0430\u0437\u043C\u0435\u0440", "error");
     }
   }
   function buildVariantColorOptionsHtml(selectedId) {
@@ -1379,21 +1253,6 @@ const Admin = (() => {
         sel.dataset.prevColor = sel.value;
       }
     });
-  }
-  function bindSizeQuickModalOnce() {
-    const sm = document.getElementById("size-quick-modal");
-    if (sm && !sm.dataset.bound) {
-      sm.dataset.bound = "1";
-      const x = sm.querySelector(".size-quick-modal-close");
-      const c = document.getElementById("size-quick-cancel-btn");
-      const s = document.getElementById("size-quick-save-btn");
-      if (x) x.onclick = dismissSizeQuickModal;
-      if (c) c.onclick = dismissSizeQuickModal;
-      if (s) s.onclick = saveSizeQuickFromModal;
-      sm.addEventListener("click", function(e) {
-        if (e.target === sm) dismissSizeQuickModal();
-      });
-    }
   }
   function openBrandQuickModal() {
     const modal = document.getElementById("brand-quick-modal");
@@ -3081,10 +2940,6 @@ const Admin = (() => {
           return apiFetch("/api/sizes?category_id=" + encodeURIComponent(id)).then(function(r) {
             return r.ok ? r.json() : [];
           });
-        },
-        onNewSize: function(hid) {
-          const prev = hid.dataset.prevValue != null ? hid.dataset.prevValue : "";
-          openSizeQuickModal(hid, prev);
         }
       });
       if (h && typeof h.whenReady === "function") {
@@ -3898,7 +3753,6 @@ const Admin = (() => {
       }
     });
     bindCollectionModalOnce();
-    bindSizeQuickModalOnce();
     setupTableDelegation();
     setupResizableColumns();
     syncAdminDataPanelsVisibility();
@@ -3961,7 +3815,6 @@ const Admin = (() => {
         fetchSizes(),
         fetchColors(),
         fetchCollections(),
-        fetchSizeTypes(),
         fetchReferenceMaterials()
       ]).then(function() {
         populateFilterCategoryDropdown();

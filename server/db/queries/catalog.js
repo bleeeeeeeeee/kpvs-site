@@ -123,12 +123,11 @@ async function validateCategoryIdForProduct(pool, categoryId) {
 async function assertValidParentForCategory(pool, parentId, excludeId) {
   const pid = Number(parentId);
   if (!Number.isFinite(pid) || pid <= 0) throw new Error("Укажите родительскую категорию");
-  const r = await pool.query("SELECT id, slug FROM categories WHERE id = $1", [pid]);
+  const r = await pool.query("SELECT id, slug, parent_id FROM categories WHERE id = $1", [pid]);
   if (!r.rows.length) throw new Error("Родительская категория не найдена");
   if (r.rows[0].slug === CATALOG_ROOT_SLUG) return pid;
-  const parentRow = await pool.query("SELECT parent_id FROM categories WHERE id = $1", [pid]);
-  if (!parentRow.rows.length || parentRow.rows[0].parent_id == null) {
-    throw new Error("Родительская категория должна быть в иерархии каталога");
+  if (r.rows[0].parent_id == null) {
+    await ensureCategoryHierarchy(pool);
   }
   if (excludeId != null && pid === Number(excludeId)) {
     throw new Error("Категория не может быть родителем самой себе");
@@ -150,6 +149,7 @@ async function assertValidParentForCategory(pool, parentId, excludeId) {
 }
 
 async function createCategory(pool, data, ctx = {}) {
+  await ensureCategoryHierarchy(pool);
   const name = String(data.name || "").trim();
   if (!name) throw new Error("Укажите название категории");
   let slug = String(data.slug || "").trim();

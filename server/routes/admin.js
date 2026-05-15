@@ -402,17 +402,6 @@ function mountAdminRoutes(app, ctx) {
       });
     }
   });
-  app.post("/api/admin/sizes", requireAuth, async (req, res) => {
-    try {
-      if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
-        return res.status(400).json({ error: "\u041E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F JSON-\u043E\u0431\u044A\u0435\u043A\u0442" });
-      }
-      res.status(201).json(await db.createSize(req.body));
-    } catch (err) {
-      console.error("POST /api/admin/sizes:", err);
-      res.status(400).json({ error: err.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0437\u0434\u0430\u0442\u044C \u0440\u0430\u0437\u043C\u0435\u0440" });
-    }
-  });
   ["/api/admin/size-groups", "/api/admin/size-equivalent-groups"].forEach((routePath) => {
     app.get(routePath, requireAuth, (req, res) => handleListSizeGroups(req, res, db));
     app.post(routePath, requireAuth, (req, res) => handleCreateSizeGroup(req, res, db));
