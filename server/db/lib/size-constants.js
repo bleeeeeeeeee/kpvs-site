@@ -1,4 +1,8 @@
-const { otherScalesHintSubquery, otherScalesHintSqlColumn } = require("./sql-constants");
+const {
+  otherScalesHintSubquery,
+  otherScalesHintSqlColumn,
+  sizeIsEuReferenceRowSql
+} = require("./sql-constants");
 const sizeRowDisplayOrderSql = `
   CASE lower(btrim(COALESCE(st.slug::text, '')))
     WHEN 'eu_clothing' THEN (
@@ -51,4 +55,9 @@ const sizeRowDisplayOrderSql = `
     ELSE 0
   END
 `;
-module.exports = { otherScalesHintSubquery, otherScalesHintSqlColumn, sizeRowDisplayOrderSql };
+module.exports = {
+  otherScalesHintSubquery,
+  otherScalesHintSqlColumn,
+  sizeRowDisplayOrderSql,
+  sizeIsEuReferenceRowSql
+};

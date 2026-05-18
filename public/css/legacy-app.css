@@ -5443,6 +5443,12 @@ select option.admin-select-action-option,
     overflow-y: auto;
 }
 
+.size-cascade--filter .size-cascade-col--sizes-scroll {
+    overflow-x: visible;
+    overflow-y: auto;
+    min-width: 0;
+}
+
 .size-cascade-section-title {
     padding: 0.4rem 0.65rem 0.25rem;
     font-size: 0.72rem;
@@ -5536,8 +5542,286 @@ select option.admin-select-action-option,
     max-height: min(40vh, 360px);
 }
 
-.filter-options--size-cascade {
-    padding: 0.35rem 0 0.5rem;
+.filter-size-cascade-wrap .size-cascade--filter .size-cascade-panels--two-cols {
+    max-height: min(52vh, 440px);
+}
+
+.filter-modal-content .filter-options.filter-options--size-cascade,
+.filter-options.filter-options--size-cascade {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    padding: 0;
+    grid-template-columns: none;
+    gap: 0;
+}
+
+.filter-size-cascade-wrap {
+    width: 100%;
+    min-width: 0;
+    background: var(--surface-color, #fff);
+    border: 1px solid rgba(36, 53, 42, 0.12);
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+
+.size-cascade--filter {
+    width: 100%;
+    min-width: 0;
+}
+
+.size-cascade--filter .size-cascade-panels--two-cols {
+    height: min(52vh, 420px);
+    min-height: 220px;
+    max-height: min(52vh, 420px);
+    grid-template-columns: minmax(10.5rem, 34%) minmax(0, 1fr);
+    width: 100%;
+    overflow: hidden;
+    align-items: stretch;
+}
+
+.size-cascade--filter .size-cascade-col--cat,
+.size-cascade--filter .size-cascade-col--sizes {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    max-height: 100%;
+    overflow: hidden;
+}
+
+.size-cascade--filter .size-cascade-col-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.size-cascade--filter .size-cascade-col-heading {
+    flex-shrink: 0;
+}
+
+.size-cascade-col-heading {
+    margin: 0;
+    padding: 0.55rem 0.7rem 0.4rem;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    background: rgba(36, 53, 42, 0.04);
+    border-bottom: 1px solid rgba(36, 53, 42, 0.08);
+    position: sticky;
+    top: 0;
+    z-index: 2;
+}
+
+.size-cascade--filter .size-cascade-col--cat {
+    background: rgba(36, 53, 42, 0.02);
+    border-right: 1px solid rgba(36, 53, 42, 0.1);
+}
+
+.size-cascade--filter .size-cascade-col--sizes {
+    background: var(--surface-color, #fff);
+}
+
+.size-cascade-section {
+    padding-bottom: 0.15rem;
+}
+
+.size-cascade-sizes-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    padding: 0.35rem 0.55rem 0.5rem;
+    min-width: 0;
+}
+
+.size-cascade--filter .size-cascade-sizes-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+}
+
+.size-cascade--filter .size-cascade-section-title {
+    padding: 0.45rem 0.65rem 0.3rem;
+    margin-top: 0;
+    border-top: 1px solid rgba(36, 53, 42, 0.08);
+    text-transform: none;
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0;
+    color: var(--primary-color);
+}
+
+.size-cascade--filter .size-cascade-section:first-child .size-cascade-section-title {
+    border-top: none;
+}
+
+.size-cascade--filter .size-cascade-check {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 0.45rem 0.5rem;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.42rem 0.5rem;
+    margin: 0;
+    border-radius: 0.5rem;
+    border: 1px solid transparent;
+    transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.size-cascade--filter .size-cascade-check:hover {
+    background: rgba(182, 197, 63, 0.12);
+    border-color: rgba(182, 197, 63, 0.28);
+}
+
+.size-cascade--filter .size-cascade-check:has(input:checked) {
+    background: rgba(182, 197, 63, 0.18);
+    border-color: rgba(182, 197, 63, 0.42);
+}
+
+.size-cascade--filter .size-cascade-check input {
+    margin: 0.12rem 0 0;
+    width: 1rem;
+    height: 1rem;
+    flex-shrink: 0;
+}
+
+.size-cascade-check-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.08rem;
+    min-width: 0;
+}
+
+.size-cascade-check-value {
+    font-size: 0.86rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: var(--text-primary);
+    white-space: nowrap;
+}
+
+.size-cascade-check-equiv {
+    font-size: 0.74rem;
+    line-height: 1.25;
+    color: var(--text-secondary);
+    white-space: normal;
+    word-break: break-word;
+}
+
+.size-cascade--filter .size-cascade-check-text {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.2rem 0.4rem;
+}
+
+.size-cascade--filter .size-cascade-check-value {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.size-cascade--filter .size-cascade-check-equiv {
+    font-size: 0.8125rem;
+    font-weight: 400;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.size-cascade--filter .size-cascade-item.size-cascade-cat {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.size-cascade--filter .size-cascade-item.size-cascade-cat.is-active {
+    background: rgba(182, 197, 63, 0.22);
+    color: var(--text-primary);
+}
+
+.size-cascade-floating-tip {
+    position: fixed;
+    z-index: 12050;
+    max-width: min(320px, calc(100vw - 2rem));
+    padding: 0.42rem 0.62rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #fff;
+    background: #24352a;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 0.5rem;
+    box-shadow: none;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.size-cascade-floating-tip[hidden] {
+    display: none !important;
+}
+
+.filter-group[data-group="size"].is-open .filter-group-body {
+    margin-top: 0.55rem;
+}
+
+.filter-modal-content .filter-group[data-group="size"].is-open {
+    position: relative;
+    z-index: 3;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.35rem;
+    background: var(--bg-primary, #fff);
+}
+
+.filter-modal-content .filter-group {
+    position: relative;
+    z-index: 0;
+}
+
+.filter-modal-content .filter-group.is-open:not([data-group="size"]) {
+    z-index: 2;
+}
+
+.filter-modal-content .filter-group[data-group="size"] .filter-group-body {
+    position: relative;
+    z-index: 1;
+    isolation: isolate;
+    overflow: hidden;
+}
+
+.filter-modal-content .filter-group:not(.is-open) .filter-group-body {
+    display: none !important;
+}
+
+.filter-modal-content .filter-group:not(.is-open) .filter-group-body[hidden] {
+    display: none !important;
+}
+
+@media (max-width: 560px) {
+    .size-cascade--filter .size-cascade-panels--two-cols {
+        grid-template-columns: 1fr;
+        max-height: none;
+    }
+
+    .size-cascade--filter .size-cascade-col--cat {
+        max-height: 9.5rem;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .size-cascade--filter .size-cascade-col--sizes {
+        max-height: min(42vh, 360px);
+    }
+
+    .size-cascade-sizes-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 .admin-attributes-list {
@@ -6656,8 +6940,19 @@ select option.admin-select-action-option,
 }
 
 .filter-modal-content {
-    max-width: 720px;
-    width: min(720px, calc(100vw - 2rem));
+    max-width: min(860px, calc(100vw - 2rem));
+    width: min(860px, calc(100vw - 2rem));
+}
+
+.filter-modal-content .modal-body {
+    overflow-x: hidden;
+    overflow-y: auto;
+    min-width: 0;
+}
+
+.filter-group[data-group="size"] .filter-group-body {
+    min-width: 0;
+    overflow: visible;
 }
 
 .filter-group {
@@ -6787,13 +7082,13 @@ select option.admin-select-action-option,
 }
 
 @media (min-width: 860px) {
-    .filter-modal-content .filter-options {
+    .filter-modal-content .filter-options:not(.filter-options--size-cascade) {
         grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 520px) {
-    .filter-modal-content .filter-options {
+    .filter-modal-content .filter-options:not(.filter-options--size-cascade) {
         grid-template-columns: 1fr;
     }
 }

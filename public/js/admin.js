@@ -919,6 +919,7 @@ const Admin = (() => {
         id: Number(s.id),
         value: s.value || "",
         size_type: s.size_type || "",
+        size_type_slug: s.size_type_slug || "",
         size_type_id: s.size_type_id != null ? Number(s.size_type_id) : NaN,
         equivalent_hint: s.equivalent_hint != null && String(s.equivalent_hint).trim() !== "" ? String(s.equivalent_hint) : ""
       };
@@ -2109,7 +2110,8 @@ const Admin = (() => {
       return '<label class="filter-option"><input type="radio" name="active" value="' + escapeHtml(a.value) + '" ' + checked + "><span>" + escapeHtml(a.label) + "</span></label>";
     }).join("");
     const group = function(key, label, body) {
-      return '<div class="filter-group" data-group="' + escapeHtml(key) + '"><button type="button" class="filter-group-title filter-group-toggle" aria-expanded="false"><span class="filter-group-label">' + escapeHtml(label) + '</span><span class="filter-group-right"><span class="filter-group-count" aria-hidden="true"></span><span class="filter-group-caret" aria-hidden="true">\u25BE</span></span></button><div class="filter-group-body" hidden><div class="filter-options">' + body + "</div></div></div>";
+      const optsClass = key === "size" ? "filter-options filter-options--size-cascade" : "filter-options";
+      return '<div class="filter-group" data-group="' + escapeHtml(key) + '"><button type="button" class="filter-group-title filter-group-toggle" aria-expanded="false"><span class="filter-group-label">' + escapeHtml(label) + '</span><span class="filter-group-right"><span class="filter-group-count" aria-hidden="true"></span><span class="filter-group-caret" aria-hidden="true">\u25BE</span></span></button><div class="filter-group-body" hidden><div class="' + optsClass + '">' + body + "</div></div></div>";
     };
     const modal = document.createElement("div");
     modal.className = "modal";
@@ -2174,6 +2176,7 @@ const Admin = (() => {
           return fetchSizesForCategoryId(id);
         },
         mode: "multi",
+        filterLayout: true,
         inputName: "size_id",
         checkedIds: state.sizes,
         onChange: function() {

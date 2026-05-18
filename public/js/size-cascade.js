@@ -11,8 +11,112 @@
     const full = v + " \u2014 " + h;
     return full.length > 220 ? full.slice(0, 217) + "\u2026" : full;
   }
+  function sizeScalePrefix(typeSlug) {
+    const slug = normalizeSizeTypeSlug(typeSlug, "");
+    if (slug === "eu_clothing" || slug === "eu_footwear" || slug === "eu_accessories") return "EU ";
+    return "";
+  }
+  function isEuEtalonValue(row) {
+    if (!row) return false;
+    const raw = String(row.value != null ? row.value : "").trim();
+    if (/^(RU|UK|US)\s+/i.test(raw)) return false;
+    const slug = rowTypeSlug(row);
+    const v = sizeSortValue(row.value);
+    if (slug === "eu_clothing" || slug === "eu_accessories") {
+      return euLetterClothingRank(v) != null;
+    }
+    if (slug === "eu_footwear") {
+      const n = parseFloat(v.replace(",", "."));
+      return Number.isFinite(n) && n >= 35 && n <= 50;
+    }
+    if (slug === "universal") return true;
+    return false;
+  }
+  function formatSizePrimaryLabel(row) {
+    const v = String(row && row.value != null ? row.value : "").trim();
+    if (!v) return "\u2014";
+    if (!isEuEtalonValue(row)) return v;
+    const prefix = sizeScalePrefix(rowTypeSlug(row));
+    if (!prefix || /^eu\s/i.test(v)) return v;
+    return prefix + v;
+  }
+  function formatEquivPart(part) {
+    const p = String(part != null ? part : "").trim();
+    if (!p) return "";
+    if (/^(RU|UK|US|EU)\s+/i.test(p)) return p;
+    if (/^\d+([.,]\d+)?$/.test(p)) return "RU " + p;
+    return p;
+  }
+  function formatSizeEquivInline(equivalentHint) {
+    const h = equivalentHint != null ? String(equivalentHint).trim() : "";
+    if (!h) return "";
+    const parts = h.split(/\s*,\s*/).map(formatEquivPart).filter(Boolean);
+    return "\u2248 " + (parts.length ? parts.join(", ") : h);
+  }
+  function filterEuEtalonSizes(rows) {
+    return (rows || []).filter(isEuEtalonValue);
+  }
+  let floatingTipEl = null;
+  function ensureFloatingTip() {
+    if (!floatingTipEl && typeof document !== "undefined") {
+      floatingTipEl = document.createElement("div");
+      floatingTipEl.id = "kpvs-size-cascade-tip";
+      floatingTipEl.className = "size-cascade-floating-tip";
+      floatingTipEl.hidden = true;
+      floatingTipEl.setAttribute("role", "tooltip");
+      document.body.appendChild(floatingTipEl);
+    }
+    return floatingTipEl;
+  }
+  function positionFloatingTip(tip, anchor) {
+    if (!tip || !anchor) return;
+    const r = anchor.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    tip.style.left = Math.min(window.innerWidth - 16, Math.max(16, cx)) + "px";
+    tip.style.top = Math.max(8, r.top - 6) + "px";
+    tip.style.transform = "translate(-50%, -100%)";
+  }
+  function bindCheckTooltips(scope) {
+    const tip = ensureFloatingTip();
+    if (!tip || !scope) return;
+    scope.querySelectorAll(".size-cascade-check[data-tip]").forEach(function(lab) {
+      if (lab.dataset.tipBound === "1") return;
+      lab.dataset.tipBound = "1";
+      const show = function() {
+        const text = lab.getAttribute("data-tip");
+        if (!text) return;
+        tip.textContent = text;
+        tip.hidden = false;
+        positionFloatingTip(tip, lab);
+      };
+      const hide = function() {
+        tip.hidden = true;
+      };
+      lab.addEventListener("mouseenter", show);
+      lab.addEventListener("focusin", show);
+      lab.addEventListener("mouseleave", hide);
+      lab.addEventListener("focusout", hide);
+    });
+  }
+  function normalizeSizeTypeSlug(slug, typeName) {
+    const s = String(slug || "").toLowerCase().trim().replace(/_/g, "-");
+    if (s === "eu-clothing" || s === "eu_clothing" || s === "apparel") return "eu_clothing";
+    if (s === "eu-footwear" || s === "eu_footwear" || s === "footwear") return "eu_footwear";
+    if (s === "eu-accessories" || s === "eu_accessories" || s === "gloves") return "eu_accessories";
+    if (s === "universal") return "universal";
+    const name = String(typeName || "").toLowerCase();
+    if (/(eu|одежд|letter|2xs|3xl)/i.test(name) && !/обув|footwear|перчат/i.test(name)) return "eu_clothing";
+    if (/обув|footwear|eu\s*3[5-9]|eu\s*4[0-7]/i.test(name)) return "eu_footwear";
+    if (/аксесс|accessor|перчат|glove/i.test(name)) return "eu_accessories";
+    if (/универс|universal|one\s*size/i.test(name)) return "universal";
+    if (/\bru\b|росс|ru\s*\(/i.test(name) || /^ru[\s_-]/i.test(name)) return "ru_numeric";
+    return s.replace(/-/g, "_") || "";
+  }
+  function sizeSortValue(raw) {
+    return String(raw != null ? raw : "").trim().replace(/^eu\s+/i, "");
+  }
   function euLetterClothingRank(raw) {
-    const v = String(raw != null ? raw : "").trim().toLowerCase().replace(/\s+/g, "");
+    const v = sizeSortValue(raw).toLowerCase().replace(/\s+/g, "");
     if (v === "2xs" || v === "xxs") return 1;
     if (v === "xs") return 2;
     if (v === "s") return 3;
@@ -21,7 +125,28 @@
     if (v === "xl") return 6;
     if (v === "xxl" || v === "2xl") return 7;
     if (v === "3xl") return 8;
+    if (v === "4xl") return 9;
+    if (v === "5xl") return 10;
     return null;
+  }
+  function numericSizeRank(raw) {
+    const v = sizeSortValue(raw).replace(",", ".");
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  function rowTypeSlug(row) {
+    let slug = normalizeSizeTypeSlug(row && row.size_type_slug, row && row.size_type);
+    if (slug === "ru_numeric") return slug;
+    const v = sizeSortValue(row && row.value);
+    if (slug === "eu_clothing" || slug === "eu_accessories" || slug === "eu_footwear") return slug;
+    if (euLetterClothingRank(v) != null) return "eu_clothing";
+    if (numericSizeRank(v) != null && !euLetterClothingRank(v)) return "ru_numeric";
+    return slug;
+  }
+  function sizeTypeGroupSortKey(group) {
+    const slug = group && group.sizes && group.sizes[0] ? rowTypeSlug(group.sizes[0]) : normalizeSizeTypeSlug("", group && group.size_type);
+    const order = { eu_clothing: 10, eu_footwear: 20, eu_accessories: 30, ru_numeric: 40, universal: 50 };
+    return order[slug] != null ? order[slug] : 80;
   }
   function universalSizeRank(raw) {
     const v = String(raw != null ? raw : "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -40,9 +165,17 @@
     return 90;
   }
   function compareSizeRows(a, b, typeSlug) {
-    const slug = String(typeSlug || "").toLowerCase();
-    const va = String(a.value || "");
-    const vb = String(b.value || "");
+    const slug = typeSlug ? normalizeSizeTypeSlug(typeSlug, "") : rowTypeSlug(a);
+    const va = sizeSortValue(a.value);
+    const vb = sizeSortValue(b.value);
+    if (slug === "ru_numeric") {
+      const na = numericSizeRank(va);
+      const nb = numericSizeRank(vb);
+      if (na != null && nb != null && na !== nb) return na - nb;
+      if (na != null && nb == null) return -1;
+      if (na == null && nb != null) return 1;
+      return va.localeCompare(vb, "ru", { numeric: true });
+    }
     if (slug === "eu_clothing") {
       const ra = euLetterClothingRank(va);
       const rb = euLetterClothingRank(vb);
@@ -79,9 +212,36 @@
     }
     return va.localeCompare(vb, "ru", { numeric: true });
   }
+  function parentCategoriesForSizeFilter(categories) {
+    const list = Array.isArray(categories) ? categories : [];
+    if (!list.length) return [];
+    const hasChild = new Set();
+    list.forEach(function(c) {
+      const pid = c && c.parent_id != null ? Number(c.parent_id) : NaN;
+      if (Number.isFinite(pid) && pid > 0) hasChild.add(pid);
+    });
+    const parents = list.filter(function(c) {
+      if (!c || c.id == null) return false;
+      if (hasChild.has(Number(c.id))) return true;
+      const depth = Number(c.depth);
+      return depth === 0;
+    });
+    const seen = new Set();
+    return parents.filter(function(c) {
+      const id = Number(c.id);
+      if (!Number.isFinite(id) || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    }).sort(function(a, b) {
+      const ao = a.sort_order != null ? Number(a.sort_order) : 0;
+      const bo = b.sort_order != null ? Number(b.sort_order) : 0;
+      if (ao !== bo) return ao - bo;
+      return String(a.name || "").localeCompare(String(b.name || ""), "ru");
+    });
+  }
   function groupSizesByType(rows) {
     const map = new Map();
-    (rows || []).forEach(function(s) {
+    filterEuEtalonSizes(rows).forEach(function(s) {
       if (!s || s.id == null) return;
       const tid = s.size_type_id != null && Number.isFinite(Number(s.size_type_id)) ? Number(s.size_type_id) : NaN;
       const tname = s.size_type || "\u0422\u0438\u043F";
@@ -90,57 +250,88 @@
       map.get(key).sizes.push(s);
     });
     return Array.from(map.values()).map(function(g) {
-      const slug = g.sizes[0] && g.sizes[0].size_type_slug || "";
+      g.size_type_slug = g.sizes[0] ? rowTypeSlug(g.sizes[0]) : "";
       g.sizes.sort(function(a, b) {
-        return compareSizeRows(a, b, slug);
+        return compareSizeRows(a, b, rowTypeSlug(a));
       });
       return g;
     }).sort(function(a, b) {
+      const ra = sizeTypeGroupSortKey(a);
+      const rb = sizeTypeGroupSortKey(b);
+      if (ra !== rb) return ra - rb;
       return String(a.size_type).localeCompare(String(b.size_type), "ru");
     });
   }
   function renderFlatSizeList(colSizes, groups, mode, inputName, checkedSet, opt) {
+    const filterLayout = !!(opt && opt.filterLayout);
     colSizes.innerHTML = "";
+    /* filterLayout: headings are in mount template */
     if (!groups || !groups.length) {
-      colSizes.innerHTML = '<p class="size-cascade-empty">\u041D\u0435\u0442 \u0440\u0430\u0437\u043C\u0435\u0440\u043E\u0432</p>';
+      const empty = document.createElement("p");
+      empty.className = "size-cascade-empty";
+      empty.textContent = "\u041D\u0435\u0442 \u0440\u0430\u0437\u043C\u0435\u0440\u043E\u0432 \u0434\u043B\u044F \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E \u0440\u0430\u0437\u0434\u0435\u043B\u0430";
+      colSizes.appendChild(empty);
       return;
     }
     groups.forEach(function(g) {
       if (!g.sizes.length) return;
+      const section = filterLayout ? document.createElement("div") : null;
+      if (section) section.className = "size-cascade-section";
       const h = document.createElement("div");
       h.className = "size-cascade-section-title";
       h.textContent = g.size_type;
-      colSizes.appendChild(h);
+      if (section) section.appendChild(h);
+      else colSizes.appendChild(h);
+      const listParent = section || colSizes;
+      const grid = filterLayout ? document.createElement("div") : null;
+      if (grid) {
+        grid.className = "size-cascade-sizes-grid";
+        listParent.appendChild(grid);
+      }
+      const appendTarget = grid || listParent;
       g.sizes.forEach(function(s) {
         const id = String(s.id);
-        const title = sizeOptionTitle(s.value, s.equivalent_hint);
+        const primary = formatSizePrimaryLabel(s);
+        const equiv = formatSizeEquivInline(s.equivalent_hint);
+        const title = sizeOptionTitle(primary, s.equivalent_hint);
         if (mode === "multi") {
           const lab = document.createElement("label");
           lab.className = "size-cascade-check";
-          lab.title = title;
+          if (title && (!filterLayout || !equiv)) lab.setAttribute("data-tip", title);
           const ck = checkedSet.has(id);
-          lab.innerHTML = '<input type="checkbox" name="' + escapeHtml(inputName) + '" value="' + escapeHtml(id) + '"' + (ck ? " checked" : "") + " /><span>" + escapeHtml(String(s.value)) + "</span>";
+          let inner = '<input type="checkbox" name="' + escapeHtml(inputName) + '" value="' + escapeHtml(id) + '"' + (ck ? " checked" : "") + " />";
+          if (filterLayout) {
+            inner += '<span class="size-cascade-check-text"><span class="size-cascade-check-value">' + escapeHtml(primary) + "</span>";
+            if (equiv) inner += '<span class="size-cascade-check-equiv">' + escapeHtml(equiv) + "</span>";
+            inner += "</span>";
+          } else {
+            inner += "<span>" + escapeHtml(primary) + "</span>";
+          }
+          lab.innerHTML = inner;
           const inp = lab.querySelector("input");
           inp.addEventListener("change", function() {
             if (inp.checked) checkedSet.add(id);
             else checkedSet.delete(id);
             if (typeof opt.onChange === "function") opt.onChange();
           });
-          colSizes.appendChild(lab);
+          appendTarget.appendChild(lab);
         } else {
           const btn = document.createElement("button");
           btn.type = "button";
           btn.className = "size-cascade-item size-cascade-size";
           btn.dataset.sizeId = id;
           btn.title = title;
-          btn.textContent = String(s.value);
-          colSizes.appendChild(btn);
+          btn.textContent = primary;
+          appendTarget.appendChild(btn);
         }
       });
+      if (section) colSizes.appendChild(section);
     });
+    if (filterLayout) bindCheckTooltips(colSizes);
   }
   function mount(root, opt) {
-    const categories = Array.isArray(opt.categories) ? opt.categories : [];
+    const filterLayout = opt.filterLayout === true;
+    const categories = filterLayout ? parentCategoriesForSizeFilter(opt.categories) : Array.isArray(opt.categories) ? opt.categories : [];
     const mode = opt.mode === "multi" ? "multi" : "single";
     const loadSizes = typeof opt.loadSizes === "function" ? opt.loadSizes : function() {
       return Promise.resolve([]);
@@ -151,9 +342,15 @@
     const cache = new Map();
     let selectedCatId = null;
     let selectCategorySeq = 0;
-    root.innerHTML = '<div class="size-cascade"><div class="size-cascade-panels size-cascade-panels--two-cols"><div class="size-cascade-col size-cascade-col--cat"></div><div class="size-cascade-col size-cascade-col--sizes size-cascade-col--sizes-scroll"></div></div></div>';
+    if (filterLayout) {
+      root.innerHTML = '<div class="size-cascade size-cascade--filter"><div class="size-cascade-panels size-cascade-panels--two-cols"><div class="size-cascade-col size-cascade-col--cat"><p class="size-cascade-col-heading">\u0420\u0430\u0437\u0434\u0435\u043B \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430</p><div class="size-cascade-col-scroll size-cascade-col-scroll--cat"></div></div><div class="size-cascade-col size-cascade-col--sizes"><p class="size-cascade-col-heading">\u0420\u0430\u0437\u043C\u0435\u0440\u044B</p><div class="size-cascade-col-scroll size-cascade-col-scroll--sizes"></div></div></div></div>';
+    } else {
+      root.innerHTML = '<div class="size-cascade"><div class="size-cascade-panels size-cascade-panels--two-cols"><div class="size-cascade-col size-cascade-col--cat"></div><div class="size-cascade-col size-cascade-col--sizes size-cascade-col--sizes-scroll"></div></div></div>';
+    }
     const colCat = root.querySelector(".size-cascade-col--cat");
     const colSizes = root.querySelector(".size-cascade-col--sizes");
+    const colCatList = filterLayout ? root.querySelector(".size-cascade-col-scroll--cat") : colCat;
+    const colSizesList = filterLayout ? root.querySelector(".size-cascade-col-scroll--sizes") : colSizes;
     function fireChange() {
       if (typeof opt.onChange === "function") opt.onChange();
     }
@@ -165,7 +362,7 @@
       colCat.querySelectorAll(".size-cascade-cat").forEach(function(b) {
         b.classList.toggle("is-active", b.dataset.catId === ck);
       });
-      colSizes.innerHTML = '<p class="size-cascade-loading">\u2026</p>';
+      colSizesList.innerHTML = '<p class="size-cascade-loading">\u2026</p>';
       if (!cache.has(ck)) {
         try {
           const rows2 = await loadSizes(catId);
@@ -179,12 +376,16 @@
       if (mySeq !== selectCategorySeq) return;
       const rows = cache.get(ck) || [];
       const groups = groupSizesByType(rows);
-      renderFlatSizeList(colSizes, groups, mode, inputName, checkedSet, { onChange: fireChange });
+      renderFlatSizeList(colSizesList, groups, mode, inputName, checkedSet, { onChange: fireChange, filterLayout: filterLayout });
     }
     function renderCats() {
-      colCat.innerHTML = "";
+      if (!colCatList) return;
+      colCatList.innerHTML = "";
       if (!categories.length) {
-        colCat.innerHTML = '<p class="size-cascade-empty">\u041D\u0435\u0442 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0439</p>';
+        const empty = document.createElement("p");
+        empty.className = "size-cascade-empty";
+        empty.textContent = "\u041D\u0435\u0442 \u043A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u0439";
+        colCatList.appendChild(empty);
         return;
       }
       categories.forEach(function(c) {
@@ -193,13 +394,15 @@
         btn.type = "button";
         btn.className = "size-cascade-item size-cascade-cat";
         btn.dataset.catId = id;
-        const depth = Number(c.depth) || 0;
+        const depth = filterLayout ? 0 : Number(c.depth) || 0;
         btn.style.paddingLeft = 8 + depth * 12 + "px";
         btn.textContent = c.name || "";
-        btn.addEventListener("mouseenter", function() {
-          void selectCategory(id, true);
-        });
-        colCat.appendChild(btn);
+        if (!filterLayout) {
+          btn.addEventListener("mouseenter", function() {
+            void selectCategory(id, true);
+          });
+        }
+        colCatList.appendChild(btn);
       });
     }
     colCat.addEventListener("click", function(e) {
@@ -222,6 +425,8 @@
       return String(c.id) === defCat;
     })) {
       void selectCategory(defCat, false);
+    } else if (filterLayout && categories.length) {
+      void selectCategory(String(categories[0].id), false);
     }
     const api = {
       destroy: function() {
@@ -249,8 +454,9 @@
     let refillPromise = Promise.resolve();
     let refillSeq = 0;
     function applySizeOptionEl(o, s) {
-      const title = sizeOptionTitle(s.value, s.equivalent_hint);
-      o.textContent = String(s.value);
+      const primary = formatSizePrimaryLabel(s);
+      const title = sizeOptionTitle(primary, s.equivalent_hint);
+      o.textContent = primary;
       o.title = title;
     }
     async function refill() {

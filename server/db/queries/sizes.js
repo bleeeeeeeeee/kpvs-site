@@ -1,4 +1,4 @@
-const { otherScalesHintSqlColumn } = require("../lib/size-constants");
+const { otherScalesHintSqlColumn, sizeIsEuReferenceRowSql } = require("../lib/size-constants");
 const SIZE_GRID_SLUGS_CLOTHING = Object.freeze(["eu_clothing"]);
 const SIZE_GRID_SLUGS_FOOTWEAR = Object.freeze(["eu_footwear"]);
 const SIZE_GRID_SLUGS_ACCESSORIES = Object.freeze(["eu_accessories", "universal"]);
@@ -75,6 +75,7 @@ async function getSizes(pool, categoryId) {
       FROM category_size_types cst
       WHERE cst.category_id IN (SELECT id FROM ancestors)
     )
+      AND ${sizeIsEuReferenceRowSql}
     ORDER BY st.id, s.id
     `,
     [cid]

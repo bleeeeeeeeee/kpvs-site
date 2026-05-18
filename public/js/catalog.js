@@ -874,6 +874,7 @@ const Catalog = (() => {
           });
         },
         mode: "multi",
+        filterLayout: true,
         inputName: "size",
         checkedIds: activeFilters.sizes,
         onChange: function() {
@@ -911,6 +912,9 @@ const Catalog = (() => {
       setGroupOpen(group, false);
       updateGroupCount(group);
     });
+    if (activeFilters.sizes.length && catSizeGroup) {
+      setGroupOpen(catSizeGroup, true);
+    }
     modal.querySelector(".catalog-filter-apply-btn").addEventListener("click", function() {
       activeFilters.categories = Array.from(modal.querySelectorAll('input[name="category"]:checked')).map(function(i) {
         return i.value;
@@ -928,14 +932,16 @@ const Catalog = (() => {
         const id = String(inp.value || "").trim();
         if (!id) return;
         activeFilters.sizes.push(id);
-        const span = inp.parentElement && inp.parentElement.querySelector("span");
+        const valSpan = inp.parentElement && inp.parentElement.querySelector(".size-cascade-check-value");
+        const span = valSpan || (inp.parentElement && inp.parentElement.querySelector("span"));
         if (span && span.textContent) sizeLabels[id] = span.textContent.trim();
       });
       if (!activeFilters.sizes.length && catalogFilterSizeCascadeHandle && typeof catalogFilterSizeCascadeHandle.getCheckedIds === "function") {
         activeFilters.sizes = catalogFilterSizeCascadeHandle.getCheckedIds();
         activeFilters.sizes.forEach(function(id) {
-          const inp = modal.querySelector('input[name="size_id"][value="' + CSS.escape(String(id)) + '"]');
-          const span = inp && inp.parentElement && inp.parentElement.querySelector("span");
+          const inp = modal.querySelector('input[name="size"][value="' + CSS.escape(String(id)) + '"]');
+          const valSpan = inp && inp.parentElement && inp.parentElement.querySelector(".size-cascade-check-value");
+          const span = valSpan || (inp && inp.parentElement && inp.parentElement.querySelector("span"));
           if (span && span.textContent) sizeLabels[id] = span.textContent.trim();
         });
       }
