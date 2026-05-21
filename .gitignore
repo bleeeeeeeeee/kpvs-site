@@ -4,6 +4,8 @@ node_modules/
 .env.*
 .cursor/
 public/img/uploads/
+public/img/Товары/
+project-export.txt
 *.log
 server.log
 npm-debug.log*
