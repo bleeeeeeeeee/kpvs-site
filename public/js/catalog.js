@@ -1,4 +1,6 @@
 const Catalog = (() => {
+  const escapeHtml = window.KpvsEscape.escapeHtml;
+  const escapeAttr = window.KpvsEscape.escapeAttr;
   let pageGender = "mens";
   let allProducts = [];
   let sectionCollections = [];
@@ -869,7 +871,7 @@ const Catalog = (() => {
       catalogFilterSizeCascadeHandle = window.KpvsSizeCascade.mount(catSizeMount, {
         categories: catalogCategories,
         loadSizes: function(id) {
-          return fetch("/api/sizes?category_id=" + encodeURIComponent(id)).then(function(r) {
+          return fetch("/api/sizes?category_id=" + encodeURIComponent(id) + "&scope=catalog").then(function(r) {
             return r.ok ? r.json() : [];
           });
         },
@@ -989,10 +991,6 @@ const Catalog = (() => {
     }
     return "";
   }
-  function escapeAttr(str) {
-    if (str == null) return "";
-    return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-  }
   function getProductImage(item) {
     if (!item) return "/img/item.png";
     let raw = "";
@@ -1005,10 +1003,6 @@ const Catalog = (() => {
     } else return "/img/item.png";
     const clean = sanitizeProductImageUrl(raw);
     return clean || "/img/item.png";
-  }
-  function escapeHtml(str) {
-    if (str == null) return "";
-    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
   }
   function formatCatalogPrice(n) {
     const x = Number(n);

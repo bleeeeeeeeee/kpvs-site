@@ -45,7 +45,9 @@ function mountCatalogRoutes(app, ctx) {
       const raw = req.query.category_id;
       const cid = raw != null && String(raw).trim() !== "" ? Number(raw) : NaN;
       const categoryId = Number.isFinite(cid) && cid > 0 ? cid : null;
-      res.json(await db.getSizes(categoryId));
+      const scope = String(req.query.scope || "").trim().toLowerCase();
+      const euEtalonOnly = scope !== "admin";
+      res.json(await db.getSizes(categoryId, { euEtalonOnly }));
     } catch (err) {
       console.error("GET /api/sizes:", err);
       res.status(500).json({ error: "Failed to load sizes" });

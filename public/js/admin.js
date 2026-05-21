@@ -1,4 +1,5 @@
 const Admin = (() => {
+  const escapeHtml = window.KpvsEscape.escapeHtml;
   async function checkAuth() {
     try {
       const r = await apiFetch("/api/auth/me");
@@ -96,10 +97,6 @@ const Admin = (() => {
       if (xsrf && !init.headers["X-XSRF-TOKEN"]) init.headers["X-XSRF-TOKEN"] = xsrf;
     }
     return window.fetch(url, init);
-  }
-  function escapeHtml(str) {
-    if (str == null) return "";
-    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
   function formatProductCount(n) {
     n = Number(n) || 0;
@@ -933,10 +930,12 @@ const Admin = (() => {
     const n = Number(id);
     return Number.isFinite(n) && n > 0;
   }
-  async function fetchSizesForCategoryId(categoryId) {
+  async function fetchSizesForCategoryId(categoryId, opts) {
     const id = String(categoryId || "").trim();
     if (!isValidProductCategoryIdForSizes(id)) return [];
-    const r = await apiFetch("/api/sizes?category_id=" + encodeURIComponent(id));
+    const catalogFilter = opts && opts.catalogFilter === true;
+    const scope = catalogFilter ? "catalog" : "admin";
+    const r = await apiFetch("/api/sizes?category_id=" + encodeURIComponent(id) + "&scope=" + scope);
     if (!r.ok) throw new Error("sizes_fetch_failed");
     return mapSizesApiRows(await r.json());
   }
@@ -2173,7 +2172,7 @@ const Admin = (() => {
       adminFilterSizeCascadeHandle = window.KpvsSizeCascade.mount(sizeCascadeEl, {
         categories,
         loadSizes: function(id) {
-          return fetchSizesForCategoryId(id);
+          return fetchSizesForCategoryId(id, { catalogFilter: true });
         },
         mode: "multi",
         filterLayout: true,

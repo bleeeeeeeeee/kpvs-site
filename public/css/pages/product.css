@@ -426,7 +426,8 @@
 }
 
 .product-page .product-size-colors-adaptive > .product-color-more-wrap:hover,
-.product-page .product-size-colors-adaptive > .product-color-more-wrap:focus-within {
+.product-page .product-size-colors-adaptive > .product-color-more-wrap:focus-within,
+.product-page .product-size-colors-adaptive > .product-color-more-wrap.product-color-more-wrap--open {
   z-index: 80;
 }
 
@@ -519,7 +520,7 @@
 }
 
 .product-page .product-color-more-popover {
-  box-shadow: none;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.2);
   border: 1px solid rgba(255, 255, 255, 0.2);
 }
 

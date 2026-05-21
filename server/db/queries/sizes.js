@@ -1,4 +1,4 @@
-const { otherScalesHintSqlColumn, sizeIsEuReferenceRowSql } = require("../lib/size-constants");
+const { otherScalesHintSqlColumn, sizeIsEuReferenceRowSql, sizeRowDisplayOrderSql } = require("../lib/size-constants");
 const SIZE_GRID_SLUGS_CLOTHING = Object.freeze(["eu_clothing"]);
 const SIZE_GRID_SLUGS_FOOTWEAR = Object.freeze(["eu_footwear"]);
 const SIZE_GRID_SLUGS_ACCESSORIES = Object.freeze(["eu_accessories", "universal"]);
@@ -51,11 +51,13 @@ function classifyCategorySizeTypeSlugs(name, slug) {
   if (unisexHay) return Array.from(SIZE_GRID_DEFAULT);
   return Array.from(SIZE_GRID_DEFAULT);
 }
-async function getSizes(pool, categoryId) {
+async function getSizes(pool, categoryId, options = {}) {
   const cid = Number(categoryId);
   if (!Number.isFinite(cid) || cid <= 0) {
     return [];
   }
+  const euEtalonOnly = options.euEtalonOnly === true;
+  const etalonClause = euEtalonOnly ? `AND ${sizeIsEuReferenceRowSql}` : "";
   const result = await pool.query(
     `
     WITH RECURSIVE ancestors AS (
@@ -75,8 +77,8 @@ async function getSizes(pool, categoryId) {
       FROM category_size_types cst
       WHERE cst.category_id IN (SELECT id FROM ancestors)
     )
-      AND ${sizeIsEuReferenceRowSql}
-    ORDER BY st.id, s.id
+      ${etalonClause}
+    ORDER BY ${sizeRowDisplayOrderSql}, s.id
     `,
     [cid]
   );

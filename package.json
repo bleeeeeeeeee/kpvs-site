@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "bootstrap-admin": "node scripts/bootstrap-admin.js"
+    "bootstrap-admin": "node scripts/bootstrap-admin.js",
+    "export-project": "node scripts/export-project.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1046.0",

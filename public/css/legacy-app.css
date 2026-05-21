@@ -1178,21 +1178,41 @@
     transform: scale(1.1);
 }
 
+.product-color-more-wrap::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: 100%;
+    width: min(300px, calc(100vw - 1.5rem));
+    height: 12px;
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: 49;
+}
+
+.product-color-more-wrap--open::before,
+.product-color-more-wrap:hover::before,
+.product-color-more-wrap:focus-within::before {
+    pointer-events: auto;
+}
+
 .product-color-more-popover {
     position: absolute;
     left: 50%;
-    bottom: calc(100% + 10px);
-    transform: translateX(-50%) translateY(4px);
+    bottom: calc(100% + 4px);
+    transform: translateX(-50%) translateY(6px);
     min-width: 220px;
     max-width: min(300px, calc(100vw - 1.5rem));
-    max-height: min(260px, 46vh);
+    max-height: min(280px, 50vh);
     overflow-y: auto;
     overflow-x: hidden;
+    overscroll-behavior: contain;
     padding: 0.55rem 0.65rem 0.6rem;
+    padding-right: 0.45rem;
     background: #24352a;
     color: #f0f3ee;
     border-radius: 0.55rem;
-    box-shadow: none;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.22);
     border: 1px solid rgba(255, 255, 255, 0.18);
     font-size: 0.82rem;
     line-height: 1.35;
@@ -1200,13 +1220,37 @@
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.16s ease, transform 0.16s ease, visibility 0.16s;
+    transition:
+        opacity 0.22s ease,
+        transform 0.22s ease,
+        visibility 0.22s ease;
     z-index: 50;
     -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.42) rgba(255, 255, 255, 0.1);
+}
+
+.product-color-more-popover::-webkit-scrollbar {
+    width: 7px;
+}
+
+.product-color-more-popover::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+}
+
+.product-color-more-popover::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.38);
+    border-radius: 4px;
+}
+
+.product-color-more-popover::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.55);
 }
 
 .product-color-more-wrap:hover .product-color-more-popover,
-.product-color-more-wrap:focus-within .product-color-more-popover {
+.product-color-more-wrap:focus-within .product-color-more-popover,
+.product-color-more-wrap--open .product-color-more-popover {
     opacity: 1;
     visibility: visible;
     transform: translateX(-50%) translateY(0);

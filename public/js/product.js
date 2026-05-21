@@ -1,17 +1,11 @@
 let currentProductId = null;
+const escapeHtml = window.KpvsEscape.escapeHtml;
+const escapeAttr = window.KpvsEscape.escapeAttr;
 function genderDisplayLabel(g) {
   if (g === "mens" || g === "male") return "\u041C\u0443\u0436\u0441\u043A\u043E\u0439";
   if (g === "womens" || g === "female") return "\u0416\u0435\u043D\u0441\u043A\u0438\u0439";
   if (g === "unisex") return "\u0423\u043D\u0438\u0441\u0435\u043A\u0441";
   return "";
-}
-function escapeAttr(str) {
-  if (str == null) return "";
-  return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
-}
-function escapeHtml(str) {
-  if (str == null) return "";
-  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 function formatProductDescriptionHtml(raw) {
   if (raw == null) return "";
@@ -173,6 +167,62 @@ function requestProductBackAlign() {
   }
 }
 let productAdaptiveColorsState = null;
+const PRODUCT_COLOR_MORE_CLOSE_MS = 220;
+function clearProductColorMoreCloseTimer(wrap) {
+  if (!wrap || wrap._morePopCloseTimer == null) return;
+  clearTimeout(wrap._morePopCloseTimer);
+  wrap._morePopCloseTimer = null;
+}
+function setProductColorMoreOpen(wrap, open) {
+  if (!wrap) return;
+  wrap.classList.toggle("product-color-more-wrap--open", !!open);
+  const btn = wrap.querySelector(".product-color-more-circle");
+  if (btn) btn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+function scheduleProductColorMoreClose(wrap) {
+  if (!wrap) return;
+  clearProductColorMoreCloseTimer(wrap);
+  wrap._morePopCloseTimer = setTimeout(function() {
+    wrap._morePopCloseTimer = null;
+    setProductColorMoreOpen(wrap, false);
+  }, PRODUCT_COLOR_MORE_CLOSE_MS);
+}
+function bindProductColorMoreWrap(wrap) {
+  if (!wrap || wrap.dataset.morePopBound === "1") return;
+  wrap.dataset.morePopBound = "1";
+  const btn = wrap.querySelector(".product-color-more-circle");
+  const pop = wrap.querySelector(".product-color-more-popover");
+  const openNow = function() {
+    clearProductColorMoreCloseTimer(wrap);
+    setProductColorMoreOpen(wrap, true);
+  };
+  const leaveLater = function() {
+    scheduleProductColorMoreClose(wrap);
+  };
+  wrap.addEventListener("mouseenter", openNow);
+  wrap.addEventListener("mouseleave", leaveLater);
+  wrap.addEventListener("pointerenter", openNow);
+  wrap.addEventListener("pointerleave", leaveLater);
+  if (pop) {
+    pop.addEventListener("mouseenter", openNow);
+    pop.addEventListener("mouseleave", leaveLater);
+    pop.addEventListener("pointerenter", openNow);
+    pop.addEventListener("pointerleave", leaveLater);
+  }
+  if (btn) {
+    btn.addEventListener("click", function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      openNow();
+    });
+    btn.setAttribute("aria-haspopup", "listbox");
+    btn.setAttribute("aria-expanded", "false");
+  }
+}
+function bindAllProductColorMoreWraps(root) {
+  const scope = root && root.querySelectorAll ? root : document;
+  scope.querySelectorAll(".product-color-more-wrap").forEach(bindProductColorMoreWrap);
+}
 function teardownProductAdaptiveColorRows() {
   if (productAdaptiveColorsState) {
     if (productAdaptiveColorsState.ro) productAdaptiveColorsState.ro.disconnect();
@@ -181,6 +231,10 @@ function teardownProductAdaptiveColorRows() {
     }
     productAdaptiveColorsState = null;
   }
+  document.querySelectorAll(".product-color-more-wrap").forEach(function(wrap) {
+    wrap.classList.remove("product-color-more-wrap--open");
+    clearProductColorMoreCloseTimer(wrap);
+  });
 }
 function productColorTrackClip(host) {
   return host.querySelector(".product-size-colors-track-clip");
@@ -313,6 +367,7 @@ function layoutOneAdaptiveColorRow(host) {
     btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0435\u0449\u0451 " + overflow + " " + (overflow === 1 ? "\u0446\u0432\u0435\u0442" : overflow < 5 ? "\u0446\u0432\u0435\u0442\u0430" : "\u0446\u0432\u0435\u0442\u043E\u0432"));
   }
   refreshMorePopover(moreWrap, wraps, fit, headingLine);
+  if (moreWrap) bindProductColorMoreWrap(moreWrap);
   alignProductSwatchTooltips(track, host);
 }
 function layoutProductAdaptiveColorRows(root) {
@@ -344,6 +399,7 @@ function setupProductAdaptiveColorRows(productMainEl) {
     run();
   };
   window.addEventListener("resize", onResize);
+  bindAllProductColorMoreWraps(productMainEl);
   productAdaptiveColorsState = { ro, onResize };
 }
 function setupProductBackAlign() {
@@ -656,7 +712,7 @@ function renderProductColorOverflowPopover(allColors, headingLine) {
     return '<div class="product-color-more-pop-row"><span class="' + dotCls + '"' + styleAttr + ' aria-hidden="true"></span><span class="product-color-more-pop-name">' + escapeHtml(c.name || "\u2014") + "</span></div>";
   }).join("");
   const head = headingLine && String(headingLine).trim() ? '<span class="product-color-more-pop-heading">' + escapeHtml(String(headingLine).trim()) + "</span>" : "";
-  return '<span class="product-color-more-wrap" hidden data-heading="' + escapeAttr(headingLine || "") + '"><button type="button" class="product-color-more-circle" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430">+0</button><span class="product-color-more-popover" role="tooltip">' + head + rows + "</span></span>";
+  return '<span class="product-color-more-wrap" hidden data-heading="' + escapeAttr(headingLine || "") + '"><button type="button" class="product-color-more-circle" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430" aria-haspopup="listbox" aria-expanded="false">+0</button><span class="product-color-more-popover" role="listbox" tabindex="-1">' + head + rows + "</span></span>";
 }
 function buildProductColorsAdaptiveRow(colors, headingLine) {
   const arr = Array.isArray(colors) ? colors : [];

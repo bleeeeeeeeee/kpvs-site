@@ -19,26 +19,43 @@
 
 ```
 kpvs-site/
-├── server.js                 # npm start
+├── server.js                 # npm start → server/index.js
 ├── package.json
 ├── .env                      # не коммитится (см. .gitignore)
-├── public/                   # фронтенд и статика
-│   ├── welcome.html          # стартовая страница
-│   ├── mens.html / womens.html / all.html
-│   ├── product.html
-│   ├── login.html
-│   ├── admin.html
-│   ├── css/  js/  img/
+├── public/                   # фронтенд и статика (без сборщика)
+│   ├── *.html
+│   ├── css/
+│   │   ├── site.css          # точка входа стилей (@import)
+│   │   ├── base.css          # токены
+│   │   ├── legacy-app.css    # основной UI
+│   │   ├── components/       # кнопки, формы
+│   │   └── pages/            # каталог, карточка товара
+│   └── js/
+│       ├── utils/
+│       │   ├── api.js        # KpvsApi.apiFetch + CSRF
+│       │   └── escape.js     # KpvsEscape (XSS-safe HTML)
+│       ├── catalog.js, product.js, admin.js, size-cascade.js, …
 ├── server/
-│   ├── app.js                # Express, маршруты, запуск
-│   ├── config/http-env.js    # PORT, секреты, OAuth
-│   ├── db/                   # пул PostgreSQL, запросы, migrate.js
+│   ├── index.js              # dotenv, validateProductionEnv, startServer
+│   ├── app.js                # Express, middleware, маршруты
+│   ├── config/http-env.js
+│   ├── db/
+│   │   ├── index.js          # pool + bindPool(queries/*)
+│   │   ├── lib/
+│   │   │   ├── sql-constants.js    # SQL-фрагменты каталога и размеров
+│   │   │   └── size-constants.js   # сортировка размеров + re-export для sizes.js
+│   │   └── queries/          # catalog.js, sizes.js, users.js
 │   ├── routes/               # auth, catalog, admin, media
-│   ├── middleware/           # CSRF, requireAuth, JWT пользователя
-│   └── services/             # auth, storage, catalog-validation
+│   ├── middleware/
+│   └── services/             # auth-helpers, auth-mail, catalog-validation, storage
 └── scripts/
-    └── bootstrap-admin.js    # миграции схемы + первый администратор
+    ├── bootstrap-admin.js    # миграции схемы + первый администратор
+    └── export-project.js     # npm run export-project → project-export.txt (в .gitignore)
 ```
+
+**Разделение слоёв (сервер):** `routes` — HTTP, `services` — валидация и инфраструктура, `db/queries` — SQL, `db/lib` — переиспользуемые фрагменты запросов. Классов ООП нет: модули CommonJS и явные экспорты — для этого размера проекта это нормально и проще сопровождать.
+
+**Разделение слоёв (клиент):** страницы подключают `escape.js` и `api.js`, затем страничные скрипты (`catalog.js`, `admin.js` и т.д.). Общая логика размеров — в `size-cascade.js`.
 
 ---
 
@@ -323,6 +340,7 @@ npm run bootstrap-admin -- --reset-password
 |---------|----------|
 | `npm start` | Запуск сервера (без изменений БД) |
 | `npm run bootstrap-admin` | Миграции схемы + создать admin или сбросить пароль (`-- --reset-password`) |
+| `npm run export-project` | Служебный дамп исходников в `project-export.txt` (для LLM/архива; файл в `.gitignore`) |
 
 ---
 

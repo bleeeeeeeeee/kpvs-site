@@ -1,9 +1,6 @@
 (function(global) {
   "use strict";
-  function escapeHtml(str) {
-    if (str == null) return "";
-    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-  }
+  const escapeHtml = global.KpvsEscape.escapeHtml;
   function sizeOptionTitle(value, equivalentHint) {
     const v = String(value != null ? value : "").trim();
     const h = equivalentHint != null ? String(equivalentHint).trim() : "";
@@ -239,9 +236,10 @@
       return String(a.name || "").localeCompare(String(b.name || ""), "ru");
     });
   }
-  function groupSizesByType(rows) {
+  function groupSizesByType(rows, options) {
     const map = new Map();
-    filterEuEtalonSizes(rows).forEach(function(s) {
+    const list = options && options.euEtalonOnly === true ? filterEuEtalonSizes(rows) : rows || [];
+    list.forEach(function(s) {
       if (!s || s.id == null) return;
       const tid = s.size_type_id != null && Number.isFinite(Number(s.size_type_id)) ? Number(s.size_type_id) : NaN;
       const tname = s.size_type || "\u0422\u0438\u043F";
@@ -265,7 +263,6 @@
   function renderFlatSizeList(colSizes, groups, mode, inputName, checkedSet, opt) {
     const filterLayout = !!(opt && opt.filterLayout);
     colSizes.innerHTML = "";
-    /* filterLayout: headings are in mount template */
     if (!groups || !groups.length) {
       const empty = document.createElement("p");
       empty.className = "size-cascade-empty";
@@ -375,7 +372,7 @@
       }
       if (mySeq !== selectCategorySeq) return;
       const rows = cache.get(ck) || [];
-      const groups = groupSizesByType(rows);
+      const groups = groupSizesByType(rows, { euEtalonOnly: filterLayout });
       renderFlatSizeList(colSizesList, groups, mode, inputName, checkedSet, { onChange: fireChange, filterLayout: filterLayout });
     }
     function renderCats() {
