@@ -49,8 +49,7 @@ kpvs-site/
 │   ├── middleware/
 │   └── services/             # auth-helpers, auth-mail, catalog-validation, storage
 └── scripts/
-    ├── bootstrap-admin.js    # миграции схемы + первый администратор
-    └── export-project.js     # npm run export-project → project-export.txt (в .gitignore)
+    └── bootstrap-admin.js    # миграции схемы + первый администратор
 ```
 
 **Разделение слоёв (сервер):** `routes` — HTTP, `services` — валидация и инфраструктура, `db/queries` — SQL, `db/lib` — переиспользуемые фрагменты запросов. Классов ООП нет: модули CommonJS и явные экспорты — для этого размера проекта это нормально и проще сопровождать.
@@ -340,7 +339,6 @@ npm run bootstrap-admin -- --reset-password
 |---------|----------|
 | `npm start` | Запуск сервера (без изменений БД) |
 | `npm run bootstrap-admin` | Миграции схемы + создать admin или сбросить пароль (`-- --reset-password`) |
-| `npm run export-project` | Служебный дамп исходников в `project-export.txt` (для LLM/архива; файл в `.gitignore`) |
 
 ---
 
