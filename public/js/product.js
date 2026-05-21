@@ -1,6 +1,10 @@
 let currentProductId = null;
 const escapeHtml = window.KpvsEscape.escapeHtml;
 const escapeAttr = window.KpvsEscape.escapeAttr;
+const BTN_ADD_FAVORITE = "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435";
+const BTN_REMOVE_FAVORITE = "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E";
+const BTN_ADD_CART = "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432 \u043A\u043E\u0440\u0437\u0438\u043D\u0443";
+const BTN_REMOVE_CART = "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B";
 function genderDisplayLabel(g) {
   if (g === "mens" || g === "male") return "\u041C\u0443\u0436\u0441\u043A\u043E\u0439";
   if (g === "womens" || g === "female") return "\u0416\u0435\u043D\u0441\u043A\u0438\u0439";
@@ -603,7 +607,7 @@ async function loadProduct() {
     const availHtml = '<p class="product-availability ' + (avail === "in" ? "product-availability--in" : "product-availability--out") + '">' + (avail === "in" ? "\u0412 \u043D\u0430\u043B\u0438\u0447\u0438\u0438" : "\u041D\u0435\u0442 \u0432 \u043D\u0430\u043B\u0438\u0447\u0438\u0438") + "</p>";
     const descPlaceholder = "\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435 \u0442\u043E\u0432\u0430\u0440\u0430 \u0431\u0443\u0434\u0435\u0442 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0437\u0436\u0435.";
     const descSummaryInner = product.description && String(product.description).trim() ? formatProductDescriptionHtml(product.description) : '<p class="product-desc-p">' + escapeHtml(descPlaceholder) + "</p>";
-    productMainEl.innerHTML = '<div class="product-page"><div class="product-image-block"><div class="product-gallery-stage">' + navHtml + '<div class="product-image-wrapper"><img src="' + escapeAttr(stageSrc) + '" alt="' + escapeAttr(product.name || "") + '" class="product-image product-image--main" data-gallery-idx="' + startIdx + '"></div></div>' + thumbsHtml + '<div class="product-actions site-product-actions"><button type="button" class="btn btn--primary product-page-action-btn favorite-action-btn ' + (isFavorite ? "in-favorites" : "") + '" data-action="product-favorite">' + (isFavorite ? "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E" : "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435") + '</button><button type="button" class="btn btn--primary product-page-action-btn cart-action-btn ' + (isInCart ? "in-cart" : "") + '" data-action="product-cart">' + (isInCart ? "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B" : "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0443") + '</button><button type="button" class="btn inquire-action-btn" data-action="product-inquire">\u0417\u0430\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u0446\u0435\u043D\u0443</button></div></div><div class="product-info"><h1 class="product-title">' + escapeHtml(product.name || "") + '</h1><p class="product-meta">' + escapeHtml(metaGender) + catPart + "</p>" + priceHtml + availHtml + artHtml + brandHtml + '<div class="product-summary"><div class="product-description">' + descSummaryInner + '</div></div><div class="product-specs">' + seasonHtml + materialsHtml + variantsHtml + attributesHtml + "</div></div></div>";
+    productMainEl.innerHTML = '<div class="product-page"><div class="product-image-block"><div class="product-gallery-stage">' + navHtml + '<div class="product-image-wrapper"><img src="' + escapeAttr(stageSrc) + '" alt="' + escapeAttr(product.name || "") + '" class="product-image product-image--main" data-gallery-idx="' + startIdx + '"></div></div>' + thumbsHtml + '<div class="product-actions site-product-actions"><button type="button" class="btn btn--primary product-page-action-btn favorite-action-btn ' + (isFavorite ? "in-favorites" : "") + '" data-action="product-favorite">' + (isFavorite ? BTN_REMOVE_FAVORITE : BTN_ADD_FAVORITE) + '</button><button type="button" class="btn btn--primary product-page-action-btn cart-action-btn ' + (isInCart ? "in-cart" : "") + '" data-action="product-cart">' + (isInCart ? BTN_REMOVE_CART : BTN_ADD_CART) + '</button><button type="button" class="btn inquire-action-btn" data-action="product-inquire">\u0417\u0430\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u0446\u0435\u043D\u0443</button></div></div><div class="product-info"><h1 class="product-title">' + escapeHtml(product.name || "") + '</h1><p class="product-meta">' + escapeHtml(metaGender) + catPart + "</p>" + priceHtml + availHtml + artHtml + brandHtml + '<div class="product-summary"><div class="product-description">' + descSummaryInner + '</div></div><div class="product-specs">' + seasonHtml + materialsHtml + variantsHtml + attributesHtml + "</div></div></div>";
     const favBtn = productMainEl.querySelector('[data-action="product-favorite"]');
     const cartBtnEl = productMainEl.querySelector('[data-action="product-cart"]');
     const inqBtn = productMainEl.querySelector('[data-action="product-inquire"]');
@@ -804,6 +808,9 @@ function getProductImage(product) {
 function listsPush() {
   if (window.KpvsListsSync) window.KpvsListsSync.push();
 }
+function listsPushNow() {
+  if (window.KpvsListsSync) window.KpvsListsSync.pushNow();
+}
 function refreshProductButtons() {
   if (!currentProductId) return;
   const favorites = getFavorites();
@@ -811,11 +818,11 @@ function refreshProductButtons() {
   const isFavorite = favorites.some((i) => i.id === currentProductId);
   const isInCart = cart.some((i) => i.id === currentProductId);
   document.querySelectorAll(".favorite-action-btn").forEach((btn) => {
-    btn.textContent = isFavorite ? "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E" : "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435";
+    btn.textContent = isFavorite ? BTN_REMOVE_FAVORITE : BTN_ADD_FAVORITE;
     btn.classList.toggle("in-favorites", isFavorite);
   });
   document.querySelectorAll(".cart-action-btn").forEach((btn) => {
-    btn.textContent = isInCart ? "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B" : "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0443";
+    btn.textContent = isInCart ? BTN_REMOVE_CART : BTN_ADD_CART;
     btn.classList.toggle("in-cart", isInCart);
   });
 }
@@ -827,17 +834,17 @@ function toggleCart(productId, buttonElement) {
   if (idx === -1) {
     cart.push({ id, source: "product" });
     localStorage.setItem("cart", JSON.stringify(cart));
-    listsPush();
+    listsPushNow();
     if (buttonElement) {
-      buttonElement.textContent = "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B";
+      buttonElement.textContent = BTN_REMOVE_CART;
       buttonElement.classList.add("in-cart");
     }
   } else {
     cart.splice(idx, 1);
     localStorage.setItem("cart", JSON.stringify(cart));
-    listsPush();
+    listsPushNow();
     if (buttonElement) {
-      buttonElement.textContent = "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0443";
+      buttonElement.textContent = BTN_ADD_CART;
       buttonElement.classList.remove("in-cart");
     }
   }
@@ -862,24 +869,24 @@ function toggleFavorite(productId, buttonElement) {
     favorites.push({ id: productId, source: "product" });
   }
   localStorage.setItem("favorites", JSON.stringify(favorites));
-  listsPush();
+  listsPushNow();
   const btn = buttonElement || document.querySelector(".favorite-action-btn");
   if (btn) {
-    btn.textContent = wasFavorite ? "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435" : "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E";
+    btn.textContent = wasFavorite ? BTN_ADD_FAVORITE : BTN_REMOVE_FAVORITE;
     btn.classList.toggle("in-favorites", !wasFavorite);
   }
   refreshProductButtons();
 }
 function removeFromFavorites(productId) {
   localStorage.setItem("favorites", JSON.stringify(getFavorites().filter((i) => i.id !== productId)));
-  listsPush();
+  listsPushNow();
   refreshProductButtons();
 }
 function removeFromCart(productId) {
   const id = Number(productId);
   if (!Number.isFinite(id)) return;
   localStorage.setItem("cart", JSON.stringify(getCart().filter((i) => Number(i.id) !== id)));
-  listsPush();
+  listsPushNow();
   refreshProductButtons();
   document.querySelectorAll('#kpvs-favorites-modal [data-action="toggle-cart"]').forEach((btn) => {
     const pid = Number(btn.dataset && btn.dataset.productId);
@@ -998,6 +1005,13 @@ function inquirePriceFromCart() {
   });
 }
 function openFavoritesModal() {
+  if (window.KpvsListsSync && window.KpvsListsSync.refreshBefore) {
+    window.KpvsListsSync.refreshBefore(openFavoritesModalInner);
+    return;
+  }
+  openFavoritesModalInner();
+}
+function openFavoritesModalInner() {
   const existing = document.getElementById("kpvs-favorites-modal");
   if (existing) window.kpvsDismissTopModal(existing);
   const favorites = getFavorites();
@@ -1063,6 +1077,13 @@ function openFavoritesModal() {
   });
 }
 function openCartModal() {
+  if (window.KpvsListsSync && window.KpvsListsSync.refreshBefore) {
+    window.KpvsListsSync.refreshBefore(openCartModalInner);
+    return;
+  }
+  openCartModalInner();
+}
+function openCartModalInner() {
   const existing = document.getElementById("kpvs-cart-modal");
   if (existing) window.kpvsDismissTopModal(existing);
   const cart = getCart();
@@ -1130,11 +1151,14 @@ function openMap() {
   window.open("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("\u0411\u0440\u0435\u0441\u0442, \u0443\u043B. \u043B-\u0442\u0430 \u0420\u044F\u0431\u0446\u0435\u0432\u0430, 44"), "_blank");
 }
 document.addEventListener("DOMContentLoaded", () => {
-  loadProduct();
-  if (window.KpvsListsSync) {
-    window.KpvsListsSync.pull().then(() => {
-      refreshProductButtons();
-    });
+  document.addEventListener("kpvs-lists-synced", () => {
+    refreshProductButtons();
+  });
+  const bootProduct = () => loadProduct();
+  if (window.KpvsListsSync && window.KpvsListsSync.pull) {
+    window.KpvsListsSync.pull().finally(bootProduct);
+  } else {
+    bootProduct();
   }
   try {
     const el = document.querySelector("[data-account-action]");

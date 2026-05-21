@@ -131,14 +131,19 @@ const Catalog = (() => {
     loadCatalogStateFromStorage();
     attachPageEvents();
     applyCatalogStateToControls();
-    loadReferenceData().then(function() {
-      loadProducts();
+    document.addEventListener("kpvs-lists-synced", function() {
+      refreshCatalogButtons();
+      renderProducts();
     });
-    if (window.KpvsListsSync) {
-      window.KpvsListsSync.pull().then(function() {
-        refreshCatalogButtons();
-        renderProducts();
+    var bootCatalog = function() {
+      loadReferenceData().then(function() {
+        loadProducts();
       });
+    };
+    if (window.KpvsListsSync && window.KpvsListsSync.pull) {
+      window.KpvsListsSync.pull().finally(bootCatalog);
+    } else {
+      bootCatalog();
     }
   }
   function detectPageGender() {
@@ -1136,6 +1141,9 @@ const Catalog = (() => {
   function listsPush() {
     if (window.KpvsListsSync) window.KpvsListsSync.push();
   }
+  function listsPushNow() {
+    if (window.KpvsListsSync) window.KpvsListsSync.pushNow();
+  }
   function getCart() {
     try {
       const raw = localStorage.getItem("cart");
@@ -1202,7 +1210,7 @@ const Catalog = (() => {
       favorites.push({ id, source: pageGender });
     }
     localStorage.setItem("favorites", JSON.stringify(favorites));
-    listsPush();
+    listsPushNow();
     if (buttonElement) {
       buttonElement.textContent = wasFavorite ? "\u0412 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435" : "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E";
       buttonElement.classList.toggle("in-favorites", !wasFavorite);
@@ -1219,7 +1227,7 @@ const Catalog = (() => {
     if (idx === -1) {
       cart.push({ id, source: pageGender });
       localStorage.setItem("cart", JSON.stringify(cart));
-      listsPush();
+      listsPushNow();
       if (buttonElement) {
         buttonElement.textContent = "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B";
         buttonElement.classList.add("in-cart");
@@ -1227,7 +1235,7 @@ const Catalog = (() => {
     } else {
       cart.splice(idx, 1);
       localStorage.setItem("cart", JSON.stringify(cart));
-      listsPush();
+      listsPushNow();
       if (buttonElement) {
         buttonElement.textContent = "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0443";
         buttonElement.classList.remove("in-cart");
@@ -1242,7 +1250,7 @@ const Catalog = (() => {
     localStorage.setItem("favorites", JSON.stringify(getFavorites().filter(function(i) {
       return Number(i.id) !== id;
     })));
-    listsPush();
+    listsPushNow();
     refreshCatalogButtons();
     renderProducts();
   }
@@ -1252,7 +1260,7 @@ const Catalog = (() => {
     localStorage.setItem("cart", JSON.stringify(getCart().filter(function(i) {
       return Number(i.id) !== id;
     })));
-    listsPush();
+    listsPushNow();
     refreshCatalogButtons();
     renderProducts();
     syncOpenModalCartToggleButtons();
@@ -1326,6 +1334,13 @@ const Catalog = (() => {
     });
   }
   function openFavoritesModal() {
+    if (window.KpvsListsSync && window.KpvsListsSync.refreshBefore) {
+      window.KpvsListsSync.refreshBefore(openFavoritesModalInner);
+      return;
+    }
+    openFavoritesModalInner();
+  }
+  function openFavoritesModalInner() {
     const existing = document.getElementById("kpvs-favorites-modal");
     if (existing) window.kpvsDismissTopModal(existing);
     const favorites = getFavorites();
@@ -1385,6 +1400,13 @@ const Catalog = (() => {
     });
   }
   function openCartModal() {
+    if (window.KpvsListsSync && window.KpvsListsSync.refreshBefore) {
+      window.KpvsListsSync.refreshBefore(openCartModalInner);
+      return;
+    }
+    openCartModalInner();
+  }
+  function openCartModalInner() {
     const existing = document.getElementById("kpvs-cart-modal");
     if (existing) window.kpvsDismissTopModal(existing);
     const cart = getCart();

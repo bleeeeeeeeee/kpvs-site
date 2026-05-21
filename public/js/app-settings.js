@@ -2,6 +2,15 @@
   var THEME_KEY = "kpvs.theme";
   var pushTimer = null;
   var pullInFlight = null;
+  var pullFocusTimer = null;
+  var lastFingerprint = "";
+  var csrfReady = null;
+  function ensureCsrf() {
+    if (!csrfReady) {
+      csrfReady = fetch("/api/csrf-token", { credentials: "include" }).catch(function() {});
+    }
+    return csrfReady;
+  }
   function applyTheme() {
     var t = "";
     try {
@@ -33,20 +42,16 @@
     }
     return out;
   }
-  function mergeById(a, b) {
-    var out = [];
-    var seen = {};
-    var lists = [a, b];
-    for (var li = 0; li < lists.length; li++) {
-      var list = lists[li];
-      for (var i = 0; i < list.length; i++) {
-        var id = list[i].id;
-        if (seen[id]) continue;
-        seen[id] = 1;
-        out.push(list[i]);
-      }
+  function fingerprint(cart, favorites) {
+    function sig(list) {
+      return list
+        .map(function(i) {
+          return String(i.id) + ":" + (i.source || "");
+        })
+        .sort()
+        .join(",");
     }
-    return out;
+    return sig(cart) + ";" + sig(favorites);
   }
   function readLocal() {
     var cart = [];
@@ -63,12 +68,28 @@
     }
     return { cart: normalizeItems(cart), favorites: normalizeItems(favorites) };
   }
-  function persistLocal(cart, favorites) {
+  function persistLocal(cart, favorites, notify) {
+    var fp = fingerprint(cart, favorites);
+    var changed = fp !== lastFingerprint;
     try {
       localStorage.setItem("cart", JSON.stringify(cart));
       localStorage.setItem("favorites", JSON.stringify(favorites));
     } catch {
     }
+    lastFingerprint = fp;
+    if (notify && changed) {
+      try {
+        document.dispatchEvent(new CustomEvent("kpvs-lists-synced", { detail: { cart: cart, favorites: favorites } }));
+      } catch {
+      }
+    }
+    return changed;
+  }
+  function resolveList(serverList, localList) {
+    var server = normalizeItems(serverList);
+    var local = normalizeItems(localList);
+    if (!server.length && local.length) return { list: local, upload: true };
+    return { list: server, upload: false };
   }
   function fetchMe() {
     return fetch("/api/user/auth/me", { credentials: "include" }).then(function(r) {
@@ -79,59 +100,119 @@
     });
   }
   function putLists(cart, favorites) {
-    if (!window.KpvsApi || !window.KpvsApi.apiFetch) return Promise.resolve(false);
-    return window.KpvsApi.apiFetch("/api/user/lists", {
+    if (!window.KpvsApi || !window.KpvsApi.apiFetch) return Promise.resolve(null);
+    return ensureCsrf().then(function() {
+      return window.KpvsApi.apiFetch("/api/user/lists", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cart: cart, favorites: favorites })
-    }).then(function(r) {
-      return !!(r && r.ok);
-    }).catch(function() {
-      return false;
     });
+    }).then(function(r) {
+        if (!r || !r.ok) return null;
+        return r.json();
+      })
+      .catch(function() {
+        return null;
+      });
+  }
+  function getLists() {
+    if (!window.KpvsApi || !window.KpvsApi.apiFetch) return Promise.resolve(null);
+    return ensureCsrf().then(function() {
+      return window.KpvsApi.apiFetch("/api/user/lists");
+    })
+      .then(function(r) {
+        if (!r || !r.ok) return null;
+        return r.json();
+      })
+      .catch(function() {
+        return null;
+      });
   }
   function pull() {
-    if (pullInFlight) return pullInFlight;
-    pullInFlight = fetchMe().then(function(me) {
-      if (!me || !me.id || String(me.role) !== "user") return false;
-      if (!window.KpvsApi || !window.KpvsApi.apiFetch) return false;
-      return window.KpvsApi.apiFetch("/api/user/lists").then(function(r) {
-        if (!r || !r.ok) return false;
-        return r.json();
-      }).then(function(data) {
-        if (!data) return false;
-        var local = readLocal();
-        var cart = mergeById(local.cart, normalizeItems(data.cart));
-        var favorites = mergeById(local.favorites, normalizeItems(data.favorites));
-        persistLocal(cart, favorites);
-        return putLists(cart, favorites);
+    if (pushTimer) {
+      return new Promise(function(resolve) {
+        setTimeout(function() {
+          resolve(pull());
+        }, 450);
       });
-    }).finally(function() {
-      pullInFlight = null;
-    });
+    }
+    if (pullInFlight) return pullInFlight;
+    pullInFlight = fetchMe()
+      .then(function(me) {
+        if (!me || !me.id || String(me.role) !== "user") {
+          lastFingerprint = fingerprint(readLocal().cart, readLocal().favorites);
+          return false;
+        }
+        return getLists().then(function(data) {
+          if (!data) return false;
+          var local = readLocal();
+          var cartResolved = resolveList(data.cart, local.cart);
+          var favResolved = resolveList(data.favorites, local.favorites);
+          var outCart = cartResolved.list;
+          var outFav = favResolved.list;
+          var needUpload = cartResolved.upload || favResolved.upload;
+          if (needUpload) {
+            return putLists(outCart, outFav).then(function(saved) {
+              if (saved) {
+                persistLocal(saved.cart, saved.favorites, true);
+                return true;
+              }
+              persistLocal(outCart, outFav, true);
+              return true;
+            });
+          }
+          persistLocal(outCart, outFav, true);
+          return true;
+        });
+      })
+      .finally(function() {
+        pullInFlight = null;
+      });
     return pullInFlight;
   }
   function push() {
     clearTimeout(pushTimer);
     pushTimer = setTimeout(function() {
-      fetchMe().then(function(me) {
-        if (!me || !me.id || String(me.role) !== "user") return;
-        var local = readLocal();
-        putLists(local.cart, local.favorites);
-      });
-    }, 400);
+      pushTimer = null;
+      pushNow();
+    }, 250);
   }
   function pushNow() {
     clearTimeout(pushTimer);
+    pushTimer = null;
     return fetchMe().then(function(me) {
-      if (!me || !me.id || String(me.role) !== "user") return;
+      if (!me || !me.id || String(me.role) !== "user") return false;
       var local = readLocal();
-      return putLists(local.cart, local.favorites);
+      return putLists(local.cart, local.favorites).then(function(saved) {
+        if (saved) lastFingerprint = fingerprint(saved.cart, saved.favorites);
+        return !!saved;
+      });
     });
   }
-  window.KpvsListsSync = { pull: pull, push: push, pushNow: pushNow };
+  function refreshBefore(action) {
+    if (typeof action !== "function") return Promise.resolve();
+    return pull().then(function() {
+      action();
+    });
+  }
+  window.KpvsListsSync = { pull: pull, push: push, pushNow: pushNow, refreshBefore: refreshBefore };
   document.addEventListener("DOMContentLoaded", function() {
     applyTheme();
+    var local = readLocal();
+    lastFingerprint = fingerprint(local.cart, local.favorites);
     pull();
+  });
+  document.addEventListener("visibilitychange", function() {
+    if (document.visibilityState !== "visible") return;
+    clearTimeout(pullFocusTimer);
+    pullFocusTimer = setTimeout(function() {
+      pull();
+    }, 200);
+  });
+  window.addEventListener("focus", function() {
+    clearTimeout(pullFocusTimer);
+    pullFocusTimer = setTimeout(function() {
+      pull();
+    }, 200);
   });
 })();
