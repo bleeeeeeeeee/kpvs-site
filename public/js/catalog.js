@@ -134,6 +134,12 @@ const Catalog = (() => {
     loadReferenceData().then(function() {
       loadProducts();
     });
+    if (window.KpvsListsSync) {
+      window.KpvsListsSync.pull().then(function() {
+        refreshCatalogButtons();
+        renderProducts();
+      });
+    }
   }
   function detectPageGender() {
     const body = document.body;
@@ -1127,6 +1133,9 @@ const Catalog = (() => {
       return [];
     }
   }
+  function listsPush() {
+    if (window.KpvsListsSync) window.KpvsListsSync.push();
+  }
   function getCart() {
     try {
       const raw = localStorage.getItem("cart");
@@ -1193,6 +1202,7 @@ const Catalog = (() => {
       favorites.push({ id, source: pageGender });
     }
     localStorage.setItem("favorites", JSON.stringify(favorites));
+    listsPush();
     if (buttonElement) {
       buttonElement.textContent = wasFavorite ? "\u0412 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435" : "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E";
       buttonElement.classList.toggle("in-favorites", !wasFavorite);
@@ -1209,6 +1219,7 @@ const Catalog = (() => {
     if (idx === -1) {
       cart.push({ id, source: pageGender });
       localStorage.setItem("cart", JSON.stringify(cart));
+      listsPush();
       if (buttonElement) {
         buttonElement.textContent = "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B";
         buttonElement.classList.add("in-cart");
@@ -1216,6 +1227,7 @@ const Catalog = (() => {
     } else {
       cart.splice(idx, 1);
       localStorage.setItem("cart", JSON.stringify(cart));
+      listsPush();
       if (buttonElement) {
         buttonElement.textContent = "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0443";
         buttonElement.classList.remove("in-cart");
@@ -1230,6 +1242,7 @@ const Catalog = (() => {
     localStorage.setItem("favorites", JSON.stringify(getFavorites().filter(function(i) {
       return Number(i.id) !== id;
     })));
+    listsPush();
     refreshCatalogButtons();
     renderProducts();
   }
@@ -1239,6 +1252,7 @@ const Catalog = (() => {
     localStorage.setItem("cart", JSON.stringify(getCart().filter(function(i) {
       return Number(i.id) !== id;
     })));
+    listsPush();
     refreshCatalogButtons();
     renderProducts();
     syncOpenModalCartToggleButtons();

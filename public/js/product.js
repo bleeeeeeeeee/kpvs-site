@@ -801,6 +801,9 @@ function getProductImage(product) {
   }
   return "/img/item.png";
 }
+function listsPush() {
+  if (window.KpvsListsSync) window.KpvsListsSync.push();
+}
 function refreshProductButtons() {
   if (!currentProductId) return;
   const favorites = getFavorites();
@@ -824,6 +827,7 @@ function toggleCart(productId, buttonElement) {
   if (idx === -1) {
     cart.push({ id, source: "product" });
     localStorage.setItem("cart", JSON.stringify(cart));
+    listsPush();
     if (buttonElement) {
       buttonElement.textContent = "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B";
       buttonElement.classList.add("in-cart");
@@ -831,6 +835,7 @@ function toggleCart(productId, buttonElement) {
   } else {
     cart.splice(idx, 1);
     localStorage.setItem("cart", JSON.stringify(cart));
+    listsPush();
     if (buttonElement) {
       buttonElement.textContent = "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0443";
       buttonElement.classList.remove("in-cart");
@@ -857,6 +862,7 @@ function toggleFavorite(productId, buttonElement) {
     favorites.push({ id: productId, source: "product" });
   }
   localStorage.setItem("favorites", JSON.stringify(favorites));
+  listsPush();
   const btn = buttonElement || document.querySelector(".favorite-action-btn");
   if (btn) {
     btn.textContent = wasFavorite ? "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435" : "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E";
@@ -866,12 +872,14 @@ function toggleFavorite(productId, buttonElement) {
 }
 function removeFromFavorites(productId) {
   localStorage.setItem("favorites", JSON.stringify(getFavorites().filter((i) => i.id !== productId)));
+  listsPush();
   refreshProductButtons();
 }
 function removeFromCart(productId) {
   const id = Number(productId);
   if (!Number.isFinite(id)) return;
   localStorage.setItem("cart", JSON.stringify(getCart().filter((i) => Number(i.id) !== id)));
+  listsPush();
   refreshProductButtons();
   document.querySelectorAll('#kpvs-favorites-modal [data-action="toggle-cart"]').forEach((btn) => {
     const pid = Number(btn.dataset && btn.dataset.productId);
@@ -1123,6 +1131,11 @@ function openMap() {
 }
 document.addEventListener("DOMContentLoaded", () => {
   loadProduct();
+  if (window.KpvsListsSync) {
+    window.KpvsListsSync.pull().then(() => {
+      refreshProductButtons();
+    });
+  }
   try {
     const el = document.querySelector("[data-account-action]");
     if (el) {

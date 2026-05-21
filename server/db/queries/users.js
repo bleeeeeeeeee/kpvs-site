@@ -391,6 +391,46 @@ async function deleteUserById(db, id) {
   const result = await db.query("DELETE FROM users WHERE id = $1 RETURNING id, username, role", [id]);
   return result.rows[0] || null;
 }
+function sanitizeListItems(raw) {
+  if (!Array.isArray(raw)) return [];
+  const out = [];
+  const seen = new Set();
+  for (const item of raw) {
+    let id = NaN;
+    let source = "";
+    if (typeof item === "number" || typeof item === "string") {
+      id = Number(item);
+    } else if (item && typeof item === "object") {
+      id = Number(item.id);
+      source = item.source != null ? String(item.source).trim().slice(0, 32) : "";
+    }
+    if (!Number.isFinite(id) || id <= 0) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    out.push({ id, source });
+    if (out.length >= 500) break;
+  }
+  return out;
+}
+async function getUserLists(db, userId) {
+  const r = await db.query("SELECT cart_json, favorites_json FROM users WHERE id = $1 LIMIT 1", [userId]);
+  const row = r.rows[0];
+  if (!row) return null;
+  return {
+    cart: sanitizeListItems(row.cart_json),
+    favorites: sanitizeListItems(row.favorites_json)
+  };
+}
+async function setUserLists(db, userId, cart, favorites) {
+  const cartSafe = sanitizeListItems(cart);
+  const favSafe = sanitizeListItems(favorites);
+  await db.query("UPDATE users SET cart_json = $2::jsonb, favorites_json = $3::jsonb WHERE id = $1", [
+    userId,
+    JSON.stringify(cartSafe),
+    JSON.stringify(favSafe)
+  ]);
+  return { cart: cartSafe, favorites: favSafe };
+}
 async function ensureUserAuthSchema(db) {
   const client = await db.connect();
   try {
@@ -510,4 +550,6 @@ module.exports.deleteUserById = deleteUserById;
 module.exports.insertEmailVerificationCode = insertEmailVerificationCode;
 module.exports.getLatestEmailVerification = getLatestEmailVerification;
 module.exports.consumeEmailVerificationCode = consumeEmailVerificationCode;
+module.exports.getUserLists = getUserLists;
+module.exports.setUserLists = setUserLists;
 module.exports.ensureUserAuthSchema = ensureUserAuthSchema;

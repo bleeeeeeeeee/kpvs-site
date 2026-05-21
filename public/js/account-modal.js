@@ -421,16 +421,16 @@
       b.disabled = true;
     });
     if (built.hint) built.hint.textContent = "";
-    apiFetchAccount("/api/csrf-token", { method: "GET" })
-      .catch(function() {})
-      .then(function() {
+    var syncOut = window.KpvsListsSync && window.KpvsListsSync.pushNow ? window.KpvsListsSync.pushNow() : Promise.resolve();
+    syncOut.catch(function() {}).then(function() {
+      return apiFetchAccount("/api/csrf-token", { method: "GET" });
+    }).catch(function() {}).then(function() {
         return apiFetchAccount("/api/user/auth/logout", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: "{}"
         });
-      })
-      .then(function(r) {
+      }).then(function(r) {
         lockBtns.forEach(function(b) {
           b.disabled = false;
         });

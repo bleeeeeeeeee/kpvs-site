@@ -305,6 +305,34 @@ function mountAuthRoutes(app, ctx) {
       res.status(500).json({ error: "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430" });
     }
   });
+  app.get("/api/user/lists", requireUserJwt, async (req, res) => {
+    try {
+      const id = Number(req.userJwt.sub);
+      const row = await db.findUserById(id);
+      if (!row || !row.is_active) return res.status(403).json({ error: "\u0410\u043A\u043A\u0430\u0443\u043D\u0442 \u043E\u0442\u043A\u043B\u044E\u0447\u0451\u043D" });
+      if (String(row.role || "") !== "user") return res.status(403).json({ error: "\u041D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E" });
+      const lists = await db.getUserLists(id);
+      if (!lists) return res.status(404).json({ error: "\u041F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044C \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D" });
+      res.json(lists);
+    } catch (err) {
+      console.error("GET /api/user/lists:", err);
+      res.status(500).json({ error: "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430" });
+    }
+  });
+  app.put("/api/user/lists", requireUserJwt, async (req, res) => {
+    try {
+      const id = Number(req.userJwt.sub);
+      const row = await db.findUserById(id);
+      if (!row || !row.is_active) return res.status(403).json({ error: "\u0410\u043A\u043A\u0430\u0443\u043D\u0442 \u043E\u0442\u043A\u043B\u044E\u0447\u0451\u043D" });
+      if (String(row.role || "") !== "user") return res.status(403).json({ error: "\u041D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E" });
+      const body = req.body || {};
+      const saved = await db.setUserLists(id, body.cart, body.favorites);
+      res.json(saved);
+    } catch (err) {
+      console.error("PUT /api/user/lists:", err);
+      res.status(500).json({ error: "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430" });
+    }
+  });
   app.patch("/api/user/auth/username", requireUserJwt, async (req, res) => {
     try {
       const id = Number(req.userJwt.sub);
