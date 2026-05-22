@@ -1000,7 +1000,16 @@ async function updateProduct(pool, id, data, ctx = {}) {
 }
 async function deleteProduct(pool, id) {
   const result = await pool.query("DELETE FROM products WHERE id = $1", [id]);
-  return result.rowCount > 0;
+  const deleted = result.rowCount > 0;
+  if (deleted) {
+    try {
+      const users = require("./users");
+      await users.removeProductIdFromAllUserLists(pool, id);
+    } catch (e) {
+      console.warn("[lists] prune after product delete:", e && e.message);
+    }
+  }
+  return deleted;
 }
 async function updateProductActiveFlag(pool, id, isActive) {
   const result = await pool.query(

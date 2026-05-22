@@ -10,7 +10,34 @@
   var TOKEN_KEY = "kpvs.user.jwt";
   var THEME_KEY = "kpvs.theme";
   var OAUTH_PWD_PROMPT_KEY = "kpvs.oauthPasswordPrompt";
+  var PROFILE_SYNC_KEY = "kpvs.profile.revision";
   var modalState = null;
+  function notifyProfileChanged(kind) {
+    if (window.KpvsApi && window.KpvsApi.notifyProfileChanged) {
+      window.KpvsApi.notifyProfileChanged(kind);
+    }
+  }
+  function isAccountModalVisible() {
+    var m = qs("#account-modal");
+    return !!(m && m.classList.contains("show"));
+  }
+  function applyProfileSyncFromServer() {
+    return fetchMe().then(function(me) {
+      if (!me) return;
+      if (document.getElementById("oauth-password-prompt-modal") && userHasPasswordSet(me)) {
+        dismissOauthPasswordPrompt();
+      }
+      if (userHasPasswordSet(me)) {
+        try {
+          sessionStorage.removeItem(OAUTH_PWD_PROMPT_KEY);
+        } catch {
+        }
+      }
+      if (modalState && isAccountModalVisible()) {
+        renderAuthed(modalState, me);
+      }
+    });
+  }
   function apiFetchAccount(url, init) {
     if (window.KpvsApi && window.KpvsApi.apiFetch) {
       return window.KpvsApi.apiFetch(url, init);
@@ -233,6 +260,7 @@
         } catch {
         }
         dismissOauthPasswordPrompt();
+        notifyProfileChanged("password");
       }).catch(function() {
         hint.textContent = "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C \u043F\u0430\u0440\u043E\u043B\u044C";
         btnSave.disabled = false;
@@ -1000,10 +1028,7 @@
           built.hint.textContent = "\u041B\u043E\u0433\u0438\u043D \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D";
           setRenameBusy(false);
           setRenameMode(false);
-          try {
-            window.location.reload();
-          } catch {
-          }
+          notifyProfileChanged("username");
         }).catch(function() {
           built.hint.textContent = "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043C\u0435\u043D\u0438\u0442\u044C \u043B\u043E\u0433\u0438\u043D";
           setRenameBusy(false);
@@ -1087,6 +1112,7 @@
             }
             if (me) renderAuthed(built, me, "\u041F\u0430\u0440\u043E\u043B\u044C \u0441\u043E\u0445\u0440\u0430\u043D\u0451\u043D");
             else collapseAccountPasswordPanel(built);
+            notifyProfileChanged("password");
           });
         }).catch(function() {
           built.pwdHint.textContent = "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043C\u0435\u043D\u0438\u0442\u044C \u043F\u0430\u0440\u043E\u043B\u044C";
@@ -1104,13 +1130,22 @@
       }
       var current = document.documentElement.getAttribute("data-theme") || "light";
       setSelected(current);
+      function prefsPushNow() {
+        if (window.KpvsListsSync && window.KpvsListsSync.pushNow) window.KpvsListsSync.pushNow();
+      }
       if (built.themeLightBtn) built.themeLightBtn.addEventListener("click", function() {
         setTheme("light");
         setSelected("light");
+        prefsPushNow();
       });
       if (built.themeDarkBtn) built.themeDarkBtn.addEventListener("click", function() {
         setTheme("dark");
         setSelected("dark");
+        prefsPushNow();
+      });
+      document.addEventListener("kpvs-lists-synced", function() {
+        var synced = document.documentElement.getAttribute("data-theme") || "light";
+        setSelected(synced);
       });
     })();
     var persistKey = "kpvs.catalog.persist";
@@ -1123,6 +1158,13 @@
       built.sPersistToggle.addEventListener("change", function() {
         try {
           localStorage.setItem(persistKey, built.sPersistToggle.checked ? "1" : "0");
+        } catch {
+        }
+        if (window.KpvsListsSync && window.KpvsListsSync.pushNow) window.KpvsListsSync.pushNow();
+      });
+      document.addEventListener("kpvs-lists-synced", function() {
+        try {
+          built.sPersistToggle.checked = localStorage.getItem(persistKey) !== "0";
         } catch {
         }
       });
@@ -1298,6 +1340,13 @@
       });
     });
   }
+  function onProfileChangedExternally() {
+    applyProfileSyncFromServer();
+  }
+  window.addEventListener("storage", function(e) {
+    if (e.key === PROFILE_SYNC_KEY) onProfileChangedExternally();
+  });
+  document.addEventListener("kpvs-profile-changed", onProfileChangedExternally);
   document.addEventListener("DOMContentLoaded", function() {
     bindTriggers();
     loadTheme();

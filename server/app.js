@@ -159,7 +159,6 @@ app.use((req, res) => {
   sendHtmlError(res, PUB_ROOT, 404);
 });
 app.use((err, req, res, next) => {
-  console.error(err);
   if (res.headersSent) return next(err);
   if (err && err.code === "EBADCSRFTOKEN" && isApiPath(req.path)) {
     return res.status(403).type("application/json").json({
@@ -167,6 +166,7 @@ app.use((err, req, res, next) => {
         "\u041D\u0435\u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u0439 CSRF-\u0442\u043E\u043A\u0435\u043D. \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u0435 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443 \u0438\u043B\u0438 \u0437\u0430\u0439\u0434\u0438\u0442\u0435 \u0441\u043D\u043E\u0432\u0430."
     });
   }
+  console.error(err);
   if (isApiPath(req.path)) {
     return res.status(500).json({ error: "\u041E\u0448\u0438\u0431\u043A\u0430 \u0441\u0435\u0440\u0432\u0435\u0440\u0430" });
   }

@@ -13,4 +13,18 @@ function apiFetch(url, init) {
   }
   return window.fetch(url, next);
 }
-window.KpvsApi = { apiFetch, readCookie };
+const PROFILE_SYNC_KEY = "kpvs.profile.revision";
+function notifyProfileChanged(kind) {
+  const stamp = String(Date.now()) + ":" + String(kind || "profile");
+  try {
+    localStorage.setItem(PROFILE_SYNC_KEY, stamp);
+  } catch {
+  }
+  try {
+    document.dispatchEvent(
+      new CustomEvent("kpvs-profile-changed", { detail: { kind: String(kind || "profile") } })
+    );
+  } catch {
+  }
+}
+window.KpvsApi = { apiFetch, readCookie, notifyProfileChanged, PROFILE_SYNC_KEY };

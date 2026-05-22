@@ -412,24 +412,137 @@ function sanitizeListItems(raw) {
   }
   return out;
 }
-async function getUserLists(db, userId) {
-  const r = await db.query("SELECT cart_json, favorites_json FROM users WHERE id = $1 LIMIT 1", [userId]);
-  const row = r.rows[0];
-  if (!row) return null;
+const CATALOG_STATE_GENDERS = ["mens", "womens", "all"];
+function sanitizeCatalogFilters(raw) {
+  if (!raw || typeof raw !== "object") {
+    return { categories: [], brands: [], seasons: [], sizes: [], sizeLabels: {}, colors: [], collections: [] };
+  }
+  const arr = (v, max) => (Array.isArray(v) ? v.map(String).slice(0, max) : []);
+  const sizeLabels = raw.sizeLabels && typeof raw.sizeLabels === "object" ? raw.sizeLabels : {};
+  const labelsOut = {};
+  for (const k of Object.keys(sizeLabels).slice(0, 80)) {
+    const v = sizeLabels[k];
+    if (v != null) labelsOut[String(k).slice(0, 32)] = String(v).slice(0, 64);
+  }
   return {
-    cart: sanitizeListItems(row.cart_json),
-    favorites: sanitizeListItems(row.favorites_json)
+    categories: arr(raw.categories, 80),
+    brands: arr(raw.brands, 80),
+    seasons: arr(raw.seasons, 12),
+    sizes: arr(raw.sizes, 120),
+    sizeLabels: labelsOut,
+    colors: arr(raw.colors, 80),
+    collections: arr(raw.collections, 40)
   };
 }
-async function setUserLists(db, userId, cart, favorites) {
-  const cartSafe = sanitizeListItems(cart);
-  const favSafe = sanitizeListItems(favorites);
-  await db.query("UPDATE users SET cart_json = $2::jsonb, favorites_json = $3::jsonb WHERE id = $1", [
-    userId,
-    JSON.stringify(cartSafe),
-    JSON.stringify(favSafe)
-  ]);
-  return { cart: cartSafe, favorites: favSafe };
+function sanitizePreferences(raw) {
+  const out = { theme: "light", catalogPersist: true, catalogState: {} };
+  if (!raw || typeof raw !== "object") return out;
+  out.theme = raw.theme === "dark" ? "dark" : "light";
+  out.catalogPersist = raw.catalogPersist !== false;
+  const src = raw.catalogState && typeof raw.catalogState === "object" ? raw.catalogState : {};
+  for (const g of CATALOG_STATE_GENDERS) {
+    const block = src[g];
+    if (!block || typeof block !== "object") continue;
+    out.catalogState[g] = {
+      v: 1,
+      gender: g,
+      sort: typeof block.sort === "string" ? block.sort.slice(0, 64) : "name_asc",
+      search: typeof block.search === "string" ? block.search.slice(0, 200) : "",
+      filters: sanitizeCatalogFilters(block.filters)
+    };
+  }
+  return out;
+}
+function isEmptyPreferences(prefs) {
+  const p = sanitizePreferences(prefs);
+  if (p.theme === "dark") return false;
+  if (p.catalogPersist === false) return false;
+  return Object.keys(p.catalogState).length === 0;
+}
+async function filterActiveProductIds(db, ids) {
+  const nums = [...new Set(
+    (Array.isArray(ids) ? ids : [])
+      .map((v) => Number(v))
+      .filter((n) => Number.isFinite(n) && n > 0)
+  )].slice(0, 500);
+  if (!nums.length) return new Set();
+  const r = await db.query(
+    "SELECT id FROM products WHERE id = ANY($1::int[]) AND is_active = TRUE",
+    [nums]
+  );
+  return new Set(r.rows.map((row) => Number(row.id)));
+}
+async function pruneListItemsAgainstProducts(db, items) {
+  const safe = sanitizeListItems(items);
+  if (!safe.length) return safe;
+  const active = await filterActiveProductIds(
+    db,
+    safe.map((i) => i.id)
+  );
+  return safe.filter((i) => active.has(i.id));
+}
+function listsPayloadEqual(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+async function removeProductIdFromAllUserLists(db, productId) {
+  const pid = Number(productId);
+  if (!Number.isFinite(pid) || pid <= 0) return 0;
+  const r = await db.query(
+    `UPDATE users u SET
+      cart_json = COALESCE((
+        SELECT jsonb_agg(e ORDER BY (e->>'id'))
+        FROM jsonb_array_elements(COALESCE(u.cart_json, '[]'::jsonb)) AS e
+        WHERE (e->>'id')::bigint <> $1
+      ), '[]'::jsonb),
+      favorites_json = COALESCE((
+        SELECT jsonb_agg(e ORDER BY (e->>'id'))
+        FROM jsonb_array_elements(COALESCE(u.favorites_json, '[]'::jsonb)) AS e
+        WHERE (e->>'id')::bigint <> $1
+      ), '[]'::jsonb)
+    WHERE role = 'user'
+      AND (
+        EXISTS (
+          SELECT 1 FROM jsonb_array_elements(COALESCE(u.cart_json, '[]'::jsonb)) e
+          WHERE (e->>'id')::bigint = $1
+        )
+        OR EXISTS (
+          SELECT 1 FROM jsonb_array_elements(COALESCE(u.favorites_json, '[]'::jsonb)) e
+          WHERE (e->>'id')::bigint = $1
+        )
+      )`,
+    [pid]
+  );
+  return r.rowCount || 0;
+}
+async function getUserLists(db, userId) {
+  const r = await db.query(
+    "SELECT cart_json, favorites_json, preferences_json FROM users WHERE id = $1 LIMIT 1",
+    [userId]
+  );
+  const row = r.rows[0];
+  if (!row) return null;
+  const cartRaw = sanitizeListItems(row.cart_json);
+  const favRaw = sanitizeListItems(row.favorites_json);
+  const cart = await pruneListItemsAgainstProducts(db, cartRaw);
+  const favorites = await pruneListItemsAgainstProducts(db, favRaw);
+  const preferences = sanitizePreferences(row.preferences_json);
+  if (!listsPayloadEqual(cart, cartRaw) || !listsPayloadEqual(favorites, favRaw)) {
+    await db.query(
+      "UPDATE users SET cart_json = $2::jsonb, favorites_json = $3::jsonb WHERE id = $1",
+      [userId, JSON.stringify(cart), JSON.stringify(favorites)]
+    );
+  }
+  return { cart, favorites, preferences };
+}
+async function setUserLists(db, userId, cart, favorites, preferences) {
+  const cartSafe = await pruneListItemsAgainstProducts(db, sanitizeListItems(cart));
+  const favSafe = await pruneListItemsAgainstProducts(db, sanitizeListItems(favorites));
+  const prefsSafe = sanitizePreferences(preferences);
+  await db.query(
+    "UPDATE users SET cart_json = $2::jsonb, favorites_json = $3::jsonb, preferences_json = $4::jsonb WHERE id = $1",
+    [userId, JSON.stringify(cartSafe), JSON.stringify(favSafe), JSON.stringify(prefsSafe)]
+  );
+  return { cart: cartSafe, favorites: favSafe, preferences: prefsSafe };
 }
 async function ensureUserAuthSchema(db) {
   const client = await db.connect();
@@ -552,4 +665,5 @@ module.exports.getLatestEmailVerification = getLatestEmailVerification;
 module.exports.consumeEmailVerificationCode = consumeEmailVerificationCode;
 module.exports.getUserLists = getUserLists;
 module.exports.setUserLists = setUserLists;
+module.exports.removeProductIdFromAllUserLists = removeProductIdFromAllUserLists;
 module.exports.ensureUserAuthSchema = ensureUserAuthSchema;

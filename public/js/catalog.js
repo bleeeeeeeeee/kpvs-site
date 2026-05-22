@@ -82,6 +82,13 @@ const Catalog = (() => {
   function storageKey() {
     return "kpvs.catalogState.v1." + String(pageGender || "mens");
   }
+  function catalogPersistEnabled() {
+    try {
+      return localStorage.getItem("kpvs.catalog.persist") !== "0";
+    } catch {
+      return true;
+    }
+  }
   function loadCatalogStateFromStorage() {
     try {
       const raw = localStorage.getItem(storageKey());
@@ -106,6 +113,7 @@ const Catalog = (() => {
     }
   }
   function saveCatalogStateToStorage() {
+    if (!catalogPersistEnabled()) return;
     try {
       const payload = {
         v: 1,
@@ -117,6 +125,7 @@ const Catalog = (() => {
       localStorage.setItem(storageKey(), JSON.stringify(payload));
     } catch {
     }
+    listsPush();
   }
   function applyCatalogStateToControls() {
     const sortSelect = document.getElementById("sort-select");
@@ -132,6 +141,8 @@ const Catalog = (() => {
     attachPageEvents();
     applyCatalogStateToControls();
     document.addEventListener("kpvs-lists-synced", function() {
+      loadCatalogStateFromStorage();
+      applyCatalogStateToControls();
       refreshCatalogButtons();
       renderProducts();
     });
@@ -1361,6 +1372,12 @@ const Catalog = (() => {
       return;
     }
     getProductsByIds(ids).then(function(products) {
+      if (window.KpvsListsSync && window.KpvsListsSync.persistPrunedList) {
+        if (window.KpvsListsSync.persistPrunedList("favorites", favorites, products)) {
+          refreshCatalogButtons();
+          renderProducts();
+        }
+      }
       const itemsHtml = products.length ? products.map(function(p) {
         const isInCart = getCart().some(function(i) {
           return Number(i.id) === Number(p.id);
@@ -1427,6 +1444,12 @@ const Catalog = (() => {
       return;
     }
     getProductsByIds(ids).then(function(products) {
+      if (window.KpvsListsSync && window.KpvsListsSync.persistPrunedList) {
+        if (window.KpvsListsSync.persistPrunedList("cart", cart, products)) {
+          refreshCatalogButtons();
+          renderProducts();
+        }
+      }
       const itemsHtml = products.length ? products.map(function(p) {
         const imgSrc = getProductImage(p);
         const artRaw = p.art != null ? String(p.art).trim() : "";

@@ -326,7 +326,7 @@ function mountAuthRoutes(app, ctx) {
       if (!row || !row.is_active) return res.status(403).json({ error: "\u0410\u043A\u043A\u0430\u0443\u043D\u0442 \u043E\u0442\u043A\u043B\u044E\u0447\u0451\u043D" });
       if (String(row.role || "") !== "user") return res.status(403).json({ error: "\u041D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u043E" });
       const body = req.body || {};
-      const saved = await db.setUserLists(id, body.cart, body.favorites);
+      const saved = await db.setUserLists(id, body.cart, body.favorites, body.preferences);
       res.json(saved);
     } catch (err) {
       console.error("PUT /api/user/lists:", err);

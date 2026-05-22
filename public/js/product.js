@@ -1034,6 +1034,10 @@ function openFavoritesModalInner() {
     return;
   }
   getProductsByIds(ids).then((products) => {
+    if (window.KpvsListsSync && window.KpvsListsSync.persistPrunedList) {
+      window.KpvsListsSync.persistPrunedList("favorites", favorites, products);
+      refreshProductButtons();
+    }
     const itemsHtml = products.filter(function(p) {
       return p && p.id;
     }).map(function(p) {
@@ -1106,6 +1110,10 @@ function openCartModalInner() {
     return;
   }
   getProductsByIds(ids).then((products) => {
+    if (window.KpvsListsSync && window.KpvsListsSync.persistPrunedList) {
+      window.KpvsListsSync.persistPrunedList("cart", cart, products);
+      refreshProductButtons();
+    }
     const itemsHtml = products.filter(function(p) {
       return p && p.id;
     }).map(function(p) {

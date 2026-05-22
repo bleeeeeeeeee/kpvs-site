@@ -554,6 +554,9 @@ document.addEventListener("DOMContentLoaded", async () => {
           return;
         }
         clearError();
+        if (window.KpvsApi && window.KpvsApi.notifyProfileChanged) {
+          window.KpvsApi.notifyProfileChanged("password");
+        }
         window.location.replace("/login.html?mode=user");
         return;
       }
