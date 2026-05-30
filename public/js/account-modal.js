@@ -466,6 +466,9 @@
           try {
             localStorage.removeItem(TOKEN_KEY);
           } catch (_) {}
+          if (window.KpvsListsSync && window.KpvsListsSync.clearSyncState) {
+            window.KpvsListsSync.clearSyncState();
+          }
           hideLogoutConfirm(built);
           closeAccountModalFully();
           window.location.reload();

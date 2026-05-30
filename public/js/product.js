@@ -808,8 +808,21 @@ function getProductImage(product) {
 function listsPush() {
   if (window.KpvsListsSync) window.KpvsListsSync.push();
 }
-function listsPushNow() {
-  if (window.KpvsListsSync) window.KpvsListsSync.pushNow();
+function listsCommit(cart, favorites, afterUi) {
+  if (window.KpvsListsSync && window.KpvsListsSync.writeLists && window.KpvsListsSync.commitLists) {
+    window.KpvsListsSync.writeLists(cart, favorites);
+    return window.KpvsListsSync.commitLists().then(function(ok) {
+      if (typeof afterUi === "function") afterUi(ok);
+      return ok;
+    });
+  }
+  try {
+    localStorage.setItem("cart", JSON.stringify(cart));
+    localStorage.setItem("favorites", JSON.stringify(favorites));
+  } catch {
+  }
+  if (typeof afterUi === "function") afterUi(true);
+  return Promise.resolve(true);
 }
 function refreshProductButtons() {
   if (!currentProductId) return;
@@ -826,29 +839,7 @@ function refreshProductButtons() {
     btn.classList.toggle("in-cart", isInCart);
   });
 }
-function toggleCart(productId, buttonElement) {
-  const id = Number(productId);
-  if (!Number.isFinite(id)) return;
-  let cart = getCart();
-  const idx = cart.findIndex((i) => Number(i.id) === id);
-  if (idx === -1) {
-    cart.push({ id, source: "product" });
-    localStorage.setItem("cart", JSON.stringify(cart));
-    listsPushNow();
-    if (buttonElement) {
-      buttonElement.textContent = BTN_REMOVE_CART;
-      buttonElement.classList.add("in-cart");
-    }
-  } else {
-    cart.splice(idx, 1);
-    localStorage.setItem("cart", JSON.stringify(cart));
-    listsPushNow();
-    if (buttonElement) {
-      buttonElement.textContent = BTN_ADD_CART;
-      buttonElement.classList.remove("in-cart");
-    }
-  }
-  refreshProductButtons();
+function syncModalCartToggleButtons() {
   document.querySelectorAll('#kpvs-favorites-modal [data-action="toggle-cart"]').forEach((btn) => {
     const pid = Number(btn.dataset && btn.dataset.productId);
     if (!Number.isFinite(pid)) return;
@@ -857,10 +848,42 @@ function toggleCart(productId, buttonElement) {
     btn.classList.toggle("in-cart", inCart);
   });
 }
+function toggleCart(productId, buttonElement) {
+  const id = Number(productId);
+  if (!Number.isFinite(id)) return;
+  let cart = getCart();
+  const favorites = getFavorites();
+  const idx = cart.findIndex((i) => Number(i.id) === id);
+  const wasInCart = idx !== -1;
+  if (wasInCart) {
+    cart.splice(idx, 1);
+  } else {
+    cart.push({ id, source: "product" });
+  }
+  listsCommit(cart, favorites, (ok) => {
+    if (!ok) {
+      if (wasInCart) cart.push({ id, source: "product" });
+      else cart = cart.filter((i) => Number(i.id) !== id);
+      if (window.KpvsListsSync && window.KpvsListsSync.writeLists) {
+        window.KpvsListsSync.writeLists(cart, favorites);
+      } else {
+        localStorage.setItem("cart", JSON.stringify(cart));
+      }
+    }
+    if (buttonElement) {
+      const inCart = cart.some((i) => Number(i.id) === id);
+      buttonElement.textContent = inCart ? BTN_REMOVE_CART : BTN_ADD_CART;
+      buttonElement.classList.toggle("in-cart", inCart);
+    }
+    refreshProductButtons();
+    syncModalCartToggleButtons();
+  });
+}
 function toggleCartFromModal(productId, buttonElement) {
   toggleCart(productId, buttonElement);
 }
 function toggleFavorite(productId, buttonElement) {
+  const cart = getCart();
   let favorites = getFavorites();
   const wasFavorite = favorites.some((i) => i.id === productId);
   if (wasFavorite) {
@@ -868,32 +891,37 @@ function toggleFavorite(productId, buttonElement) {
   } else {
     favorites.push({ id: productId, source: "product" });
   }
-  localStorage.setItem("favorites", JSON.stringify(favorites));
-  listsPushNow();
-  const btn = buttonElement || document.querySelector(".favorite-action-btn");
-  if (btn) {
-    btn.textContent = wasFavorite ? BTN_ADD_FAVORITE : BTN_REMOVE_FAVORITE;
-    btn.classList.toggle("in-favorites", !wasFavorite);
-  }
-  refreshProductButtons();
+  listsCommit(cart, favorites, (ok) => {
+    if (!ok) {
+      if (wasFavorite) favorites.push({ id: productId, source: "product" });
+      else favorites = favorites.filter((i) => i.id !== productId);
+      if (window.KpvsListsSync && window.KpvsListsSync.writeLists) {
+        window.KpvsListsSync.writeLists(cart, favorites);
+      } else {
+        localStorage.setItem("favorites", JSON.stringify(favorites));
+      }
+    }
+    const btn = buttonElement || document.querySelector(".favorite-action-btn");
+    if (btn) {
+      const nowFav = favorites.some((i) => i.id === productId);
+      btn.textContent = nowFav ? BTN_REMOVE_FAVORITE : BTN_ADD_FAVORITE;
+      btn.classList.toggle("in-favorites", nowFav);
+    }
+    refreshProductButtons();
+  });
 }
 function removeFromFavorites(productId) {
-  localStorage.setItem("favorites", JSON.stringify(getFavorites().filter((i) => i.id !== productId)));
-  listsPushNow();
-  refreshProductButtons();
+  const cart = getCart();
+  const favorites = getFavorites().filter((i) => i.id !== productId);
+  listsCommit(cart, favorites, () => refreshProductButtons());
 }
 function removeFromCart(productId) {
   const id = Number(productId);
   if (!Number.isFinite(id)) return;
-  localStorage.setItem("cart", JSON.stringify(getCart().filter((i) => Number(i.id) !== id)));
-  listsPushNow();
-  refreshProductButtons();
-  document.querySelectorAll('#kpvs-favorites-modal [data-action="toggle-cart"]').forEach((btn) => {
-    const pid = Number(btn.dataset && btn.dataset.productId);
-    if (!Number.isFinite(pid)) return;
-    const inCart = getCart().some((i) => Number(i.id) === pid);
-    btn.textContent = inCart ? "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B" : "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0443";
-    btn.classList.toggle("in-cart", inCart);
+  const cart = getCart().filter((i) => Number(i.id) !== id);
+  listsCommit(cart, getFavorites(), () => {
+    refreshProductButtons();
+    syncModalCartToggleButtons();
   });
 }
 function getFavorites() {

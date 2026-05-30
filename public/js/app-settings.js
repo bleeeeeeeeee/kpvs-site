@@ -1,6 +1,7 @@
 (function() {
   var THEME_KEY = "kpvs.theme";
   var PERSIST_KEY = "kpvs.catalog.persist";
+  var LISTS_SYNCED_FP_KEY = "kpvs.lists.synced";
   var CATALOG_GENDERS = ["mens", "womens", "all"];
   var pushTimer = null;
   var pullInFlight = null;
@@ -8,10 +9,12 @@
   var lastFingerprint = "";
   var csrfReady = null;
   var xsrfToken = "";
+
   function resetCsrf() {
     csrfReady = null;
     xsrfToken = "";
   }
+
   function ensureCsrf() {
     if (!csrfReady) {
       csrfReady = fetch("/api/csrf-token", { credentials: "include" })
@@ -36,15 +39,40 @@
     }
     return csrfReady;
   }
+
   function mutatingHeaders(jsonBody) {
     var h = jsonBody ? { "Content-Type": "application/json" } : {};
     var t = xsrfToken || (window.KpvsApi && window.KpvsApi.readCookie ? window.KpvsApi.readCookie("XSRF-TOKEN") : "");
     if (t) h["X-XSRF-TOKEN"] = t;
     return h;
   }
+
+  function getSyncedFingerprint() {
+    try {
+      return localStorage.getItem(LISTS_SYNCED_FP_KEY) || "";
+    } catch {
+      return "";
+    }
+  }
+
+  function setSyncedFingerprint(fp) {
+    try {
+      localStorage.setItem(LISTS_SYNCED_FP_KEY, String(fp || ""));
+    } catch {
+    }
+  }
+
+  function clearSyncedFingerprint() {
+    try {
+      localStorage.removeItem(LISTS_SYNCED_FP_KEY);
+    } catch {
+    }
+  }
+
   function normalizeTheme(t) {
     return t === "dark" ? "dark" : "light";
   }
+
   function readPreferencesLocal() {
     var theme = "light";
     try {
@@ -70,6 +98,7 @@
     }
     return { theme: theme, catalogPersist: catalogPersist, catalogState: catalogState };
   }
+
   function applyPreferencesLocal(prefs) {
     if (!prefs || typeof prefs !== "object") return;
     var theme = normalizeTheme(prefs.theme);
@@ -94,6 +123,7 @@
       }
     }
   }
+
   function isEmptyPreferences(prefs) {
     if (!prefs || typeof prefs !== "object") return true;
     if (prefs.theme === "dark") return false;
@@ -101,6 +131,7 @@
     var cs = prefs.catalogState;
     return !(cs && typeof cs === "object" && Object.keys(cs).length > 0);
   }
+
   function resolvePreferences(server, local) {
     var s = server && typeof server === "object" ? server : {};
     var l = local && typeof local === "object" ? local : readPreferencesLocal();
@@ -109,9 +140,11 @@
     }
     return { preferences: s, upload: false };
   }
+
   function applyTheme() {
     applyPreferencesLocal(readPreferencesLocal());
   }
+
   function normalizeItems(input) {
     if (!Array.isArray(input)) return [];
     var out = [];
@@ -133,6 +166,7 @@
     }
     return out;
   }
+
   function fingerprint(cart, favorites, preferences) {
     function sig(list) {
       return list
@@ -144,6 +178,7 @@
     }
     return sig(cart) + ";" + sig(favorites) + ";" + JSON.stringify(preferences || {});
   }
+
   function readLocal() {
     var cart = [];
     var favorites = [];
@@ -163,6 +198,7 @@
       preferences: readPreferencesLocal()
     };
   }
+
   function persistLocal(cart, favorites, preferences, notify) {
     var fp = fingerprint(cart, favorites, preferences);
     var changed = fp !== lastFingerprint;
@@ -185,28 +221,19 @@
     }
     return changed;
   }
-  function resolveList(serverList, localList) {
-    var server = normalizeItems(serverList);
-    var local = normalizeItems(localList);
-    if (!server.length) return { list: local, upload: local.length > 0 };
-    if (!local.length) return { list: server, upload: false };
-    var seen = {};
-    var merged = [];
-    var extra = false;
-    var i;
-    for (i = 0; i < server.length; i++) {
-      seen[server[i].id] = 1;
-      merged.push(server[i]);
-    }
-    for (i = 0; i < local.length; i++) {
-      if (!seen[local[i].id]) {
-        seen[local[i].id] = 1;
-        merged.push(local[i]);
-        extra = true;
-      }
-    }
-    return { list: merged, upload: extra };
+
+  function applyServerPayload(data, local) {
+    var prefResolved = resolvePreferences(data.preferences, local.preferences);
+    var outCart = normalizeItems(data.cart);
+    var outFav = normalizeItems(data.favorites);
+    var outPrefs = prefResolved.preferences;
+    persistLocal(outCart, outFav, outPrefs, true);
+    var fp = fingerprint(outCart, outFav, outPrefs);
+    setSyncedFingerprint(fp);
+    lastFingerprint = fp;
+    return true;
   }
+
   function fetchMe() {
     return fetch("/api/user/auth/me", { credentials: "include" }).then(function(r) {
       if (!r.ok) return null;
@@ -215,6 +242,7 @@
       return null;
     });
   }
+
   function putUserData(cart, favorites, preferences, isRetry) {
     if (!window.KpvsApi || !window.KpvsApi.apiFetch) return Promise.resolve(null);
     return ensureCsrf()
@@ -241,12 +269,10 @@
         return null;
       });
   }
+
   function getLists() {
     if (!window.KpvsApi || !window.KpvsApi.apiFetch) return Promise.resolve(null);
-    return ensureCsrf()
-      .then(function() {
-        return window.KpvsApi.apiFetch("/api/user/lists");
-      })
+    return window.KpvsApi.apiFetch("/api/user/lists")
       .then(function(r) {
         if (!r || !r.ok) return null;
         return r.json();
@@ -255,6 +281,7 @@
         return null;
       });
   }
+
   function pull() {
     if (pushTimer) {
       return new Promise(function(resolve) {
@@ -267,6 +294,7 @@
     pullInFlight = fetchMe()
       .then(function(me) {
         if (!me || !me.id || String(me.role) !== "user") {
+          clearSyncedFingerprint();
           var guest = readLocal();
           lastFingerprint = fingerprint(guest.cart, guest.favorites, guest.preferences);
           return false;
@@ -274,29 +302,20 @@
         return getLists().then(function(data) {
           if (!data) return false;
           var local = readLocal();
-          var fpNow = fingerprint(local.cart, local.favorites, local.preferences);
-          if (fpNow !== lastFingerprint) {
-            return pushNow();
+          var localFp = fingerprint(local.cart, local.favorites, local.preferences);
+          var syncedFp = getSyncedFingerprint();
+
+          if (!syncedFp) {
+            return applyServerPayload(data, local);
           }
-          var cartResolved = resolveList(data.cart, local.cart);
-          var favResolved = resolveList(data.favorites, local.favorites);
-          var prefResolved = resolvePreferences(data.preferences, local.preferences);
-          var outCart = cartResolved.list;
-          var outFav = favResolved.list;
-          var outPrefs = prefResolved.preferences;
-          var needUpload = cartResolved.upload || favResolved.upload || prefResolved.upload;
-          if (needUpload) {
-            return putUserData(outCart, outFav, outPrefs).then(function(saved) {
-              if (saved) {
-                persistLocal(saved.cart, saved.favorites, saved.preferences || outPrefs, true);
-                return true;
-              }
-              persistLocal(outCart, outFav, outPrefs, true);
-              return true;
+
+          if (syncedFp !== localFp) {
+            return pushNow().then(function(ok) {
+              return !!ok;
             });
           }
-          persistLocal(outCart, outFav, outPrefs, true);
-          return true;
+
+          return applyServerPayload(data, local);
         });
       })
       .finally(function() {
@@ -304,6 +323,7 @@
       });
     return pullInFlight;
   }
+
   function push() {
     clearTimeout(pushTimer);
     pushTimer = setTimeout(function() {
@@ -311,6 +331,7 @@
       pushNow();
     }, 250);
   }
+
   function pushNow() {
     clearTimeout(pushTimer);
     pushTimer = null;
@@ -318,19 +339,31 @@
       if (!me || !me.id || String(me.role) !== "user") return false;
       var local = readLocal();
       return putUserData(local.cart, local.favorites, local.preferences).then(function(saved) {
-        if (saved) {
-          lastFingerprint = fingerprint(saved.cart, saved.favorites, saved.preferences || local.preferences);
-        }
-        return !!saved;
+        if (!saved) return false;
+        var fp = fingerprint(saved.cart, saved.favorites, saved.preferences || local.preferences);
+        setSyncedFingerprint(fp);
+        lastFingerprint = fp;
+        return true;
       });
     });
   }
+
+  function writeLists(cart, favorites) {
+    var prefs = readPreferencesLocal();
+    persistLocal(cart, favorites, prefs, true);
+  }
+
+  function commitLists() {
+    return pushNow();
+  }
+
   function refreshBefore(action) {
     if (typeof action !== "function") return Promise.resolve();
     return pull().then(function() {
       action();
     });
   }
+
   function pruneListItems(items, products) {
     if (!items.length) return items;
     var valid = {};
@@ -342,6 +375,7 @@
       return valid[Number(it.id)];
     });
   }
+
   function persistPrunedList(listKey, items, products) {
     var pruned = pruneListItems(items, products);
     if (pruned.length === items.length) return false;
@@ -351,24 +385,34 @@
     if (listKey === "cart") cart = pruned;
     else if (listKey === "favorites") favorites = pruned;
     else return false;
-    persistLocal(cart, favorites, prefs, true);
+    writeLists(cart, favorites);
     push();
     return true;
   }
+
+  function clearSyncState() {
+    clearSyncedFingerprint();
+  }
+
   window.KpvsListsSync = {
     pull: pull,
     push: push,
     pushNow: pushNow,
+    writeLists: writeLists,
+    commitLists: commitLists,
     refreshBefore: refreshBefore,
     applyTheme: applyTheme,
-    persistPrunedList: persistPrunedList
+    persistPrunedList: persistPrunedList,
+    clearSyncState: clearSyncState
   };
+
   document.addEventListener("DOMContentLoaded", function() {
     applyTheme();
     var local = readLocal();
     lastFingerprint = fingerprint(local.cart, local.favorites, local.preferences);
     pull();
   });
+
   document.addEventListener("visibilitychange", function() {
     if (document.visibilityState !== "visible") return;
     clearTimeout(pullFocusTimer);
@@ -376,6 +420,7 @@
       pull();
     }, 200);
   });
+
   window.addEventListener("focus", function() {
     clearTimeout(pullFocusTimer);
     pullFocusTimer = setTimeout(function() {

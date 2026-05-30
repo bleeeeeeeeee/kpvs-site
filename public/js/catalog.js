@@ -1152,8 +1152,21 @@ const Catalog = (() => {
   function listsPush() {
     if (window.KpvsListsSync) window.KpvsListsSync.push();
   }
-  function listsPushNow() {
-    if (window.KpvsListsSync) window.KpvsListsSync.pushNow();
+  function listsCommit(cart, favorites, afterUi) {
+    if (window.KpvsListsSync && window.KpvsListsSync.writeLists && window.KpvsListsSync.commitLists) {
+      window.KpvsListsSync.writeLists(cart, favorites);
+      return window.KpvsListsSync.commitLists().then(function(ok) {
+        if (typeof afterUi === "function") afterUi(ok);
+        return ok;
+      });
+    }
+    try {
+      localStorage.setItem("cart", JSON.stringify(cart));
+      localStorage.setItem("favorites", JSON.stringify(favorites));
+    } catch {
+    }
+    if (typeof afterUi === "function") afterUi(true);
+    return Promise.resolve(true);
   }
   function getCart() {
     try {
@@ -1209,6 +1222,7 @@ const Catalog = (() => {
   function toggleFavorite(productId, buttonElement) {
     var id = Number(productId);
     if (!Number.isFinite(id)) return;
+    var cart = getCart();
     var favorites = getFavorites();
     var wasFavorite = favorites.some(function(i) {
       return Number(i.id) === id;
@@ -1218,15 +1232,35 @@ const Catalog = (() => {
         return Number(i.id) !== id;
       });
     } else {
-      favorites.push({ id, source: pageGender });
+      favorites.push({ id: id, source: pageGender });
     }
-    localStorage.setItem("favorites", JSON.stringify(favorites));
-    listsPushNow();
-    if (buttonElement) {
-      buttonElement.textContent = wasFavorite ? "\u0412 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435" : "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E";
-      buttonElement.classList.toggle("in-favorites", !wasFavorite);
-    }
-    refreshCatalogButtons();
+    listsCommit(cart, favorites, function(ok) {
+      if (!ok) {
+        if (wasFavorite) {
+          favorites.push({ id: id, source: pageGender });
+        } else {
+          favorites = favorites.filter(function(i) {
+            return Number(i.id) !== id;
+          });
+        }
+        if (window.KpvsListsSync && window.KpvsListsSync.writeLists) {
+          window.KpvsListsSync.writeLists(cart, favorites);
+        } else {
+          try {
+            localStorage.setItem("favorites", JSON.stringify(favorites));
+          } catch {
+          }
+        }
+      }
+      if (buttonElement) {
+        var nowFav = favorites.some(function(i) {
+          return Number(i.id) === id;
+        });
+        buttonElement.textContent = nowFav ? "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E" : "\u0412 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435";
+        buttonElement.classList.toggle("in-favorites", nowFav);
+      }
+      refreshCatalogButtons();
+    });
   }
   function toggleCart(productId, buttonElement) {
     var id = Number(productId);
@@ -1235,46 +1269,65 @@ const Catalog = (() => {
     var idx = cart.findIndex(function(i) {
       return Number(i.id) === id;
     });
-    if (idx === -1) {
-      cart.push({ id, source: pageGender });
-      localStorage.setItem("cart", JSON.stringify(cart));
-      listsPushNow();
-      if (buttonElement) {
-        buttonElement.textContent = "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B";
-        buttonElement.classList.add("in-cart");
-      }
-    } else {
+    var favorites = getFavorites();
+    var wasInCart = idx !== -1;
+    if (wasInCart) {
       cart.splice(idx, 1);
-      localStorage.setItem("cart", JSON.stringify(cart));
-      listsPushNow();
-      if (buttonElement) {
-        buttonElement.textContent = "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0443";
-        buttonElement.classList.remove("in-cart");
-      }
+    } else {
+      cart.push({ id: id, source: pageGender });
     }
-    refreshCatalogButtons();
+    listsCommit(cart, favorites, function(ok) {
+      if (!ok) {
+        if (wasInCart) {
+          cart.push({ id: id, source: pageGender });
+        } else {
+          cart = cart.filter(function(i) {
+            return Number(i.id) !== id;
+          });
+        }
+        if (window.KpvsListsSync && window.KpvsListsSync.writeLists) {
+          window.KpvsListsSync.writeLists(cart, favorites);
+        } else {
+          try {
+            localStorage.setItem("cart", JSON.stringify(cart));
+          } catch {
+          }
+        }
+      }
+      if (buttonElement) {
+        var inCart = cart.some(function(i) {
+          return Number(i.id) === id;
+        });
+        buttonElement.textContent = inCart ? "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B" : "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0443";
+        buttonElement.classList.toggle("in-cart", inCart);
+      }
+      refreshCatalogButtons();
+    });
     syncOpenModalCartToggleButtons();
   }
   function removeFromFavorites(productId) {
     var id = Number(productId);
     if (!Number.isFinite(id)) return;
-    localStorage.setItem("favorites", JSON.stringify(getFavorites().filter(function(i) {
+    var cart = getCart();
+    var favorites = getFavorites().filter(function(i) {
       return Number(i.id) !== id;
-    })));
-    listsPushNow();
-    refreshCatalogButtons();
-    renderProducts();
+    });
+    listsCommit(cart, favorites, function() {
+      refreshCatalogButtons();
+      renderProducts();
+    });
   }
   function removeFromCart(productId) {
     var id = Number(productId);
     if (!Number.isFinite(id)) return;
-    localStorage.setItem("cart", JSON.stringify(getCart().filter(function(i) {
+    var cart = getCart().filter(function(i) {
       return Number(i.id) !== id;
-    })));
-    listsPushNow();
-    refreshCatalogButtons();
-    renderProducts();
-    syncOpenModalCartToggleButtons();
+    });
+    listsCommit(cart, getFavorites(), function() {
+      refreshCatalogButtons();
+      renderProducts();
+      syncOpenModalCartToggleButtons();
+    });
   }
   function siteOrigin() {
     try {
