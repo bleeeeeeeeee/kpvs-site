@@ -1,93 +1,67 @@
 # КПВС
 
-Каталог спецодежды: витрина, карточка товара, личный кабинет, админка. Node.js отдаёт статику из `public/` и REST API, данные в PostgreSQL.
+Сайт-каталог спецодежды. Статика в `public/`, API и админка на Node.js, данные в PostgreSQL.
 
-Node.js 18+, PostgreSQL 14+. Стек: Express, `pg`, сессии staff, JWT покупателей, опционально S3/R2 и SMTP.
+Нужны Node.js 18+ и PostgreSQL 14+.
 
-## Запуск
+## Локально
 
 ```bash
 npm install
+npm start
 ```
 
-`.env` в корне. Подключение: `DATABASE_URL` или `PGHOST` / `PGPORT` / `PGDATABASE` / `PGUSER` / `PGPASSWORD`.
+В `.env` минимум:
 
 ```env
 DATABASE_URL=postgresql://user:pass@localhost:5432/kpvs_db
 ```
 
-Первый запуск сервера создаёт **только таблицы, колонки и служебный узел дерева категорий** (`catalog-root` — без разделов, товаров и коллекций):
+Можно вместо `DATABASE_URL` указать `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`.
 
-```bash
-npm start
-```
+При старте поднимается схема БД (таблицы, колонки, индексы). Из «данных» автоматически появляется только служебная категория `catalog-root`. Товары, разделы, коллекции, размеры — через `/admin`.
 
-Точка входа: `server.js` (прокси на `server/index.js`). Локально и на Render используйте **`npm start`**.
-
-Первый администратор — отдельной командой (только учётная запись staff):
+Первого админа создаёшь отдельно:
 
 ```bash
 npm run bootstrap-admin
 ```
 
-В `.env`: `ADMIN_EMAIL`, `ADMIN_PASSWORD` (≥ 6 символов), при необходимости `ADMIN_USERNAME` (по умолчанию `admin`).
+В `.env`: `ADMIN_EMAIL`, `ADMIN_PASSWORD` (от 6 символов), по желанию `ADMIN_USERNAME` (по умолчанию `admin`).
 
-Каталог, размеры, коллекции, материалы — **только через админку**, автоматически не подставляются.
+Сброс пароля staff:
 
-[http://localhost:3000](http://localhost:3000) → `/welcome.html`. Проверка: `GET /health`.
+```bash
+npm run bootstrap-admin -- --reset-password
+```
 
-## Production
+Сайт: http://localhost:3000 (стартовая — `/welcome.html`). Жив ли сервер: `GET /health`.
+
+## Production / Render
 
 ```env
 NODE_ENV=production
-SESSION_SECRET=…        # ≥ 24 символов
-JWT_SECRET=…
-DATABASE_URL=…
+DATABASE_URL=...
+SESSION_SECRET=...   # от 24 символов
+JWT_SECRET=...
+TRUST_PROXY=1
+APP_BASE_URL=https://твой-домен.onrender.com
 ```
 
-Часто: `APP_BASE_URL`, `TRUST_PROXY=1` на Render, `COOKIE_SECURE` (в production по умолчанию включён). Опционально: `STORAGE_*`, `SMTP_*`, `GOOGLE_*`, `PUBLIC_URL`.
+Build: `npm install`. Start: `npm start`. Health check: `/health`.
 
-### Render
+На Render без `TRUST_PROXY=1` за прокси могут ломаться сессии и CSRF.
 
-| Параметр | Значение |
-|----------|----------|
-| Build Command | `npm install` |
-| Start Command | **`npm start`** |
-| Health Check | `/health` |
-
-Обязательно: `NODE_ENV=production`, `DATABASE_URL`, `SESSION_SECRET`, `JWT_SECRET`, `TRUST_PROXY=1`, `APP_BASE_URL=https://…onrender.com`. Без `TRUST_PROXY` сессии staff и CSRF могут не работать за прокси.
-
-## Команды
-
-| Команда | Действие |
-|---------|----------|
-| `npm start` | Сервер + схема БД (DDL, без демо-данных) |
-| `npm run bootstrap-admin` | Создать admin |
-| `npm run bootstrap-admin -- --reset-password` | Сброс пароля staff |
+По желанию: `STORAGE_*` (S3/R2), `SMTP_*`, `GOOGLE_*`, `PUBLIC_URL`, `COOKIE_SECURE` (в production по умолчанию включён).
 
 ## Структура
 
 ```
-server.js               npm start (прокси)
-server/index.js         точка входа
-server/app.js           Express
-server/config.js        переменные окружения
-server/schema.js        DDL при connectDB
-server/middleware.js    CSRF, auth
-server/routes/          auth, catalog, admin, system
-server/services/        auth, почта, storage
-server/db/queries/      SQL
-public/                 фронтенд
-scripts/bootstrap-admin.js
+server.js          → npm start
+server/            Express, routes, schema, db/queries
+public/            фронт
+scripts/           bootstrap-admin
 ```
-
-## Сдача диплома — чеклист
-
-1. PostgreSQL (Supabase / Neon / локально) + `.env`
-2. `npm start` — схема БД
-3. `npm run bootstrap-admin` — admin
-4. `/admin` — категории, товары, размеры, коллекции
-5. Render: Start Command **`npm start`**, `TRUST_PROXY=1`, redeploy после push
 
 ---
 
