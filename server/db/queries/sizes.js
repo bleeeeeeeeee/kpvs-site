@@ -1,4 +1,4 @@
-const { otherScalesHintSqlColumn, sizeIsEuReferenceRowSql, sizeRowDisplayOrderSql } = require("../lib/size-constants");
+const { otherScalesHintSqlColumn, sizeIsEuReferenceRowSql, sizeRowDisplayOrderSql } = require("../lib/sql-constants");
 const SIZE_GRID_SLUGS_CLOTHING = Object.freeze(["eu_clothing"]);
 const SIZE_GRID_SLUGS_FOOTWEAR = Object.freeze(["eu_footwear"]);
 const SIZE_GRID_SLUGS_ACCESSORIES = Object.freeze(["eu_accessories", "universal"]);
@@ -150,51 +150,6 @@ async function reconcileCanonicalSizeTypeSlugs(pool) {
   await assign(gloveId, "gloves");
   await assign(footId, "footwear");
   await assign(appId, "apparel");
-  const still = await pool.query(`
-    SELECT lower(btrim(COALESCE(slug, ''))) AS s
-    FROM size_types
-    WHERE lower(btrim(COALESCE(slug, ''))) IN ('apparel', 'footwear', 'gloves')
-`);
-  const have = new Set(still.rows.map((r) => r.s));
-  if (!have.has("apparel")) {
-    const up = await pool.query(`
-        UPDATE size_types SET slug = 'apparel'
-        WHERE id = (
-            SELECT id FROM size_types
-            WHERE lower(btrim(name)) = '\u043E\u0434\u0435\u0436\u0434\u0430' OR lower(btrim(name)) LIKE '\u043E\u0434\u0435\u0436\u0434\u0430 %' OR lower(btrim(name)) LIKE '\u043E\u0434\u0435\u0436\u0434\u0430(%'
-            ORDER BY id LIMIT 1
-        )
-        RETURNING id`);
-    if (!up.rows.length) {
-      await pool.query(`INSERT INTO size_types (name, slug) VALUES ('\u041E\u0434\u0435\u0436\u0434\u0430', 'apparel')`);
-    }
-  }
-  if (!have.has("footwear")) {
-    const up = await pool.query(`
-        UPDATE size_types SET slug = 'footwear'
-        WHERE id = (
-            SELECT id FROM size_types
-            WHERE lower(btrim(name)) = '\u043E\u0431\u0443\u0432\u044C' OR lower(btrim(name)) LIKE '\u043E\u0431\u0443\u0432\u044C %' OR lower(btrim(name)) LIKE '\u043E\u0431\u0443\u0432\u044C(%'
-            ORDER BY id LIMIT 1
-        )
-        RETURNING id`);
-    if (!up.rows.length) {
-      await pool.query(`INSERT INTO size_types (name, slug) VALUES ('\u041E\u0431\u0443\u0432\u044C', 'footwear')`);
-    }
-  }
-  if (!have.has("gloves")) {
-    const up = await pool.query(`
-        UPDATE size_types SET slug = 'gloves'
-        WHERE id = (
-            SELECT id FROM size_types
-            WHERE lower(btrim(name)) = '\u043F\u0435\u0440\u0447\u0430\u0442\u043A\u0438' OR lower(btrim(name)) LIKE '\u043F\u0435\u0440\u0447\u0430\u0442\u043A\u0438 %' OR lower(btrim(name)) LIKE '\u043F\u0435\u0440\u0447\u0430\u0442\u043A\u0438(%'
-            ORDER BY id LIMIT 1
-        )
-        RETURNING id`);
-    if (!up.rows.length) {
-      await pool.query(`INSERT INTO size_types (name, slug) VALUES ('\u041F\u0435\u0440\u0447\u0430\u0442\u043A\u0438', 'gloves')`);
-    }
-  }
 }
 async function ensureCategorySizeTypesSchema(pool) {
   await pool.query("ALTER TABLE size_types ADD COLUMN IF NOT EXISTS slug TEXT");
@@ -213,52 +168,6 @@ async function ensureCategorySizeTypesSchema(pool) {
     const base = slugify(String(t.name || "type")) || "type";
     await pool.query("UPDATE size_types SET slug = $1 WHERE id = $2", [`${base}-${t.id}`, t.id]);
   }
-  const canonical = [
-    { name: "\u041E\u0431\u0443\u0432\u044C", slug: "footwear" },
-    { name: "\u041F\u0435\u0440\u0447\u0430\u0442\u043A\u0438", slug: "gloves" }
-  ];
-  for (const c of canonical) {
-    await pool.query(
-      `INSERT INTO size_types (name, slug)
-         SELECT $1::text, $2::text
-         WHERE NOT EXISTS (SELECT 1 FROM size_types WHERE lower(btrim(slug::text)) = lower(btrim($2::text)))`,
-      [c.name, c.slug]
-    );
-  }
-  const apparelMissing = await pool.query(
-    `SELECT 1 FROM size_types WHERE lower(btrim(slug::text)) = 'apparel' LIMIT 1`
-  );
-  if (!apparelMissing.rows.length) {
-    await pool.query(
-      `INSERT INTO size_types (name, slug) VALUES ('\u041E\u0434\u0435\u0436\u0434\u0430', 'apparel')`
-    );
-  }
-  const gridTypes = [
-    { name: "\u041E\u0434\u0435\u0436\u0434\u0430 (EU, 2XS\u20133XL)", slug: "eu_clothing" },
-    { name: "\u041E\u0431\u0443\u0432\u044C (EU, 35\u201347, \u0441 \u043F\u043E\u043B\u043E\u0432\u0438\u043D\u0430\u043C\u0438)", slug: "eu_footwear" },
-    { name: "\u0410\u043A\u0441\u0435\u0441\u0441\u0443\u0430\u0440\u044B (EU, 2XS\u20133XL)", slug: "eu_accessories" },
-    { name: "\u0423\u043D\u0438\u0432\u0435\u0440\u0441\u0430\u043B\u044C\u043D\u044B\u0439 \u0440\u0430\u0437\u043C\u0435\u0440", slug: "universal" }
-  ];
-  for (const g of gridTypes) {
-    await pool.query(
-      `INSERT INTO size_types (name, slug)
-         SELECT $1::text, $2::text
-         WHERE NOT EXISTS (SELECT 1 FROM size_types WHERE lower(btrim(slug::text)) = lower(btrim($2::text)))`,
-      [g.name, g.slug]
-    );
-  }
-  await pool.query(`
-    UPDATE size_types st
-    SET name = d.name
-    FROM (
-        VALUES
-            ('eu_clothing', '\u041E\u0434\u0435\u0436\u0434\u0430 (EU, 2XS\u20133XL)'),
-            ('eu_footwear', '\u041E\u0431\u0443\u0432\u044C (EU, 35\u201347, \u0441 \u043F\u043E\u043B\u043E\u0432\u0438\u043D\u0430\u043C\u0438)'),
-            ('eu_accessories', '\u0410\u043A\u0441\u0435\u0441\u0441\u0443\u0430\u0440\u044B (EU, 2XS\u20133XL)'),
-            ('universal', '\u0423\u043D\u0438\u0432\u0435\u0440\u0441\u0430\u043B\u044C\u043D\u044B\u0439 \u0440\u0430\u0437\u043C\u0435\u0440')
-    ) AS d(slug, name)
-    WHERE lower(btrim(st.slug::text)) = lower(btrim(d.slug::text))
-`);
   await reconcileCanonicalSizeTypeSlugs(pool);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS category_size_types (
@@ -267,48 +176,6 @@ async function ensureCategorySizeTypesSchema(pool) {
         PRIMARY KEY (category_id, size_type_id)
     )
 `);
-  const slugRows = await pool.query(
-    `SELECT id, lower(btrim(slug::text)) AS slug FROM size_types WHERE slug IS NOT NULL AND btrim(slug::text) <> ''`
-  );
-  const bySlug = {};
-  slugRows.rows.forEach((r) => {
-    bySlug[r.slug] = Number(r.id);
-  });
-  const cats = await pool.query(`
-    SELECT c.id, c.name, c.slug
-    FROM categories c
-    WHERE c.parent_id = (SELECT id FROM categories WHERE lower(btrim(slug::text)) = 'catalog-root' LIMIT 1)
-       OR (NOT EXISTS (SELECT 1 FROM categories WHERE lower(btrim(slug::text)) = 'catalog-root') AND c.parent_id IS NULL)
-    ORDER BY c.id
-  `);
-  const pairs = [];
-  for (const c of cats.rows) {
-    const slugs = classifyCategorySizeTypeSlugs(c.name, c.slug);
-    for (const sg of slugs) {
-      const tid = bySlug[sg];
-      if (tid) pairs.push([Number(c.id), Number(tid)]);
-    }
-  }
-  const catIds = pairs.map((p) => p[0]);
-  const typeIds = pairs.map((p) => p[1]);
-  if (catIds.length) {
-    await pool.query(
-      `DELETE FROM category_size_types cst
-         WHERE NOT EXISTS (
-             SELECT 1 FROM unnest($1::int[], $2::int[]) AS exp(category_id, size_type_id)
-             WHERE exp.category_id = cst.category_id AND exp.size_type_id = cst.size_type_id
-         )`,
-      [catIds, typeIds]
-    );
-  } else {
-    await pool.query("DELETE FROM category_size_types");
-  }
-  for (const [cid, tid] of pairs) {
-    await pool.query(
-      `INSERT INTO category_size_types (category_id, size_type_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-      [cid, tid]
-    );
-  }
 }
 async function ensureSizeGroupsSchema(pool) {
   await pool.query(`
@@ -567,88 +434,6 @@ async function ensureSizesUniqueValueIndex(pool) {
     console.warn("[schema] sizes_type_value_lower_uq:", e && e.message);
   }
 }
-async function ensureReferenceSizesSeed(pool) {
-  await ensureSizesUniqueValueIndex(pool);
-  const allSlugs = ["eu_clothing", "eu_footwear", "eu_accessories", "universal"];
-  const types = await pool.query(
-    `SELECT id, lower(btrim(slug::text)) AS slug FROM size_types
-     WHERE lower(btrim(slug::text)) = ANY(SELECT lower(btrim(x)) FROM unnest($1::text[]) AS t(x))`,
-    [allSlugs]
-  );
-  const bySlug = {};
-  types.rows.forEach(function(row) {
-    bySlug[row.slug] = Number(row.id);
-  });
-  const missing = allSlugs.filter(function(s) {
-    return !bySlug[s];
-  });
-  if (missing.length) {
-    console.warn("[seed] reference sizes: \u043D\u0435\u0442 \u0442\u0438\u043F\u043E\u0432 \u043F\u043E slug:", missing.join(", "));
-  }
-  async function insertValues(typeId, values) {
-    if (!typeId || !Number.isFinite(typeId) || typeId <= 0) return;
-    for (let i = 0; i < values.length; i++) {
-      const val = String(values[i] != null ? values[i] : "").trim();
-      if (!val) continue;
-      await pool.query(
-        `INSERT INTO sizes (size_type_id, value)
-             SELECT $1::int, $2::text
-             WHERE NOT EXISTS (
-               SELECT 1 FROM sizes s
-               WHERE s.size_type_id = $1::int AND lower(btrim(s.value::text)) = lower(btrim($2::text))
-             )`,
-        [typeId, val]
-      );
-    }
-  }
-  async function deleteOrphanSizesNotInWhitelist(typeId, allowedLowers) {
-    if (!typeId || !Number.isFinite(typeId) || typeId <= 0 || !allowedLowers.length) return;
-    await pool.query(
-      `DELETE FROM sizes s
-         WHERE s.size_type_id = $1::int
-           AND NOT EXISTS (SELECT 1 FROM product_variants pv WHERE pv.size_id = s.id)
-           AND NOT EXISTS (SELECT 1 FROM size_group_members m WHERE m.size_id = s.id)
-           AND lower(btrim(s.value::text)) <> ALL($2::text[])`,
-      [typeId, allowedLowers]
-    );
-  }
-  const EU_LETTERS_2XS_3XL = ["2XS", "XS", "S", "M", "L", "XL", "2XL", "3XL"];
-  const lettersLower = EU_LETTERS_2XS_3XL.map(function(v) {
-    return String(v).trim().toLowerCase();
-  });
-  await insertValues(bySlug.eu_clothing, EU_LETTERS_2XS_3XL);
-  await deleteOrphanSizesNotInWhitelist(bySlug.eu_clothing, lettersLower);
-  const shoeEu = [];
-  const footLower = [];
-  for (let n = 35; n <= 46; n += 1) {
-    shoeEu.push(String(n));
-    shoeEu.push(String(n) + ".5");
-    footLower.push(String(n).toLowerCase());
-    footLower.push(String(n).toLowerCase() + ".5");
-  }
-  shoeEu.push("47");
-  footLower.push("47");
-  await insertValues(bySlug.eu_footwear, shoeEu);
-  await deleteOrphanSizesNotInWhitelist(bySlug.eu_footwear, footLower);
-  await insertValues(bySlug.eu_accessories, EU_LETTERS_2XS_3XL);
-  await deleteOrphanSizesNotInWhitelist(bySlug.eu_accessories, lettersLower);
-  const uni = [
-    "\u0423\u043D\u0438\u0432\u0435\u0440\u0441\u0430\u043B\u044C\u043D\u044B\u0439",
-    "OSFM",
-    "\u0411\u0435\u0437 \u0440\u0430\u0437\u043C\u0435\u0440\u0430",
-    "XXS/XS",
-    "XS/S",
-    "S/M",
-    "M/L",
-    "L/XL",
-    "XL/XXL"
-  ];
-  await insertValues(bySlug.universal, uni);
-  const uniLower = uni.map(function(v) {
-    return String(v).trim().toLowerCase();
-  });
-  await deleteOrphanSizesNotInWhitelist(bySlug.universal, uniLower);
-}
 async function createSize(pool, data) {
   const value = String(data.value || "").trim();
   if (!value) throw new Error("\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043E\u0431\u043E\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u0440\u0430\u0437\u043C\u0435\u0440\u0430 (\u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440 2XL \u0438\u043B\u0438 42 \u0434\u043B\u044F \u043E\u0431\u0443\u0432\u0438)");
@@ -696,5 +481,4 @@ module.exports.getEquivalentGroups = listSizeEquivalenceBuckets;
 module.exports.expandSizeIdsForEquivalence = expandSizeIdsForEquivalence;
 module.exports.storedSizeIdForVariant = storedSizeIdForVariant;
 module.exports.ensureSizesUniqueValueIndex = ensureSizesUniqueValueIndex;
-module.exports.ensureReferenceSizesSeed = ensureReferenceSizesSeed;
 module.exports.createSize = createSize;

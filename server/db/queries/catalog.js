@@ -1,4 +1,36 @@
-const { mapProductRowMedia } = require("../media-url");
+const MEDIA_PUBLIC_BASE = String(process.env.PUBLIC_URL || process.env.MEDIA_CDN_BASE || "").replace(/\/$/, "");
+
+function publicMediaUrl(url) {
+  if (url == null) return url;
+  const u = String(url).trim();
+  if (!u) return u;
+  if (/^https?:\/\//i.test(u)) return u;
+  if (!MEDIA_PUBLIC_BASE) return u.startsWith("/") ? u : "/" + u;
+  return MEDIA_PUBLIC_BASE + (u.startsWith("/") ? u : "/" + u);
+}
+
+function mapProductRowMedia(row) {
+  if (!row || typeof row !== "object") return row;
+  if (row.image != null && String(row.image).trim() !== "") row.image = publicMediaUrl(row.image);
+  if (row.collections != null && typeof row.collections === "string") {
+    try {
+      const parsed = JSON.parse(row.collections);
+      row.collections = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      row.collections = [];
+    }
+  }
+  if (Array.isArray(row.images)) {
+    row.images = row.images.map((img) => {
+      if (!img || typeof img !== "object") return img;
+      const copy = { ...img };
+      if (copy.url != null && String(copy.url).trim() !== "") copy.url = publicMediaUrl(copy.url);
+      return copy;
+    });
+  }
+  return row;
+}
+
 const { slugify } = require("../lib/slugify");
 const { otherScalesHintSubquery, allProductFields } = require("../lib/sql-constants");
 const { buildProductListWhere } = require("../lib/product-list-filters");
@@ -15,16 +47,8 @@ async function getCatalogRootId(pool) {
 }
 
 async function ensureCategoryHierarchy(pool) {
-  let rootId = await getCatalogRootId(pool);
-  if (!rootId) {
-    const ins = await pool.query(
-      `INSERT INTO categories (name, slug, parent_id, sort_order)
-       VALUES ('Каталог', $1, NULL, 0)
-       RETURNING id`,
-      [CATALOG_ROOT_SLUG]
-    );
-    rootId = Number(ins.rows[0].id);
-  }
+  const rootId = await getCatalogRootId(pool);
+  if (!rootId) return;
   await pool.query(`UPDATE categories SET parent_id = $1 WHERE parent_id IS NULL AND id <> $1`, [rootId]);
 }
 
@@ -352,73 +376,6 @@ async function migrateTagsToCollectionsIfNeeded(pool) {
     `);
   }
 }
-async function backfillCollectionIcons(pool) {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    await client.query(`
-        UPDATE collections AS t SET icon = m.icon
-        FROM (
-            VALUES
-                ('popular', '\u{1F525}'),
-                ('populyarnoe', '\u{1F525}'),
-                ('new', '\u2728'),
-                ('novinki', '\u2728'),
-                ('novinka', '\u2728'),
-                ('sale', '\u{1F3F7}'),
-                ('skidka', '\u{1F4B8}'),
-                ('aktsiya', '\u{1F4B8}'),
-                ('akciya', '\u{1F4B8}'),
-                ('akcia', '\u{1F4B8}'),
-                ('action', '\u{1F4B8}'),
-                ('discount', '\u{1F4B8}'),
-                ('promo', '\u{1F4B8}'),
-                ('recommend', '\u2B50'),
-                ('recommended', '\u2B50'),
-                ('rekomenduem', '\u2B50'),
-                ('hit', '\u{1F3C6}'),
-                ('bestseller', '\u{1F3C6}'),
-                ('hit-prodazh', '\u{1F3C6}'),
-                ('hit_prodazh', '\u{1F3C6}'),
-                ('khit-prodazh', '\u{1F3C6}'),
-                ('khit_prodazh', '\u{1F3C6}')
-        ) AS m(slug, icon)
-        WHERE lower(btrim(t.slug)) = m.slug
-          AND (t.icon IS NULL OR btrim(coalesce(t.icon::text, '')) = '')
-    `);
-    await client.query(`
-        UPDATE collections SET icon = v.icon
-        FROM (VALUES
-            ('\u0430\u043A\u0446\u0438\u044F', '\u{1F4B8}'),
-            ('\u043D\u043E\u0432\u0438\u043D\u043A\u0438', '\u2728'),
-            ('\u043D\u043E\u0432\u0438\u043D\u043A\u0430', '\u2728'),
-            ('\u043F\u043E\u043F\u0443\u043B\u044F\u0440\u043D\u043E\u0435', '\u{1F525}'),
-            ('\u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u043C', '\u2B50'),
-            ('\u0440\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u043E\u0432\u0430\u043D\u043E', '\u2B50'),
-            ('\u0445\u0438\u0442 \u043F\u0440\u043E\u0434\u0430\u0436', '\u{1F3C6}'),
-            ('\u0445\u0438\u0442', '\u{1F3C6}'),
-            ('\u0432\u044B\u0433\u043E\u0434\u043D\u043E', '\u{1F3F7}'),
-            ('\u0441\u043A\u0438\u0434\u043A\u0430', '\u{1F4B8}'),
-            ('\u0440\u0430\u0441\u043F\u0440\u043E\u0434\u0430\u0436\u0430', '\u{1F4B8}')
-        ) AS v(tag_name, icon)
-        WHERE lower(btrim(collections.name)) = v.tag_name
-          AND (collections.icon IS NULL OR btrim(coalesce(collections.icon::text, '')) = '')
-    `);
-    await client.query(`
-        UPDATE collections SET icon = '\u{1F3F7}'
-        WHERE icon IS NULL OR btrim(coalesce(icon::text, '')) = ''
-    `);
-    await client.query("COMMIT");
-  } catch (e) {
-    try {
-      await client.query("ROLLBACK");
-    } catch {
-    }
-    console.warn("[schema] backfillCollectionIcons:", e && e.message);
-  } finally {
-    client.release();
-  }
-}
 async function ensureCoreCatalogTables(pool) {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS brands (
@@ -552,30 +509,12 @@ async function ensureCollectionsSchema(pool) {
   } catch (e) {
     console.warn("[schema] collections_slug_uq:", e && e.message);
   }
-  await pool.query(`
-    INSERT INTO collections (name, slug, icon, section, sort_order)
-    SELECT v.name, v.slug, v.icon, v.section, v.sort_order
-    FROM (
-        VALUES
-            ('\u041F\u043E\u043F\u0443\u043B\u044F\u0440\u043D\u043E\u0435'::text, 'popular'::text, '\u{1F525}'::text, 'all'::text, 0::int),
-            ('\u041D\u043E\u0432\u0438\u043D\u043A\u0438'::text, 'new'::text, '\u2728'::text, 'all'::text, 1::int),
-            ('\u0412\u044B\u0433\u043E\u0434\u043D\u043E'::text, 'sale'::text, '\u{1F3F7}'::text, 'all'::text, 2::int),
-            ('\u0410\u043A\u0446\u0438\u044F'::text, 'aktsiya'::text, '\u{1F4B8}'::text, 'all'::text, 3::int),
-            ('\u0420\u0435\u043A\u043E\u043C\u0435\u043D\u0434\u0443\u0435\u043C'::text, 'rekomenduem'::text, '\u2B50'::text, 'all'::text, 4::int),
-            ('\u0425\u0438\u0442 \u043F\u0440\u043E\u0434\u0430\u0436'::text, 'hit-prodazh'::text, '\u{1F3C6}'::text, 'all'::text, 5::int)
-    ) AS v(name, slug, icon, section, sort_order)
-    WHERE NOT EXISTS (
-        SELECT 1 FROM collections c
-        WHERE c.slug = v.slug OR lower(btrim(c.name::text)) = lower(btrim(v.name::text))
-    )
-`);
   try {
     await mergeDuplicateCollectionsByName(pool);
   } catch (e) {
     console.warn("[schema] mergeDuplicateCollectionsByName:", e && e.message);
   }
   await ensureCollectionUniqueIndexes(pool);
-  await backfillCollectionIcons(pool);
 }
 async function getCollections(pool) {
   const result = await pool.query(
@@ -1122,36 +1061,6 @@ async function replaceProductAttributes(client, productId, attributes) {
 }
 
 const MAX_REFERENCE_MATERIAL_NAME = 120;
-const SEED_REFERENCE_MATERIALS = [
-  "Хлопок",
-  "П/Э",
-  "Полиэстер",
-  "Полиамид",
-  "Вискоза",
-  "Шерсть",
-  "Лён",
-  "Спандекс",
-  "Эластан",
-  "Нейлон",
-  "Модал",
-  "Бамбук",
-  "Акрил",
-  "Шёлк",
-  "Кашемир",
-  "Флис",
-  "Тенсель (лиоцелл)",
-  "Район",
-  "Микрофибра",
-  "Полиуретан",
-  "Кожа (нат.)",
-  "Кожа (искусств.)",
-  "Мех (нат.)",
-  "Мех (искусств.)",
-  "Пух",
-  "Перо",
-  "Резина",
-  "EVA"
-];
 
 async function ensureReferenceMaterialsSchema(pool) {
   await pool.query(`
@@ -1168,26 +1077,6 @@ async function ensureReferenceMaterialsSchema(pool) {
     );
   } catch (e) {
     console.warn("[schema] reference_materials_name_lower_uq:", e && e.message);
-  }
-  await upsertSeedReferenceMaterials(pool);
-}
-
-async function upsertSeedReferenceMaterials(pool) {
-  const mx = await pool.query("SELECT COALESCE(MAX(sort_order), -1)::int AS mx FROM reference_materials");
-  let next = mx.rows.length ? Number(mx.rows[0].mx) + 1 : 0;
-  if (!Number.isFinite(next)) next = 0;
-  for (const name of SEED_REFERENCE_MATERIALS) {
-    const ins = await pool.query(
-      `INSERT INTO reference_materials (name, sort_order)
-       SELECT $1::text, $2::int
-       WHERE NOT EXISTS (
-         SELECT 1 FROM reference_materials rm
-         WHERE lower(btrim(rm.name)) = lower(btrim($1::text))
-       )
-       RETURNING id`,
-      [name, next]
-    );
-    if (ins.rows.length) next += 1;
   }
 }
 
@@ -1227,6 +1116,8 @@ async function searchProducts(pool, q, gender, category, limit = 20, offset = 0)
     offset: Number(offset) || 0
   });
 }
+module.exports.publicMediaUrl = publicMediaUrl;
+module.exports.mapProductRowMedia = mapProductRowMedia;
 module.exports.CATALOG_ROOT_SLUG = CATALOG_ROOT_SLUG;
 module.exports.getCatalogRootId = getCatalogRootId;
 module.exports.ensureCategoryHierarchy = ensureCategoryHierarchy;

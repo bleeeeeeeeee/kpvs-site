@@ -1,20 +1,15 @@
 const { pool } = require("./pool");
-const { publicMediaUrl } = require("./media-url");
 const catalog = require("./queries/catalog");
 const sizes = require("./queries/sizes");
 const users = require("./queries/users");
-async function connectDB() {
-  const client = await pool.connect();
-  try {
-    await client.query("SELECT 1");
-    console.log("  - Connected to PostgreSQL");
-  } finally {
-    client.release();
-  }
-}
-function bindPool(mod) {
+
+const CATALOG_EXPORT_SKIP = new Set(["publicMediaUrl", "mapProductRowMedia"]);
+
+function bindPool(mod, skipKeys) {
+  const skip = skipKeys || new Set();
   const out = {};
   for (const k of Object.keys(mod)) {
+    if (skip.has(k)) continue;
     const fn = mod[k];
     if (typeof fn === "function") {
       out[k] = (...args) => fn(pool, ...args);
@@ -22,11 +17,25 @@ function bindPool(mod) {
   }
   return out;
 }
+
+async function connectDB() {
+  const client = await pool.connect();
+  try {
+    await client.query("SELECT 1");
+    const { ensureDatabaseSchema } = require("../schema.js");
+    await ensureDatabaseSchema(pool);
+    console.log("  - Connected to PostgreSQL");
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   pool,
-  publicMediaUrl,
   connectDB,
-  ...bindPool(catalog),
+  ...bindPool(catalog, CATALOG_EXPORT_SKIP),
   ...bindPool(sizes),
-  ...bindPool(users)
+  ...bindPool(users),
+  publicMediaUrl: catalog.publicMediaUrl,
+  mapProductRowMedia: catalog.mapProductRowMedia
 };

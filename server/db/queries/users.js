@@ -638,9 +638,21 @@ async function ensureUserAuthSchema(db) {
       `CREATE INDEX IF NOT EXISTS email_verifications_lookup_idx ON email_verifications (email, purpose, created_at DESC)`
     );
     await client.query(`CREATE INDEX IF NOT EXISTS email_verifications_code_idx ON email_verifications (code_hash)`);
+    await ensureUserListsColumns(client);
   } finally {
     client.release();
   }
+}
+async function ensureUserListsColumns(db) {
+  await db.query(
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS cart_json JSONB NOT NULL DEFAULT '[]'::jsonb`
+  );
+  await db.query(
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS favorites_json JSONB NOT NULL DEFAULT '[]'::jsonb`
+  );
+  await db.query(
+    `ALTER TABLE users ADD COLUMN IF NOT EXISTS preferences_json JSONB NOT NULL DEFAULT '{"theme":"light","catalogPersist":true,"catalogState":{}}'::jsonb`
+  );
 }
 module.exports.findUserByUsername = findUserByUsername;
 module.exports.findUserById = findUserById;
@@ -667,3 +679,4 @@ module.exports.getUserLists = getUserLists;
 module.exports.setUserLists = setUserLists;
 module.exports.removeProductIdFromAllUserLists = removeProductIdFromAllUserLists;
 module.exports.ensureUserAuthSchema = ensureUserAuthSchema;
+module.exports.ensureUserListsColumns = ensureUserListsColumns;

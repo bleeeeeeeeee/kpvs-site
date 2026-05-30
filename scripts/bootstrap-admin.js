@@ -1,16 +1,21 @@
 #!/usr/bin/env node
 require("dotenv").config({ path: require("path").join(__dirname, "..", ".env") });
 const db = require("../server/db/index.js");
-const { runAllMigrations } = require("../server/db/migrate.js");
 
 const resetPassword = process.argv.includes("--reset-password");
 
 async function main() {
+  try {
+    await db.connectDB();
+  } catch (err) {
+    const msg = err && err.message ? String(err.message) : String(err);
+    console.error("Database unavailable:", msg);
+    process.exit(1);
+  }
+
   const email = String(process.env.ADMIN_EMAIL || "").trim().toLowerCase();
   const password = String(process.env.ADMIN_PASSWORD || "");
   const username = String(process.env.ADMIN_USERNAME || "admin").trim();
-
-  await runAllMigrations();
 
   if (resetPassword) {
     if (!password || password.length < 6) {
@@ -47,6 +52,7 @@ async function main() {
         "  ADMIN_PASSWORD=your_secure_password\n" +
         "  ADMIN_USERNAME=admin   (optional)\n" +
         "Then: npm run bootstrap-admin\n" +
+        "Schema is applied on npm start or on this script (connectDB only).\n" +
         "If the admin user already exists but you forgot the password:\n" +
         "  set ADMIN_PASSWORD and run: npm run bootstrap-admin -- --reset-password"
     );

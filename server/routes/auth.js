@@ -15,7 +15,7 @@ const {
   resolveGoogleLoginEmail,
   sha256Hex,
   readUserJwtToken
-} = require("../services/auth-helpers");
+} = require("../services/auth");
 const { trySendResetEmail, trySendEmailVerificationCode, isOutboundMailConfigured } = require("../services/auth-mail");
 const MAX_LOGIN_USERNAME_LEN = 128;
 const MAX_PASSWORD_INPUT_LEN = 500;

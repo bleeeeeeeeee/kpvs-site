@@ -1,4 +1,4 @@
-function mountMediaRoutes(app, ctx) {
+function mountSystemRoutes(app, ctx) {
   const { csrfProtection, COOKIE_SECURE } = ctx;
   const xsrfCookieOpts = {
     httpOnly: false,
@@ -19,4 +19,5 @@ function mountMediaRoutes(app, ctx) {
     });
   });
 }
-module.exports = { mountMediaRoutes };
+
+module.exports = { mountSystemRoutes };

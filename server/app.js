@@ -9,16 +9,19 @@ const session = require("express-session");
 const PgSession = require("connect-pg-simple")(session);
 const passport = require("passport");
 const db = require("./db/index.js");
-const httpEnv = require("./config/http-env");
-const { createCsrfProtection, createApplyCsrfWhenNeeded } = require("./middleware/csrf");
-const { requireAuth } = require("./middleware/require-auth");
-const { createRequireUserJwt } = require("./middleware/require-user-jwt");
-const { installGoogleStrategy } = require("./passport/setup-google");
+const httpEnv = require("./config");
+const {
+  createCsrfProtection,
+  createApplyCsrfWhenNeeded,
+  requireAuth,
+  createRequireUserJwt
+} = require("./middleware");
+const { installGoogleStrategy } = require("./services/auth");
 const { mountAuthRoutes } = require("./routes/auth");
 const { mountCatalogRoutes } = require("./routes/catalog");
 const { mountAdminRoutes } = require("./routes/admin");
-const { mountMediaRoutes } = require("./routes/media");
-const { renderErrorHtml, sendHtmlError, isApiPath } = require("./http/errors");
+const { mountSystemRoutes } = require("./routes/system");
+const { renderErrorHtml, sendHtmlError, isApiPath } = require("./errors");
 const storageService = require("./services/storage");
 const {
   isProduction,
@@ -121,7 +124,7 @@ app.get("/apple-touch-icon.png", (req, res) => {
   res.sendFile(SITE_FAVICON);
 });
 app.get("/", (req, res) => res.redirect("/welcome.html"));
-mountMediaRoutes(app, routeCtx);
+mountSystemRoutes(app, routeCtx);
 app.use((req, res, next) => {
   if (req.path === "/health") return next();
   if (!appState.dbHealthy && typeof req.path === "string" && req.path.startsWith("/api")) {

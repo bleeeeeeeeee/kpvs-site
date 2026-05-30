@@ -2,9 +2,9 @@
   "name": "kpvs-site",
   "version": "1.0.0",
   "description": "KPVS Products Website",
-  "main": "server.js",
+  "main": "server/index.js",
   "scripts": {
-    "start": "node server.js",
+    "start": "node server/index.js",
     "bootstrap-admin": "node scripts/bootstrap-admin.js"
   },
   "dependencies": {

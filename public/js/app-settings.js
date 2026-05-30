@@ -188,8 +188,24 @@
   function resolveList(serverList, localList) {
     var server = normalizeItems(serverList);
     var local = normalizeItems(localList);
-    if (!server.length && local.length) return { list: local, upload: true };
-    return { list: server, upload: false };
+    if (!server.length) return { list: local, upload: local.length > 0 };
+    if (!local.length) return { list: server, upload: false };
+    var seen = {};
+    var merged = [];
+    var extra = false;
+    var i;
+    for (i = 0; i < server.length; i++) {
+      seen[server[i].id] = 1;
+      merged.push(server[i]);
+    }
+    for (i = 0; i < local.length; i++) {
+      if (!seen[local[i].id]) {
+        seen[local[i].id] = 1;
+        merged.push(local[i]);
+        extra = true;
+      }
+    }
+    return { list: merged, upload: extra };
   }
   function fetchMe() {
     return fetch("/api/user/auth/me", { credentials: "include" }).then(function(r) {
@@ -258,6 +274,10 @@
         return getLists().then(function(data) {
           if (!data) return false;
           var local = readLocal();
+          var fpNow = fingerprint(local.cart, local.favorites, local.preferences);
+          if (fpNow !== lastFingerprint) {
+            return pushNow();
+          }
           var cartResolved = resolveList(data.cart, local.cart);
           var favResolved = resolveList(data.favorites, local.favorites);
           var prefResolved = resolvePreferences(data.preferences, local.preferences);

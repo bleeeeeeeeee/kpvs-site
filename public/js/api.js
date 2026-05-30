@@ -1,7 +1,31 @@
+(function (global) {
+  "use strict";
+
+  function escapeAttr(str) {
+    if (str == null) return "";
+    return String(str).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  }
+
+  function escapeHtml(str) {
+    if (str == null) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  global.KpvsEscape = { escapeAttr, escapeHtml };
+})(typeof window !== "undefined" ? window : globalThis);
+
 function readCookie(name) {
-  const m = document.cookie.match(new RegExp("(?:^|;\\s*)" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "=([^;]*)"));
+  const m = document.cookie.match(
+    new RegExp("(?:^|;\\s*)" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "=([^;]*)")
+  );
   return m ? decodeURIComponent(m[1]) : "";
 }
+
 function apiFetch(url, init) {
   const next = Object.assign({}, init || {});
   if (!next.credentials) next.credentials = "include";
@@ -13,7 +37,9 @@ function apiFetch(url, init) {
   }
   return window.fetch(url, next);
 }
+
 const PROFILE_SYNC_KEY = "kpvs.profile.revision";
+
 function notifyProfileChanged(kind) {
   const stamp = String(Date.now()) + ":" + String(kind || "profile");
   try {
@@ -27,4 +53,5 @@ function notifyProfileChanged(kind) {
   } catch {
   }
 }
+
 window.KpvsApi = { apiFetch, readCookie, notifyProfileChanged, PROFILE_SYNC_KEY };

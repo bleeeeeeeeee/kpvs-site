@@ -1,6 +1,8 @@
 const crypto = require("crypto");
 const jwt = require("jsonwebtoken");
 const https = require("https");
+const passport = require("passport");
+const GoogleStrategy = require("passport-google-oauth20").Strategy;
 function sha256Hex(s) {
   return crypto.createHash("sha256").update(String(s)).digest("hex");
 }
@@ -43,7 +45,7 @@ function assertSameOriginRelativeDest(req, relativePath) {
 function userJwtCookieOptions(secureFlag) {
   return {
     httpOnly: true,
-    sameSite: "strict",
+    sameSite: "lax",
     secure: secureFlag,
     maxAge: 7 * 24 * 60 * 60 * 1e3,
     path: "/"
@@ -52,7 +54,7 @@ function userJwtCookieOptions(secureFlag) {
 function userJwtCookieClearOptions(secureFlag) {
   return {
     httpOnly: true,
-    sameSite: "strict",
+    sameSite: "lax",
     secure: secureFlag,
     path: "/"
   };
@@ -242,6 +244,42 @@ function emailCodeHash(email, purpose, code, jwtSecret) {
   const pepper = process.env.EMAIL_CODE_PEPPER || jwtSecret;
   return sha256Hex([normalizeEmail(email), String(purpose || ""), String(code || ""), pepper].join("|"));
 }
+
+function installGoogleStrategy(opts) {
+  const { clientId, clientSecret, callbackUrl } = opts;
+  if (!clientId || !clientSecret) return;
+  passport.use(
+    new GoogleStrategy(
+      {
+        clientID: clientId,
+        clientSecret,
+        callbackURL: callbackUrl,
+        userProfileURL: "https://openidconnect.googleapis.com/v1/userinfo"
+      },
+      (accessToken, refreshToken, params, profile, done) => {
+        if (!profile || !profile.id) return done(new Error("google_profile_incomplete"));
+        done(null, {
+          profile,
+          accessToken: accessToken || "",
+          tokenParams: params && typeof params === "object" ? params : {}
+        });
+      }
+    )
+  );
+}
+
+function mapUserListRow(u) {
+  return {
+    id: u.id != null ? Number(u.id) : u.id,
+    username: u.username != null ? String(u.username) : "",
+    email: emailForAdminUserList(u),
+    role: u.role != null ? String(u.role) : "",
+    is_active: Boolean(u.is_active),
+    created_at: u.created_at,
+    last_login: u.last_login
+  };
+}
+
 module.exports = {
   sha256Hex,
   normalizeEmail,
@@ -260,5 +298,7 @@ module.exports = {
   emailForProfile,
   emailForAdminUserList,
   makeSixDigitCode,
-  emailCodeHash
+  emailCodeHash,
+  installGoogleStrategy,
+  mapUserListRow
 };

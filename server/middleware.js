@@ -1,4 +1,6 @@
 const crypto = require("crypto");
+const jwt = require("jsonwebtoken");
+const { readUserJwtToken } = require("./services/auth");
 
 function skipPublicAuthMutations(req) {
   const p = (req.originalUrl || "").split("?")[0];
@@ -68,4 +70,28 @@ function createApplyCsrfWhenNeeded() {
   };
 }
 
-module.exports = { createCsrfProtection, createApplyCsrfWhenNeeded, skipPublicAuthMutations };
+function requireAuth(req, res, next) {
+  if (req.session && req.session.user) return next();
+  res.status(401).json({ error: "Unauthorized" });
+}
+
+function createRequireUserJwt(jwtCookieName, jwtSecret) {
+  return function requireUserJwt(req, res, next) {
+    const token = readUserJwtToken(req, jwtCookieName);
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      req.userJwt = jwt.verify(token, jwtSecret);
+      next();
+    } catch {
+      res.status(401).json({ error: "Unauthorized" });
+    }
+  };
+}
+
+module.exports = {
+  createCsrfProtection,
+  createApplyCsrfWhenNeeded,
+  skipPublicAuthMutations,
+  requireAuth,
+  createRequireUserJwt
+};

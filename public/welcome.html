@@ -8,12 +8,10 @@
     <link rel="apple-touch-icon" href="/img/logo-preview.png">
     <title>КПВС — Спецодежда</title>
     <link rel="stylesheet" href="/css/site.css">
-    <script src="/js/utils/escape.js"></script>
+    <script src="/js/api.js"></script>
     <script src="/js/modal-lock.js" defer></script>
-    <script src="/js/utils/api.js" defer></script>
     <script src="/js/app-settings.js" defer></script>
     <script src="/js/account-modal.js" defer></script>
-    <script src="/js/welcome.js" defer></script>
 </head>
 <body class="welcome-page">
     <div class="central">
@@ -69,5 +67,10 @@
         </div>
     </footer>
 
+    <script>
+      document.querySelector(".mens")?.addEventListener("click", () => { location.href = "mens.html"; });
+      document.querySelector(".womens")?.addEventListener("click", () => { location.href = "womens.html"; });
+      document.getElementById("all-catalog-btn")?.addEventListener("click", () => { location.href = "all.html"; });
+    </script>
 </body>
 </html>

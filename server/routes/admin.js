@@ -1,9 +1,8 @@
 const path = require("path");
 const fs = require("fs");
 const storageService = require("../services/storage");
-const { normalizeEmail, isValidEmail } = require("../services/auth-helpers");
+const { normalizeEmail, isValidEmail, mapUserListRow } = require("../services/auth");
 const { validateProductPayload, validateCategoryPayload } = require("../services/catalog-validation");
-const adminService = require("../services/admin");
 const MAX_ADMIN_QUERY_LEN = 200;
 const MAX_ADMIN_LIST_LIMIT = 500;
 const MAX_ADMIN_OFFSET = 1e5;
@@ -119,7 +118,7 @@ function mountAdminRoutes(app, ctx) {
       });
       res.set("Cache-Control", "no-store, no-cache, must-revalidate");
       res.set("Pragma", "no-cache");
-      const payload = rows.map((u) => adminService.mapUserListRow(u));
+      const payload = rows.map((u) => mapUserListRow(u));
       res.json(payload);
     } catch (err) {
       console.error("GET /api/admin/users:", err);
