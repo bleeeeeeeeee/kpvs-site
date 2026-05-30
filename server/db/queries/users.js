@@ -587,30 +587,29 @@ async function ensureUserAuthSchema(db) {
       `CREATE UNIQUE INDEX IF NOT EXISTS users_oauth_uq ON users (oauth_provider, oauth_id) WHERE oauth_provider IS NOT NULL AND oauth_id IS NOT NULL`
     );
     await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS users_username_uq ON users (username)`);
-    await client.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS chk_user_role`);
-    await client.query(
-      `ALTER TABLE users
-             ADD CONSTRAINT chk_user_role
-             CHECK ((role)::text = ANY ((ARRAY['admin'::character varying, 'superadmin'::character varying, 'user'::character varying])::text[]))`
-    );
-    await client.query(
-      `UPDATE users
-             SET password_set = CASE
-                 WHEN oauth_provider IS NOT NULL THEN FALSE
-                 ELSE TRUE
-             END
-             WHERE password_set IS NULL`
-    );
-    await client.query(
-      `UPDATE users
-             SET email_verified = TRUE
-             WHERE email IS NOT NULL AND email_verified IS NULL`
-    );
-    await client.query(
-      `UPDATE users
-             SET email_verified = TRUE
-             WHERE oauth_provider IS NOT NULL AND email IS NOT NULL`
-    );
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'chk_user_role'
+        ) THEN
+          ALTER TABLE users
+            ADD CONSTRAINT chk_user_role
+            CHECK ((role)::text = ANY (
+              (ARRAY['admin'::character varying, 'superadmin'::character varying, 'user'::character varying])::text[]
+            ));
+        END IF;
+      END $$
+    `);
+    await client.query(`
+      UPDATE users
+      SET password_set = CASE WHEN oauth_provider IS NOT NULL THEN FALSE ELSE TRUE END
+      WHERE password_set IS NULL
+    `);
+    await client.query(`
+      UPDATE users SET email_verified = TRUE
+      WHERE email_verified IS NULL AND email IS NOT NULL
+    `);
     await client.query(
       `CREATE TABLE IF NOT EXISTS password_resets (
                 id SERIAL PRIMARY KEY,

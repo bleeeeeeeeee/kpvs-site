@@ -102,8 +102,14 @@ async function getCategorySizeTypeLinks(pool) {
   }));
 }
 async function reconcileCanonicalSizeTypeSlugs(pool) {
-  const { rows } = await pool.query("SELECT id, name FROM size_types ORDER BY id");
+  const { rows } = await pool.query("SELECT id, name, slug FROM size_types ORDER BY id");
+  if (!rows.length) return;
+
   const ln = (s) => String(s || "").toLowerCase();
+  const slugOf = (id) => {
+    const row = rows.find((r) => Number(r.id) === id);
+    return row ? ln(row.slug).trim() : "";
+  };
   const byExactName = (exact) => {
     const e = exact.toLowerCase();
     for (const r of rows) {
@@ -138,18 +144,38 @@ async function reconcileCanonicalSizeTypeSlugs(pool) {
       n
     ) && !/обув|ботин|сапог|кроссов|тапоч|босонож|валенк|мокасин|лофер|туфл|сабо|угг/.test(n)
   );
-  await pool.query(`
-    UPDATE size_types
-    SET slug = 'stype-' || id::text
-    WHERE lower(btrim(COALESCE(slug, ''))) IN ('apparel', 'footwear', 'gloves')
-`);
-  const assign = async (id, slug) => {
-    if (id == null || !Number.isFinite(id) || id <= 0) return;
-    await pool.query("UPDATE size_types SET slug = $1 WHERE id = $2", [slug, id]);
-  };
-  await assign(gloveId, "gloves");
-  await assign(footId, "footwear");
-  await assign(appId, "apparel");
+
+  const assigns = [
+    [gloveId, "gloves"],
+    [footId, "footwear"],
+    [appId, "apparel"]
+  ].filter(([id]) => id != null && Number.isFinite(id) && id > 0);
+
+  if (!assigns.length) return;
+
+  let needsWork = false;
+  for (const [id, slug] of assigns) {
+    if (slugOf(id) !== slug) {
+      needsWork = true;
+      break;
+    }
+  }
+  if (!needsWork) return;
+
+  for (const [id, slug] of assigns) {
+    if (slugOf(id) === slug) continue;
+    const conflict = rows.find((r) => ln(r.slug).trim() === slug && Number(r.id) !== id);
+    if (conflict) {
+      await pool.query(
+        "UPDATE size_types SET slug = 'stype-' || id::text WHERE id = $1 AND lower(btrim(COALESCE(slug, ''))) = $2",
+        [conflict.id, slug]
+      );
+    }
+    await pool.query(
+      "UPDATE size_types SET slug = $1 WHERE id = $2 AND lower(btrim(COALESCE(slug, ''))) <> $1",
+      [slug, id]
+    );
+  }
 }
 async function ensureCategorySizeTypesSchema(pool) {
   await pool.query("ALTER TABLE size_types ADD COLUMN IF NOT EXISTS slug TEXT");
@@ -162,9 +188,12 @@ async function ensureCategorySizeTypesSchema(pool) {
   } catch (e) {
     console.warn("[schema] size_types_slug_lower_uq:", e && e.message);
   }
-  const types = await pool.query("SELECT id, name, slug FROM size_types ORDER BY id");
+  const types = await pool.query(`
+    SELECT id, name FROM size_types
+    WHERE slug IS NULL OR btrim(slug::text) = ''
+    ORDER BY id
+  `);
   for (const t of types.rows) {
-    if (t.slug != null && String(t.slug).trim() !== "") continue;
     const base = slugify(String(t.name || "type")) || "type";
     await pool.query("UPDATE size_types SET slug = $1 WHERE id = $2", [`${base}-${t.id}`, t.id]);
   }

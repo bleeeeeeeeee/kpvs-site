@@ -27,9 +27,9 @@ async function ensureSessionTable(pool) {
 async function ensureDatabaseSchema(pool) {
   await ensureSessionTable(pool);
   await users.ensureUserAuthSchema(pool);
-  await users.ensureUserListsColumns(pool);
   await catalog.ensureCoreCatalogTables(pool);
-  await catalog.ensureProductsEditorColumn(pool);
+  await catalog.ensureCatalogRoot(pool);
+  await catalog.ensureCategoryHierarchy(pool);
   await catalog.ensureCollectionsSchema(pool);
   await sizes.ensureCategorySizeTypesSchema(pool);
   await sizes.ensureSizeGroupsSchema(pool);

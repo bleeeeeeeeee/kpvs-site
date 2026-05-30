@@ -46,9 +46,26 @@ async function getCatalogRootId(pool) {
   return r.rows.length ? Number(r.rows[0].id) : null;
 }
 
+async function ensureCatalogRoot(pool) {
+  const existingId = await getCatalogRootId(pool);
+  if (existingId) return existingId;
+  const ins = await pool.query(
+    `INSERT INTO categories (name, slug, parent_id, sort_order)
+     VALUES ($1, $2, NULL, 0)
+     RETURNING id`,
+    ["Каталог", CATALOG_ROOT_SLUG]
+  );
+  return Number(ins.rows[0].id);
+}
+
 async function ensureCategoryHierarchy(pool) {
   const rootId = await getCatalogRootId(pool);
   if (!rootId) return;
+  const orphans = await pool.query(
+    "SELECT 1 FROM categories WHERE parent_id IS NULL AND id <> $1 LIMIT 1",
+    [rootId]
+  );
+  if (!orphans.rows.length) return;
   await pool.query(`UPDATE categories SET parent_id = $1 WHERE parent_id IS NULL AND id <> $1`, [rootId]);
 }
 
@@ -347,35 +364,6 @@ async function createColor(pool, data) {
     throw e;
   }
 }
-async function migrateTagsToCollectionsIfNeeded(pool) {
-  const r = await pool.query(`
-    SELECT EXISTS (
-      SELECT 1 FROM information_schema.tables
-      WHERE table_schema = 'public' AND table_name = 'collections'
-    ) AS has_coll
-`);
-  const row = r.rows[0];
-  if (!row.has_coll) {
-    await pool.query(`
-        CREATE TABLE collections (
-            id SERIAL PRIMARY KEY,
-            name TEXT NOT NULL,
-            slug TEXT NOT NULL,
-            icon TEXT,
-            section TEXT NOT NULL DEFAULT 'all',
-            sort_order INT NOT NULL DEFAULT 0
-        )
-    `);
-    await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS collections_slug_uq ON collections (slug)");
-    await pool.query(`
-        CREATE TABLE product_collections (
-            product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-            collection_id INTEGER NOT NULL REFERENCES collections(id) ON DELETE CASCADE,
-            PRIMARY KEY (product_id, collection_id)
-        )
-    `);
-  }
-}
 async function ensureCoreCatalogTables(pool) {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS brands (
@@ -492,15 +480,12 @@ async function ensureCoreCatalogTables(pool) {
       console.warn("[schema] ensureCoreCatalogTables index:", e && e.message);
     }
   }
-}
-async function ensureProductsEditorColumn(pool) {
   await pool.query(`
     ALTER TABLE products
     ADD COLUMN IF NOT EXISTS updated_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
-`);
+  `);
 }
 async function ensureCollectionsSchema(pool) {
-  await migrateTagsToCollectionsIfNeeded(pool);
   await pool.query("ALTER TABLE collections ADD COLUMN IF NOT EXISTS section TEXT NOT NULL DEFAULT 'all'");
   await pool.query("ALTER TABLE collections ADD COLUMN IF NOT EXISTS sort_order INT NOT NULL DEFAULT 0");
   await pool.query("ALTER TABLE collections ADD COLUMN IF NOT EXISTS icon TEXT");
@@ -532,6 +517,13 @@ async function getCollectionsAdmin(pool) {
   return result.rows;
 }
 async function mergeDuplicateCollectionsByName(pool) {
+  const dup = await pool.query(`
+    SELECT 1 FROM collections
+    GROUP BY lower(btrim(name))
+    HAVING count(*) > 1
+    LIMIT 1
+  `);
+  if (!dup.rows.length) return;
   const groups = await pool.query(`
     SELECT lower(btrim(name)) AS nk, min(id) AS keep_id
     FROM collections
@@ -1120,6 +1112,7 @@ module.exports.publicMediaUrl = publicMediaUrl;
 module.exports.mapProductRowMedia = mapProductRowMedia;
 module.exports.CATALOG_ROOT_SLUG = CATALOG_ROOT_SLUG;
 module.exports.getCatalogRootId = getCatalogRootId;
+module.exports.ensureCatalogRoot = ensureCatalogRoot;
 module.exports.ensureCategoryHierarchy = ensureCategoryHierarchy;
 module.exports.getCategories = getCategories;
 module.exports.createCategory = createCategory;
@@ -1131,7 +1124,6 @@ module.exports.createBrand = createBrand;
 module.exports.getColors = getColors;
 module.exports.createColor = createColor;
 module.exports.ensureCoreCatalogTables = ensureCoreCatalogTables;
-module.exports.ensureProductsEditorColumn = ensureProductsEditorColumn;
 module.exports.ensureCollectionsSchema = ensureCollectionsSchema;
 module.exports.getCollections = getCollections;
 module.exports.getCollectionsAdmin = getCollectionsAdmin;

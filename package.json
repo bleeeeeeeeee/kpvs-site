@@ -4,7 +4,7 @@
   "description": "KPVS Products Website",
   "main": "server.js",
   "scripts": {
-    "start": "node server/index.js",
+    "start": "node server.js",
     "bootstrap-admin": "node scripts/bootstrap-admin.js"
   },
   "dependencies": {

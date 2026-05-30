@@ -16,11 +16,13 @@ npm install
 DATABASE_URL=postgresql://user:pass@localhost:5432/kpvs_db
 ```
 
-Первый запуск сервера создаёт **только таблицы и колонки** (без товаров, коллекций и справочников):
+Первый запуск сервера создаёт **только таблицы, колонки и служебный узел дерева категорий** (`catalog-root` — без разделов, товаров и коллекций):
 
 ```bash
 npm start
 ```
+
+Точка входа: `server.js` (прокси на `server/index.js`). Локально и на Render используйте **`npm start`**.
 
 Первый администратор — отдельной командой (только учётная запись staff):
 
@@ -45,6 +47,16 @@ DATABASE_URL=…
 
 Часто: `APP_BASE_URL`, `TRUST_PROXY=1` на Render, `COOKIE_SECURE` (в production по умолчанию включён). Опционально: `STORAGE_*`, `SMTP_*`, `GOOGLE_*`, `PUBLIC_URL`.
 
+### Render
+
+| Параметр | Значение |
+|----------|----------|
+| Build Command | `npm install` |
+| Start Command | **`npm start`** |
+| Health Check | `/health` |
+
+Обязательно: `NODE_ENV=production`, `DATABASE_URL`, `SESSION_SECRET`, `JWT_SECRET`, `TRUST_PROXY=1`, `APP_BASE_URL=https://…onrender.com`. Без `TRUST_PROXY` сессии staff и CSRF могут не работать за прокси.
+
 ## Команды
 
 | Команда | Действие |
@@ -56,7 +68,8 @@ DATABASE_URL=…
 ## Структура
 
 ```
-server/index.js       точка входа
+server.js               npm start (прокси)
+server/index.js         точка входа
 server/app.js           Express
 server/config.js        переменные окружения
 server/schema.js        DDL при connectDB
@@ -74,7 +87,7 @@ scripts/bootstrap-admin.js
 2. `npm start` — схема БД
 3. `npm run bootstrap-admin` — admin
 4. `/admin` — категории, товары, размеры, коллекции
-5. Render: `TRUST_PROXY=1`, redeploy после push
+5. Render: Start Command **`npm start`**, `TRUST_PROXY=1`, redeploy после push
 
 ---
 
