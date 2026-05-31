@@ -54,4 +54,25 @@ function notifyProfileChanged(kind) {
   }
 }
 
+const FOOTER_MAP_URL =
+  "https://www.google.com/maps/search/?api=1&query=" +
+  encodeURIComponent("Брест, ул. л-та Рябцева, 44");
+
+function initFooterContacts() {
+  document.querySelectorAll(".footer-contact").forEach(function (el) {
+    if (el.querySelector("a[href^='tel:'], a[href^='mailto:']")) return;
+    if (!(el.textContent || "").includes("ул.")) return;
+    el.addEventListener("click", function () {
+      window.open(FOOTER_MAP_URL, "_blank", "noopener,noreferrer");
+    });
+    el.style.cursor = "pointer";
+  });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initFooterContacts);
+} else {
+  initFooterContacts();
+}
+
 window.KpvsApi = { apiFetch, readCookie, notifyProfileChanged, PROFILE_SYNC_KEY };

@@ -1183,9 +1183,6 @@ function openCartModalInner() {
     }
   });
 }
-function openMap() {
-  window.open("https://www.google.com/maps/search/?api=1&query=" + encodeURIComponent("\u0411\u0440\u0435\u0441\u0442, \u0443\u043B. \u043B-\u0442\u0430 \u0420\u044F\u0431\u0446\u0435\u0432\u0430, 44"), "_blank");
-}
 document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("kpvs-lists-synced", () => {
     refreshProductButtons();
@@ -1231,17 +1228,4 @@ document.addEventListener("DOMContentLoaded", () => {
   if (favoritesLink) favoritesLink.addEventListener("click", openFavoritesModal);
   const cartLink = document.getElementById("cart");
   if (cartLink) cartLink.addEventListener("click", openCartModal);
-  document.querySelectorAll(".footer-contact").forEach((contact) => {
-    if (contact.textContent.includes("\u0443\u043B.")) {
-      contact.addEventListener("click", openMap);
-    } else if (contact.textContent.includes("+375")) {
-      contact.addEventListener("click", () => {
-        window.location.href = "tel:+375162580931";
-      });
-    } else if (contact.textContent.includes("@")) {
-      contact.addEventListener("click", () => {
-        window.location.href = "mailto:kpvssales@gmail.com";
-      });
-    }
-  });
 });
