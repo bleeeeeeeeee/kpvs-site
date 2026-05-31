@@ -39,10 +39,12 @@ npm run bootstrap-admin -- --reset-password
 
 ## Production / Render
 
+`SESSION_SECRET` — не короче 24 символов.
+
 ```env
 NODE_ENV=production
 DATABASE_URL=...
-SESSION_SECRET=...   # от 24 символов
+SESSION_SECRET=...
 JWT_SECRET=...
 TRUST_PROXY=1
 APP_BASE_URL=https://твой-домен.onrender.com

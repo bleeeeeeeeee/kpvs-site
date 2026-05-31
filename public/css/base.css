@@ -83,6 +83,8 @@
 
 html {
   font-size: var(--font-base);
+  height: 100%;
+  background-color: var(--bg-primary);
 }
 
 img,
@@ -104,6 +106,35 @@ body {
     background-color 0.3s ease,
     color 0.3s ease;
   overflow-x: hidden;
+}
+
+body.site-page,
+body.admin-page {
+  min-height: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+body.site-page > .container,
+body.admin-page > .container {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+body.site-page .itemsContainer,
+body.site-page .product-page-shell {
+  flex: 1 1 auto;
+}
+
+body.site-page > .footer,
+body.admin-page > .footer {
+  flex: 0 0 auto;
+  margin-top: auto;
+  width: 100%;
 }
 
 @media (max-width: 767px) {

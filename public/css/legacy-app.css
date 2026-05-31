@@ -4640,7 +4640,6 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     background: linear-gradient(135deg, #24352a 0%, #3B5223 100%);
     color: white;
     padding: 3rem 0 1.5rem 0;
-    margin-top: 4rem;
     width: 100%;
 }
 
@@ -7225,4 +7224,8 @@ select option.admin-select-action-option,
     text-decoration: none;
     box-sizing: border-box;
     cursor: pointer;
+}
+
+.welcome-page > .footer {
+    display: none;
 }
