@@ -336,10 +336,17 @@
     clearTimeout(pushTimer);
     pushTimer = null;
     return fetchMe().then(function(me) {
-      if (!me || !me.id || String(me.role) !== "user") return false;
       var local = readLocal();
+      if (!me || !me.id || String(me.role) !== "user") {
+        var localFp = fingerprint(local.cart, local.favorites, local.preferences);
+        lastFingerprint = localFp;
+        return true;
+      }
       return putUserData(local.cart, local.favorites, local.preferences).then(function(saved) {
-        if (!saved) return false;
+        if (!saved) {
+          lastFingerprint = fingerprint(local.cart, local.favorites, local.preferences);
+          return true;
+        }
         var fp = fingerprint(saved.cart, saved.favorites, saved.preferences || local.preferences);
         setSyncedFingerprint(fp);
         lastFingerprint = fp;
@@ -410,6 +417,7 @@
     applyTheme();
     var local = readLocal();
     lastFingerprint = fingerprint(local.cart, local.favorites, local.preferences);
+    ensureCsrf();
     pull();
   });
 

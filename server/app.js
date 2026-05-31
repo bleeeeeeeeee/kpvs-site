@@ -77,6 +77,9 @@ installGoogleStrategy({
 app.use(passport.initialize());
 const csrfProtection = createCsrfProtection();
 const applyCsrfWhenNeeded = createApplyCsrfWhenNeeded();
+app.use((req, res, next) => {
+  csrfProtection(req, res, (err) => (err ? next(err) : next()));
+});
 app.use(applyCsrfWhenNeeded);
 if (!isProduction) {
   app.use((req, res, next) => {
@@ -200,6 +203,11 @@ async function startServer() {
   }
   app.listen(PORT, () => {
     console.log(`  - Server running on http://localhost:${PORT}`);
+    if (!isProduction && COOKIE_SECURE) {
+      console.warn(
+        "  Warning: COOKIE_SECURE=true on HTTP — session/JWT cookies may not work locally. Remove COOKIE_SECURE from .env or use HTTPS."
+      );
+    }
   }).on("error", (err) => {
     if (err && err.code === "EADDRINUSE") {
       const next = Number(PORT) + 1;

@@ -116,23 +116,9 @@ body.admin-page {
   flex-direction: column;
 }
 
-body.site-page > .container,
-body.admin-page > .container {
-  flex: 1 1 auto;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-body.site-page .itemsContainer,
-body.site-page .product-page-shell {
-  flex: 1 1 auto;
-}
-
 body.site-page > .footer,
 body.admin-page > .footer {
-  flex: 0 0 auto;
+  flex-shrink: 0;
   margin-top: auto;
   width: 100%;
 }
