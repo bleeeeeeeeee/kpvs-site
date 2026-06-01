@@ -6982,6 +6982,10 @@ select option.admin-select-action-option,
     font-size: 1.05rem;
 }
 
+.modal-content--cart-favorites .modal-body .catalog-empty {
+    margin: 0;
+}
+
 .filter-modal-content {
     max-width: min(860px, calc(100vw - 2rem));
     width: min(860px, calc(100vw - 2rem));

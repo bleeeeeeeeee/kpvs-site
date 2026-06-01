@@ -1,6 +1,11 @@
 const Catalog = (() => {
   const escapeHtml = window.KpvsEscape.escapeHtml;
   const escapeAttr = window.KpvsEscape.escapeAttr;
+  const MODAL_EMPTY_FAVORITES = "\u0412 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u043C \u043F\u043E\u043A\u0430 \u043D\u0435\u0442 \u0442\u043E\u0432\u0430\u0440\u043E\u0432.";
+  const MODAL_EMPTY_CART = "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0435 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442 \u0442\u043E\u0432\u0430\u0440\u043E\u0432.";
+  function modalListEmptyHtml(msg) {
+    return '<p class="catalog-empty">' + escapeHtml(msg) + "</p>";
+  }
   let pageGender = "mens";
   let allProducts = [];
   let sectionCollections = [];
@@ -1403,7 +1408,7 @@ const Catalog = (() => {
     modal.className = "modal";
     modal.id = "kpvs-favorites-modal";
     if (!ids.length) {
-      modal.innerHTML = '<div class="modal-content modal-content--cart-favorites"><div class="modal-header"><h2>\u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435</h2><button class="modal-close ui-xbtn" type="button" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div><div class="modal-body"></div></div>';
+      modal.innerHTML = '<div class="modal-content modal-content--cart-favorites"><div class="modal-header"><h2>\u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435</h2><button class="modal-close ui-xbtn" type="button" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div><div class="modal-body">' + modalListEmptyHtml(MODAL_EMPTY_FAVORITES) + "</div></div>";
       document.body.appendChild(modal);
       if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
       setTimeout(function() {
@@ -1428,7 +1433,7 @@ const Catalog = (() => {
         const artHtml = artRaw ? '<p class="modal-item-art">' + escapeHtml(artRaw) + "</p>" : "";
         return '<div class="modal-item" data-product-id="' + p.id + '"><img src="' + escapeAttr(imgSrc) + '" alt="' + escapeHtml(p.name || "") + '" class="modal-item-img"><div class="modal-item-info"><h3>' + escapeHtml(p.name || "\u0422\u043E\u0432\u0430\u0440") + "</h3>" + artHtml + '<div class="modal-item-actions"><button type="button" class="btn btn--primary btn--small ' + (isInCart ? "in-cart" : "") + '" data-action="toggle-cart" data-product-id="' + p.id + '">' + (isInCart ? "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B" : "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0443") + '</button><button type="button" class="btn btn--danger btn--small" data-action="remove-favorite" data-product-id="' + p.id + '">\u0423\u0434\u0430\u043B\u0438\u0442\u044C</button></div></div></div>';
       }).join("") : "";
-      modal.innerHTML = '<div class="modal-content modal-content--cart-favorites"><div class="modal-header"><h2>\u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435</h2><button class="modal-close ui-xbtn" type="button" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div><div class="modal-body">' + (itemsHtml ? '<div class="modal-items">' + itemsHtml + "</div>" : "") + "</div></div>";
+      modal.innerHTML = '<div class="modal-content modal-content--cart-favorites"><div class="modal-header"><h2>\u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435</h2><button class="modal-close ui-xbtn" type="button" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div><div class="modal-body">' + (itemsHtml ? '<div class="modal-items">' + itemsHtml + "</div>" : modalListEmptyHtml(MODAL_EMPTY_FAVORITES)) + "</div></div>";
       document.body.appendChild(modal);
       if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
       setTimeout(function() {
@@ -1451,7 +1456,7 @@ const Catalog = (() => {
           removeFromFavorites(pid);
           btn.closest(".modal-item").remove();
           if (!modal.querySelector(".modal-item")) {
-            modal.querySelector(".modal-body").innerHTML = "";
+            modal.querySelector(".modal-body").innerHTML = modalListEmptyHtml(MODAL_EMPTY_FAVORITES);
           }
         });
       });
@@ -1475,7 +1480,7 @@ const Catalog = (() => {
     modal.className = "modal";
     modal.id = "kpvs-cart-modal";
     if (!ids.length) {
-      modal.innerHTML = '<div class="modal-content modal-content--cart-favorites"><div class="modal-header"><h2>\u041A\u043E\u0440\u0437\u0438\u043D\u0430</h2><button class="modal-close ui-xbtn" type="button" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div><div class="modal-body"></div></div>';
+      modal.innerHTML = '<div class="modal-content modal-content--cart-favorites"><div class="modal-header"><h2>\u041A\u043E\u0440\u0437\u0438\u043D\u0430</h2><button class="modal-close ui-xbtn" type="button" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div><div class="modal-body">' + modalListEmptyHtml(MODAL_EMPTY_CART) + "</div></div>";
       document.body.appendChild(modal);
       if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
       setTimeout(function() {
@@ -1497,7 +1502,7 @@ const Catalog = (() => {
         const artHtml = artRaw ? '<p class="modal-item-art">' + escapeHtml(artRaw) + "</p>" : "";
         return '<div class="modal-item" data-product-id="' + p.id + '"><img src="' + escapeAttr(imgSrc) + '" alt="' + escapeHtml(p.name || "") + '" class="modal-item-img"><div class="modal-item-info"><h3>' + escapeHtml(p.name || "\u0422\u043E\u0432\u0430\u0440") + "</h3>" + artHtml + '<div class="modal-item-actions"><button type="button" class="btn btn--danger btn--small" data-action="remove-cart" data-product-id="' + p.id + '">\u0423\u0434\u0430\u043B\u0438\u0442\u044C</button></div></div></div>';
       }).join("") : "";
-      const cartMain = itemsHtml ? '<div class="modal-items">' + itemsHtml + '</div><div class="cart-actions"><button type="button" class="cart-inquire-btn" data-action="cart-inquire-all">\u0423\u0437\u043D\u0430\u0442\u044C \u0446\u0435\u043D\u0443 \u043D\u0430 \u0432\u0441\u0435 \u0442\u043E\u0432\u0430\u0440\u044B</button></div>' : "";
+      const cartMain = itemsHtml ? '<div class="modal-items">' + itemsHtml + '</div><div class="cart-actions"><button type="button" class="cart-inquire-btn" data-action="cart-inquire-all">\u0423\u0437\u043D\u0430\u0442\u044C \u0446\u0435\u043D\u0443 \u043D\u0430 \u0432\u0441\u0435 \u0442\u043E\u0432\u0430\u0440\u044B</button></div>' : modalListEmptyHtml(MODAL_EMPTY_CART);
       modal.innerHTML = '<div class="modal-content modal-content--cart-favorites"><div class="modal-header"><h2>\u041A\u043E\u0440\u0437\u0438\u043D\u0430</h2><button class="modal-close ui-xbtn" type="button" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div><div class="modal-body">' + cartMain + "</div></div>";
       document.body.appendChild(modal);
       if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
@@ -1513,7 +1518,7 @@ const Catalog = (() => {
           removeFromCart(pid);
           btn.closest(".modal-item").remove();
           if (!modal.querySelector(".modal-item")) {
-            modal.querySelector(".modal-body").innerHTML = "";
+            modal.querySelector(".modal-body").innerHTML = modalListEmptyHtml(MODAL_EMPTY_CART);
           }
         });
       });

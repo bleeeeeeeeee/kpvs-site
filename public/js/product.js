@@ -1,6 +1,11 @@
 let currentProductId = null;
 const escapeHtml = window.KpvsEscape.escapeHtml;
 const escapeAttr = window.KpvsEscape.escapeAttr;
+const MODAL_EMPTY_FAVORITES = "\u0412 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u043C \u043F\u043E\u043A\u0430 \u043D\u0435\u0442 \u0442\u043E\u0432\u0430\u0440\u043E\u0432.";
+const MODAL_EMPTY_CART = "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0435 \u043F\u043E\u043A\u0430 \u043D\u0435\u0442 \u0442\u043E\u0432\u0430\u0440\u043E\u0432.";
+function modalListEmptyHtml(msg) {
+  return '<p class="catalog-empty">' + escapeHtml(msg) + "</p>";
+}
 const BTN_ADD_FAVORITE = "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435";
 const BTN_REMOVE_FAVORITE = "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0433\u043E";
 const BTN_ADD_CART = "\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C \u0432 \u043A\u043E\u0440\u0437\u0438\u043D\u0443";
@@ -1051,7 +1056,7 @@ function openFavoritesModalInner() {
     modal.innerHTML = `
             <div class="modal-content modal-content--cart-favorites">
                 <div class="modal-header"><h2>\u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435</h2><button type="button" class="modal-close ui-xbtn" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div>
-                <div class="modal-body"></div>
+                <div class="modal-body">${modalListEmptyHtml(MODAL_EMPTY_FAVORITES)}</div>
             </div>`;
     document.body.appendChild(modal);
     if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
@@ -1081,7 +1086,7 @@ function openFavoritesModalInner() {
       const artHtml = artRaw ? '<p class="modal-item-art">' + escapeHtml(artRaw) + "</p>" : "";
       return '<div class="modal-item" data-product-id="' + pid + '"><img src="' + safeSrc + '" alt="' + altA + '" class="modal-item-img"><div class="modal-item-info"><h3>' + disp + "</h3>" + artHtml + '<div class="modal-item-actions"><button type="button" class="btn btn--primary btn--small ' + (isInCart ? "in-cart" : "") + '" data-action="toggle-cart" data-product-id="' + pid + '">' + (isInCart ? "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0438\u0437 \u043A\u043E\u0440\u0437\u0438\u043D\u044B" : "\u0412 \u043A\u043E\u0440\u0437\u0438\u043D\u0443") + '</button><button type="button" class="btn btn--danger btn--small" data-action="remove-favorite" data-product-id="' + pid + '">\u0423\u0434\u0430\u043B\u0438\u0442\u044C</button></div></div></div>';
     }).join("");
-    const favBody = itemsHtml ? '<div class="modal-items">' + itemsHtml + "</div>" : "";
+    const favBody = itemsHtml ? '<div class="modal-items">' + itemsHtml + "</div>" : modalListEmptyHtml(MODAL_EMPTY_FAVORITES);
     modal.innerHTML = '<div class="modal-content modal-content--cart-favorites"><div class="modal-header"><h2>\u0418\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u0435</h2><button type="button" class="modal-close ui-xbtn" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div><div class="modal-body">' + favBody + "</div></div>";
     document.body.appendChild(modal);
     if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
@@ -1102,7 +1107,7 @@ function openFavoritesModalInner() {
         const item = btn.closest(".modal-item");
         if (item) item.remove();
         if (!modal.querySelector(".modal-item")) {
-          modal.querySelector(".modal-body").innerHTML = "";
+          modal.querySelector(".modal-body").innerHTML = modalListEmptyHtml(MODAL_EMPTY_FAVORITES);
         }
       });
     });
@@ -1127,7 +1132,7 @@ function openCartModalInner() {
     modal.innerHTML = `
             <div class="modal-content modal-content--cart-favorites">
                 <div class="modal-header"><h2>\u041A\u043E\u0440\u0437\u0438\u043D\u0430</h2><button type="button" class="modal-close ui-xbtn" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div>
-                <div class="modal-body"></div>
+                <div class="modal-body">${modalListEmptyHtml(MODAL_EMPTY_CART)}</div>
             </div>`;
     document.body.appendChild(modal);
     if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
@@ -1154,7 +1159,7 @@ function openCartModalInner() {
       const artHtml = artRaw ? '<p class="modal-item-art">' + escapeHtml(artRaw) + "</p>" : "";
       return '<div class="modal-item" data-product-id="' + pid + '"><img src="' + safeSrc + '" alt="' + altA + '" class="modal-item-img"><div class="modal-item-info"><h3>' + disp + "</h3>" + artHtml + '<div class="modal-item-actions"><button type="button" class="btn btn--danger btn--small" data-action="remove-from-cart" data-product-id="' + pid + '">\u0423\u0434\u0430\u043B\u0438\u0442\u044C</button></div></div></div>';
     }).join("");
-    const cartMain = itemsHtml ? '<div class="modal-items">' + itemsHtml + '</div><div class="cart-actions"><button type="button" class="cart-inquire-btn" data-action="cart-inquire-all">\u0423\u0437\u043D\u0430\u0442\u044C \u0446\u0435\u043D\u0443 \u043D\u0430 \u0432\u0441\u0435 \u0442\u043E\u0432\u0430\u0440\u044B</button></div>' : "";
+    const cartMain = itemsHtml ? '<div class="modal-items">' + itemsHtml + '</div><div class="cart-actions"><button type="button" class="cart-inquire-btn" data-action="cart-inquire-all">\u0423\u0437\u043D\u0430\u0442\u044C \u0446\u0435\u043D\u0443 \u043D\u0430 \u0432\u0441\u0435 \u0442\u043E\u0432\u0430\u0440\u044B</button></div>' : modalListEmptyHtml(MODAL_EMPTY_CART);
     modal.innerHTML = '<div class="modal-content modal-content--cart-favorites"><div class="modal-header"><h2>\u041A\u043E\u0440\u0437\u0438\u043D\u0430</h2><button type="button" class="modal-close ui-xbtn" onclick="kpvsDismissTopModal(this)" aria-label="\u0417\u0430\u043A\u0440\u044B\u0442\u044C">&times;</button></div><div class="modal-body">' + cartMain + "</div></div>";
     document.body.appendChild(modal);
     if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
@@ -1169,7 +1174,7 @@ function openCartModalInner() {
         const item = btn.closest(".modal-item");
         if (item) item.remove();
         if (!modal.querySelector(".modal-item")) {
-          modal.querySelector(".modal-body").innerHTML = "";
+          modal.querySelector(".modal-body").innerHTML = modalListEmptyHtml(MODAL_EMPTY_CART);
         }
       });
     });
