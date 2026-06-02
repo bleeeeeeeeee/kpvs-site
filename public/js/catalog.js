@@ -100,7 +100,7 @@ const Catalog = (() => {
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (!parsed || typeof parsed !== "object") return;
-      if (typeof parsed.sort === "string") currentSort = parsed.sort;
+      if (typeof parsed.sort === "string") currentSort = normalizeSortKey(parsed.sort);
       if (typeof parsed.search === "string") currentSearch = parsed.search;
       if (parsed.filters && typeof parsed.filters === "object") {
         const f = parsed.filters;
@@ -682,6 +682,25 @@ const Catalog = (() => {
     }
     return result;
   }
+  function normalizeSortKey(key) {
+    const k = String(key || "");
+    if (k === "id_asc") return "art_asc";
+    if (k === "id_desc") return "art_desc";
+    return k;
+  }
+  function productArtKey(p) {
+    return String(p && p.art != null ? p.art : "").trim();
+  }
+  function compareByArt(a, b, dir) {
+    const artA = productArtKey(a);
+    const artB = productArtKey(b);
+    if (!artA && !artB) return (Number(a.id) || 0) - (Number(b.id) || 0);
+    if (!artA) return 1;
+    if (!artB) return -1;
+    const cmp = artA.localeCompare(artB, "ru", { numeric: true, sensitivity: "base" });
+    if (cmp !== 0) return dir * cmp;
+    return (Number(a.id) || 0) - (Number(b.id) || 0);
+  }
   function sortProducts(products) {
     return products.slice().sort(function(a, b) {
       const dateA = a.created_at ? Date.parse(a.created_at) : 0;
@@ -699,10 +718,10 @@ const Catalog = (() => {
           return (a.price || 0) - (b.price || 0);
         case "price_desc":
           return (b.price || 0) - (a.price || 0);
-        case "id_desc":
-          return b.id - a.id;
-        case "id_asc":
-          return a.id - b.id;
+        case "art_asc":
+          return compareByArt(a, b, 1);
+        case "art_desc":
+          return compareByArt(a, b, -1);
         default:
           return 0;
       }
@@ -1079,7 +1098,7 @@ const Catalog = (() => {
     const searchClear = document.getElementById("catalog-search-clear");
     if (sortSelect) {
       sortSelect.addEventListener("change", function(e) {
-        currentSort = e.target.value;
+        currentSort = normalizeSortKey(e.target.value);
         saveCatalogStateToStorage();
         renderProducts();
       });
