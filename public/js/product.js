@@ -654,12 +654,15 @@ function colorCountLabelRu(n) {
   return n + " \u0446\u0432\u0435\u0442\u043E\u0432";
 }
 function sizeDisplaySortKey(label) {
-  const v = String(label || "").trim().toLowerCase().replace(/\s+/g, "");
-  const rank = { "2xs": 1, xxs: 1, xs: 2, s: 3, m: 4, l: 5, xl: 6, xxl: 7, "2xl": 7, "3xl": 8 };
-  if (rank[v] != null) return [0, rank[v], String(label)];
-  const num = parseFloat(String(label).replace(",", "."));
-  if (Number.isFinite(num)) return [1, num, String(label)];
-  return [2, 0, String(label)];
+  const stripped = String(label || "").trim().replace(/^eu\s+/i, "");
+  const compact = stripped.toLowerCase().replace(/\s+/g, "");
+  const rank = { "2xs": 1, xxs: 1, xs: 2, s: 3, m: 4, l: 5, xl: 6, xxl: 7, "2xl": 7, "3xl": 8, "4xl": 9, "5xl": 10 };
+  if (rank[compact] != null) return [0, rank[compact], compact];
+  const num = parseFloat(stripped.replace(",", "."));
+  if (Number.isFinite(num)) return [1, num, compact];
+  const numMatch = stripped.replace(",", ".").match(/(\d+(?:\.\d+)?)/);
+  if (numMatch) return [1, parseFloat(numMatch[1]), compact];
+  return [2, 0, compact];
 }
 function sortSizeLabels(labels) {
   return labels.slice().sort(function(a, b) {
