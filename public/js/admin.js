@@ -3056,6 +3056,80 @@ const Admin = (() => {
       }
     }
   }
+  function imageFilesFromFileList(fileList) {
+    return Array.from(fileList || []).filter(function(f) {
+      return f && String(f.type || "").startsWith("image/");
+    });
+  }
+  async function processProductImageFiles(fileList) {
+    const files = imageFilesFromFileList(fileList);
+    if (!files.length) {
+      notify("\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u0444\u0430\u0439\u043B\u044B \u0438\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u0439", "error");
+      return;
+    }
+    try {
+      notify("\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u044E \u0438\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F\u2026", "info");
+      const uploaded = await uploadFiles(files);
+      uploaded.forEach(function(img) {
+        if (!productImages.some(function(i) {
+          return i.url === img.url;
+        })) {
+          productImages.push(img);
+        }
+      });
+      if (productImages.length && !productImages.some(function(i) {
+        return i.is_primary;
+      })) {
+        productImages[0].is_primary = true;
+      }
+      renderImagesList();
+      notify("\u0418\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u044B", "success");
+    } catch (err) {
+      notify(err.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0438\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F", "error");
+    }
+  }
+  function bindProductImagesUploadOnce() {
+    const input = ui.productImagesInput;
+    const area = ui.productImagesUploadArea;
+    if ((!input && !area) || (area && area.dataset.uploadBound === "1")) return;
+    if (area) area.dataset.uploadBound = "1";
+    if (input && input.dataset.uploadBound !== "1") {
+      input.dataset.uploadBound = "1";
+      input.addEventListener("change", async function() {
+        const files = input.files;
+        if (!files || !files.length) return;
+        await processProductImageFiles(files);
+        input.value = "";
+      });
+    }
+    if (!area) return;
+    let dragDepth = 0;
+    area.addEventListener("dragenter", function(e) {
+      e.preventDefault();
+      dragDepth += 1;
+      area.classList.add("is-dragover");
+    });
+    area.addEventListener("dragover", function(e) {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+    });
+    area.addEventListener("dragleave", function(e) {
+      e.preventDefault();
+      dragDepth -= 1;
+      if (dragDepth <= 0) {
+        dragDepth = 0;
+        area.classList.remove("is-dragover");
+      }
+    });
+    area.addEventListener("drop", function(e) {
+      e.preventDefault();
+      dragDepth = 0;
+      area.classList.remove("is-dragover");
+      const dt = e.dataTransfer;
+      if (!dt || !dt.files || !dt.files.length) return;
+      processProductImageFiles(dt.files);
+    });
+  }
   async function uploadFiles(files) {
     const form = new FormData();
     Array.from(files).forEach(function(f) {
@@ -3688,32 +3762,7 @@ const Admin = (() => {
       };
     }
     if (ui.productImagesInput) {
-      ui.productImagesInput.addEventListener("change", async function() {
-        const files = ui.productImagesInput.files;
-        if (!files || !files.length) return;
-        try {
-          notify("\u0417\u0430\u0433\u0440\u0443\u0436\u0430\u044E \u0438\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F\u2026", "info");
-          const uploaded = await uploadFiles(files);
-          uploaded.forEach(function(img) {
-            if (!productImages.some(function(i) {
-              return i.url === img.url;
-            })) {
-              productImages.push(img);
-            }
-          });
-          if (productImages.length && !productImages.some(function(i) {
-            return i.is_primary;
-          })) {
-            productImages[0].is_primary = true;
-          }
-          renderImagesList();
-          notify("\u0418\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u044B", "success");
-        } catch (err) {
-          notify(err.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0438\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F", "error");
-        } finally {
-          ui.productImagesInput.value = "";
-        }
-      });
+      bindProductImagesUploadOnce();
     }
     if (ui.filterCategoryTrigger) {
       ui.filterCategoryTrigger.addEventListener("click", function(e) {
@@ -3757,6 +3806,7 @@ const Admin = (() => {
     ui.filterCategoryTrigger = document.getElementById("filter-category-trigger");
     ui.productImagesInput = document.getElementById("product-images");
     ui.productImagesList = document.getElementById("product-images-list");
+    ui.productImagesUploadArea = document.querySelector(".admin-images-upload-area");
     ui.productCollectionsContainer = document.getElementById("product-collections-container");
     ui.productCollectionsTrigger = document.getElementById("product-collections-trigger");
     ui.productCollectionsDropdown = document.getElementById("product-collections-dropdown");

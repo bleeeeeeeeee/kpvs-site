@@ -5918,6 +5918,12 @@ select option.admin-select-action-option,
     margin-top: 0.25rem;
 }
 
+.admin-images-upload-area.is-dragover .admin-file-label {
+    border-color: var(--accent-color);
+    background: rgba(182, 197, 63, 0.1);
+    color: var(--text-primary);
+}
+
 .admin-file-label {
     display: flex;
     align-items: center;
