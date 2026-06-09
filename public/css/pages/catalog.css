@@ -34,16 +34,9 @@
   font-weight: 500;
 }
 
-.catalog-page .card-price {
-  margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text-accent);
-}
-
+.catalog-page .card-price,
 .catalog-page .card-price--muted {
-  font-weight: 600;
-  color: var(--text-secondary);
+  display: none !important;
 }
 
 .catalog-page #items-container .itemsSection .effect-section .items {
@@ -176,8 +169,7 @@
   }
 
   .catalog-page .card-name,
-  .catalog-page .card-art,
-  .catalog-page .card-price {
+  .catalog-page .card-art {
     display: block;
     width: 100%;
     max-width: 100%;
@@ -205,10 +197,4 @@
     color: var(--text-secondary);
   }
 
-  .catalog-page .card-price,
-  .catalog-page .card-price--muted {
-    font-size: clamp(0.64rem, 2.3vw, 0.76rem);
-    font-weight: 600;
-    line-height: 1.2;
-  }
 }

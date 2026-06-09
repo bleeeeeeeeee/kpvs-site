@@ -153,9 +153,14 @@ body.admin-page > .footer {
 
   .container {
     width: 100%;
+    max-width: 100%;
     box-sizing: border-box;
-    margin-left: max(var(--page-inline-pad), env(safe-area-inset-left));
-    margin-right: max(var(--page-inline-pad), env(safe-area-inset-right));
+    margin-top: 1.25rem;
+    margin-bottom: 1.25rem;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: max(var(--page-inline-pad), env(safe-area-inset-left));
+    padding-right: max(var(--page-inline-pad), env(safe-area-inset-right));
   }
 
   .hide-mobile {
