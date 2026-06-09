@@ -5,6 +5,8 @@
 .container {
     margin: 1.5rem 4rem;
     max-width: 1400px;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .container .section {
@@ -4734,7 +4736,7 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 
     .central .genders {
-        gap: 12rem;
+        gap: clamp(2rem, 8vw, 6rem);
     }
 
     .card-visual-wrap {
@@ -4786,26 +4788,47 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 
     .central .genders {
-        flex-direction: row;
-        gap: 3rem;
-        flex-wrap: wrap;
+        flex-direction: column;
+        gap: clamp(1.5rem, 5vw, 2.5rem);
+        flex-wrap: nowrap;
         justify-content: center;
+        align-items: center;
+        width: 100%;
     }
 
     .central {
         --welcome-plaque-fs: 1.25rem;
+        --welcome-gap: clamp(1.5rem, 5vw, 2.5rem);
+        --welcome-card-w: clamp(9rem, 72vw, 14rem);
+    }
+
+    .central .welcome-shell {
+        width: min(100%, var(--welcome-card-w));
+    }
+
+    .central .genders .mens,
+    .central .genders .womens {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        max-width: var(--welcome-card-w);
     }
 
     .central .genders .caption {
-        width: 12rem;
+        position: static;
+        width: 100%;
+        max-width: none;
+        margin-top: 0.55rem;
     }
 
     .central header #welcome-logo {
-        width: 12rem;
+        width: clamp(8rem, 42vw, 12rem);
     }
 
     .central .genders img {
-        width: 12rem;
+        width: 100%;
+        max-width: var(--welcome-card-w);
     }
 
     .card-visual-wrap {
@@ -4885,10 +4908,6 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
 }
 
 @media (max-width: 480px) {
-    * {
-        font-size: 16px;
-    }
-
     .container {
         margin: 0.75rem 1rem;
     }
@@ -4935,19 +4954,21 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
         flex-direction: column;
         gap: 2rem;
         width: 100%;
-        max-width: 300px;
+        max-width: none;
     }
 
     .central .genders #mens-icon,
     .central .genders #womens-icon {
         width: 100%;
-        max-width: 14rem;
+        max-width: var(--welcome-card-w, 14rem);
         height: auto;
     }
 
     .central .genders .caption {
+        position: static;
         width: 100%;
-        max-width: 14rem;
+        max-width: none;
+        margin-top: 0.55rem;
     }
 
     .secTitle {
@@ -5165,10 +5186,6 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
 }
 
 @media (max-width: 360px) {
-    * {
-        font-size: 14px;
-    }
-
     .container {
         margin: 0.5rem 0.75rem;
     }
@@ -7238,4 +7255,103 @@ select option.admin-select-action-option,
 
 .welcome-page > .footer {
     display: none;
+}
+
+@media (max-width: 767px) {
+    .site-page .container > header .section.site-header-bar {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 0.35rem 0.5rem;
+        align-items: center;
+    }
+
+    .site-page .site-logo-link img {
+        height: 2rem;
+    }
+
+    .site-page .site-header-title {
+        font-size: clamp(0.82rem, 3.6vw, 1rem);
+        padding: 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .site-page .site-header-actions {
+        flex-wrap: nowrap;
+        gap: 0.2rem;
+    }
+
+    .site-page .site-header-actions .site-icon-btn {
+        min-width: var(--touch-target, 44px);
+        min-height: var(--touch-target, 44px);
+        padding: 0.2rem;
+    }
+
+    .site-page .site-header-actions .site-icon-btn img {
+        width: 1.55rem;
+        height: 1.55rem;
+    }
+
+    .site-header-actions .site-account-login-btn {
+        margin-left: 0;
+        min-inline-size: 0;
+        --btn-pad-x: 0.7rem;
+        --btn-pad-y: 0.5rem;
+        --btn-fz: 0.8125rem;
+        white-space: nowrap;
+    }
+
+    .modal-content,
+    .modal-content.modal-content--account,
+    .modal-content.modal-content--cart-favorites {
+        width: min(100%, calc(100vw - 1.25rem));
+        max-width: none;
+        margin-inline: auto;
+    }
+
+    .account-setting.account-setting--tabs {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.55rem;
+    }
+
+    .account-theme-tabs {
+        width: 100%;
+        max-width: none;
+    }
+
+    .account-setting {
+        align-items: flex-start;
+        gap: 0.65rem;
+    }
+
+    .account-setting-label {
+        flex: 1 1 auto;
+        line-height: 1.35;
+    }
+
+    .account-setting--tabs .account-setting-label {
+        flex: 0 0 auto;
+    }
+
+    .account-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .account-actions .account-action-btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .central {
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+
+    .welcome-page .welcome-top-actions {
+        right: max(0.75rem, env(safe-area-inset-right));
+        top: max(0.75rem, env(safe-area-inset-top));
+    }
 }

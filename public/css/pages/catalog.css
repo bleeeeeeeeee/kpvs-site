@@ -55,3 +55,49 @@
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
+
+@media (max-width: 767px) {
+  .catalog-page .catalog-search-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+  }
+
+  .catalog-page .catalog-search-row .admin-add-product-btn,
+  .catalog-page .catalog-search-row #filter-button {
+    width: 100%;
+  }
+
+  .catalog-page .catalog-sort-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.45rem;
+  }
+
+  .catalog-page .catalog-sort-select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .catalog-search-wrap {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .itemsContainer .itemsSection .effect-section {
+    overflow: hidden;
+    max-width: 100%;
+  }
+
+  .itemsContainer .itemsSection .effect-section .items {
+    max-width: 100%;
+    scroll-padding-inline: 0.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .card-visual-wrap {
+    width: clamp(8.5rem, 42vw, 11rem);
+    height: clamp(11rem, 54vw, 14rem);
+  }
+}
