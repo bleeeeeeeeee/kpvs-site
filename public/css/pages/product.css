@@ -665,26 +665,39 @@
 }
 
 @media (max-width: 767px) {
-  .product-page-header .container,
+  .product-page-header > .container {
+    overflow-x: hidden;
+  }
+
   .product-page-header #product-details.product-page-shell,
   .product-page .product-page {
     max-width: 100%;
     min-width: 0;
     box-sizing: border-box;
-    overflow-x: clip;
   }
 
   .product-page .product-info,
   .product-page .product-summary,
   .product-page .product-description,
   .product-page .product-specs,
-  .product-page .product-spec-group {
+  .product-page .product-spec-group,
+  .product-page .product-title,
+  .product-page .product-meta,
+  .product-page .product-sku,
+  .product-page .product-brand {
     max-width: 100%;
     min-width: 0;
   }
 
+  .product-page .product-title {
+    font-size: clamp(1.2rem, 5vw, 1.65rem);
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+  }
+
   .product-page .product-description,
-  .product-page .product-desc-p {
+  .product-page .product-desc-p,
+  .product-page .product-attr-value {
     overflow-wrap: break-word;
     word-wrap: break-word;
   }

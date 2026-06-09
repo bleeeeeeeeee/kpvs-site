@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+
 :root {
   --font-base: 16px;
   --touch-target: 44px;
@@ -127,7 +129,7 @@ body.admin-page > .footer {
   :root {
     --font-base: 14px;
     --page-inline-pad: clamp(0.75rem, 4.5vw, 1.25rem);
-    --catalog-viewport-w: calc(100vw - 2 * var(--page-inline-pad));
+    --catalog-viewport-w: 100%;
     --catalog-card-gap: 0.75rem;
     --catalog-cards-per-view: 2.12;
     --catalog-card-w: clamp(
@@ -141,7 +143,7 @@ body.admin-page > .footer {
     --catalog-card-h: calc(var(--catalog-card-w) * 18 / 14);
     --catalog-card-name-fs: clamp(0.84rem, 3.4vw, 0.94rem);
     --catalog-card-art-fs: clamp(0.58rem, 2.35vw, 0.68rem);
-    --welcome-inner-w: calc(100vw - 2 * var(--page-inline-pad));
+    --welcome-inner-w: 100%;
     --welcome-gap: max(0.5rem, calc(var(--welcome-inner-w) * 0.075));
     --welcome-card-w: calc((var(--welcome-inner-w) - var(--welcome-gap)) / 2);
     --welcome-shell-w: calc(var(--welcome-card-w) * 2 + var(--welcome-gap));
@@ -151,9 +153,25 @@ body.admin-page > .footer {
     --welcome-plaque-px: clamp(0.35rem, calc(var(--welcome-card-w) * 0.05), 0.75rem);
   }
 
+  html {
+    overflow-x: hidden;
+    max-width: 100%;
+  }
+
+  body.site-page,
+  body.admin-page {
+    overflow-x: clip;
+    max-width: 100%;
+  }
+
+  body.catalog-page {
+    overflow-y: visible;
+  }
+
   .container {
     width: 100%;
     max-width: 100%;
+    min-width: 0;
     box-sizing: border-box;
     margin-top: 1.25rem;
     margin-bottom: 1.25rem;
@@ -161,6 +179,23 @@ body.admin-page > .footer {
     margin-right: 0;
     padding-left: max(var(--page-inline-pad), env(safe-area-inset-left));
     padding-right: max(var(--page-inline-pad), env(safe-area-inset-right));
+  }
+
+  body.site-page > .container,
+  body.admin-page > .container {
+    flex: 1 1 auto;
+  }
+
+  body.site-page > .container > *:not(.itemsContainer),
+  body.admin-page > .container > * {
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  body.catalog-page > .container > .itemsContainer {
+    max-width: 100%;
+    min-width: 0;
+    overflow: visible;
   }
 
   .hide-mobile {

@@ -105,4 +105,11 @@
     min-height: var(--touch-target, 44px);
     min-width: var(--touch-target, 44px);
   }
+
+  .catalog-page .catalog-search-row .btn,
+  .catalog-page #filter-button,
+  .site-header-actions .site-account-login-btn,
+  .product-page .site-product-actions .btn {
+    min-width: 0;
+  }
 }

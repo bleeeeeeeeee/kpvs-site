@@ -7423,3 +7423,84 @@ select option.admin-select-action-option,
         filter: none;
     }
 }
+
+@media (max-width: 1024px) {
+    .site-page > .container,
+    .admin-page > .container {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: max(clamp(0.75rem, 2.5vw, 2rem), env(safe-area-inset-left));
+        padding-right: max(clamp(0.75rem, 2.5vw, 2rem), env(safe-area-inset-right));
+    }
+
+    .catalog-page .catalog-search-wrap {
+        min-width: 0;
+    }
+}
+
+@media (max-width: 767px) {
+    .site-page > .footer,
+    .admin-page > .footer {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    .modal-content,
+    .modal-content.modal-content--account,
+    .modal-content.modal-content--cart-favorites,
+    .filter-modal-content {
+        width: calc(100% - 1rem);
+        max-width: calc(100% - 1rem);
+        margin-inline: auto;
+        box-sizing: border-box;
+    }
+
+    .login-page,
+    .error-page {
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+
+    .login-container,
+    .login-card {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .central {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .central .genders {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+    }
+}
+
+@media (max-width: 390px) {
+    .site-page .site-logo-link img {
+        height: 1.65rem;
+        width: auto;
+    }
+
+    .site-page .site-header-actions {
+        gap: 0.12rem;
+    }
+
+    .site-header-actions .site-account-login-btn {
+        --btn-fz: 0.6875rem;
+        --btn-pad-x: 0.35rem;
+        --btn-pad-y: 0.4rem;
+    }
+}
