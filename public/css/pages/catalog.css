@@ -112,7 +112,20 @@
 
   .catalog-page .section-title {
     font-size: clamp(1rem, 4vw, 1.15rem);
-    margin-bottom: 0.5rem;
+    margin: 0 0 0.45rem;
+    padding: 0;
+  }
+
+  .catalog-page #items-container > .itemsSection:first-child {
+    padding-top: 1.15rem;
+  }
+
+  .catalog-page #items-container > .itemsSection {
+    padding-top: 0.85rem;
+  }
+
+  .catalog-page .itemsContainer {
+    gap: 1.5rem;
   }
 
   .itemsContainer .itemsSection .effect-section {
@@ -121,16 +134,24 @@
   }
 
   .itemsContainer .itemsSection .effect-section .items {
+    display: flex;
+    flex-wrap: nowrap;
     max-width: 100%;
-    gap: var(--catalog-card-gap, 0.65rem);
+    gap: var(--catalog-card-gap, 0.75rem);
+    margin-top: 0.5rem;
+    padding-bottom: 0.65rem;
     scroll-padding-inline: var(--page-inline-pad, 0.75rem);
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
   }
 
   .catalog-page .card {
     width: var(--catalog-card-w);
     max-width: var(--catalog-card-w);
-    min-width: 0;
+    min-width: var(--catalog-card-w);
+    flex: 0 0 var(--catalog-card-w);
     overflow: hidden;
+    scroll-snap-align: start;
   }
 
   .catalog-page .card-visual-wrap {
@@ -149,42 +170,45 @@
     width: var(--catalog-card-w);
     max-width: var(--catalog-card-w);
     min-width: 0;
-    padding: 0.25rem 0 0.2rem;
+    gap: 0.1rem;
+    padding: 0.3rem 0 0.15rem;
     box-sizing: border-box;
   }
 
   .catalog-page .card-name,
-  .catalog-page .card-art {
+  .catalog-page .card-art,
+  .catalog-page .card-price {
     display: block;
     width: 100%;
     max-width: 100%;
     min-width: 0;
-    margin-left: 0;
-    margin-right: 0;
+    margin: 0;
     box-sizing: border-box;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: center;
   }
 
   .catalog-page .card-name {
-    margin-top: 0;
-    font-size: clamp(0.78rem, 3.1vw, 0.9rem);
-    line-height: 1.3;
-    text-align: center;
+    font-size: var(--catalog-card-name-fs, 0.9rem);
+    font-weight: 700;
+    line-height: 1.28;
+    color: var(--text-primary);
   }
 
   .catalog-page .card-art {
-    font-size: clamp(0.62rem, 2.5vw, 0.7rem);
-    line-height: 1.25;
-    text-align: center;
+    font-size: var(--catalog-card-art-fs, 0.65rem);
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
   }
 
-  .catalog-page .card-price {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-align: center;
-    font-size: clamp(0.72rem, 2.8vw, 0.85rem);
+  .catalog-page .card-price,
+  .catalog-page .card-price--muted {
+    font-size: clamp(0.64rem, 2.3vw, 0.76rem);
+    font-weight: 600;
+    line-height: 1.2;
   }
 }

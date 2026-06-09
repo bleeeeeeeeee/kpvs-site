@@ -127,17 +127,20 @@ body.admin-page > .footer {
   :root {
     --font-base: 14px;
     --page-inline-pad: clamp(0.75rem, 4.5vw, 1.25rem);
-    --catalog-card-gap: 0.65rem;
-    --catalog-cards-per-view: 2.55;
+    --catalog-viewport-w: calc(100vw - 2 * var(--page-inline-pad));
+    --catalog-card-gap: 0.75rem;
+    --catalog-cards-per-view: 2.12;
     --catalog-card-w: clamp(
-      6.25rem,
+      7.5rem,
       calc(
-        (100vw - 2 * var(--page-inline-pad) - var(--catalog-card-gap) * 2) /
+        (var(--catalog-viewport-w) - var(--catalog-card-gap)) /
           var(--catalog-cards-per-view)
       ),
-      9.25rem
+      10.5rem
     );
     --catalog-card-h: calc(var(--catalog-card-w) * 18 / 14);
+    --catalog-card-name-fs: clamp(0.84rem, 3.4vw, 0.94rem);
+    --catalog-card-art-fs: clamp(0.58rem, 2.35vw, 0.68rem);
     --welcome-inner-w: calc(100vw - 2 * var(--page-inline-pad));
     --welcome-gap: max(0.5rem, calc(var(--welcome-inner-w) * 0.075));
     --welcome-card-w: calc((var(--welcome-inner-w) - var(--welcome-gap)) / 2);
@@ -163,14 +166,14 @@ body.admin-page > .footer {
 @media (max-width: 480px) {
   :root {
     --page-inline-pad: clamp(0.65rem, 4vw, 1rem);
-    --catalog-cards-per-view: 2.7;
+    --catalog-cards-per-view: 2.18;
   }
 }
 
 @media (max-width: 360px) {
   :root {
     --page-inline-pad: clamp(0.6rem, 3.5vw, 0.85rem);
-    --catalog-cards-per-view: 2.85;
+    --catalog-cards-per-view: 2.22;
   }
 }
 
