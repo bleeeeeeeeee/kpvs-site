@@ -2764,7 +2764,7 @@ html.modal-open body .notification * {
 
 @media (max-width: 767px) {
     .welcome-shell .welcome-all-btn.btn {
-        min-height: calc(2 * var(--welcome-plaque-py) + var(--welcome-plaque-lh) * 1em);
+        min-height: max(calc(2 * var(--welcome-plaque-py) + var(--welcome-plaque-lh) * 1em), var(--touch-target, 44px));
         min-width: 0;
     }
 }
@@ -4317,7 +4317,7 @@ body.admin-no-users-panel #category-quick-parent-mode-row {
     filter: brightness(0.98);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     .admin-page .admin-table {
         min-width: 720px;
     }
@@ -4755,7 +4755,7 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
     .container {
         margin: 1rem 1.5rem;
     }
@@ -5091,9 +5091,10 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 
     .modal-close {
-        font-size: 1.5rem;
-        width: 1.75rem;
-        height: 1.75rem;
+        width: var(--touch-target, 44px);
+        height: var(--touch-target, 44px);
+        min-width: var(--touch-target, 44px);
+        min-height: var(--touch-target, 44px);
     }
 
     .modal-body {
@@ -5139,9 +5140,10 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 
     .notification-close {
-        font-size: 1.25rem;
-        width: 1.5rem;
-        height: 1.5rem;
+        width: var(--touch-target, 44px);
+        height: var(--touch-target, 44px);
+        min-width: var(--touch-target, 44px);
+        min-height: var(--touch-target, 44px);
     }
 
     .footer {
@@ -7353,5 +7355,45 @@ select option.admin-select-action-option,
     .welcome-page .welcome-top-actions {
         right: max(0.75rem, env(safe-area-inset-right));
         top: max(0.75rem, env(safe-area-inset-top));
+    }
+
+    .welcome-page .welcome-top-actions .site-icon-btn,
+    .site-icon-btn,
+    .site-page .site-icon-btn {
+        min-width: var(--touch-target, 44px);
+        min-height: var(--touch-target, 44px);
+    }
+
+    .modal-close,
+    .modal-close.ui-xbtn,
+    .catalog-search-clear,
+    .catalog-search-clear.ui-xbtn,
+    .notification-close,
+    .notification-close.ui-xbtn {
+        width: var(--touch-target, 44px);
+        height: var(--touch-target, 44px);
+        min-width: var(--touch-target, 44px);
+        min-height: var(--touch-target, 44px);
+    }
+
+    .account-theme-tab {
+        min-height: var(--touch-target, 44px);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .account-setting:not(.account-setting--tabs) {
+        min-height: var(--touch-target, 44px);
+    }
+
+    .sort-section select,
+    .catalog-sort-select {
+        min-height: var(--touch-target, 44px);
+    }
+
+    .card-hover-btn,
+    .filter-option {
+        min-height: var(--touch-target, 44px);
     }
 }

@@ -57,6 +57,11 @@
 }
 
 @media (max-width: 767px) {
+  .catalog-page .catalog-search-input,
+  .catalog-page .catalog-sort-select {
+    min-height: var(--touch-target, 44px);
+  }
+
   .catalog-page .catalog-search-row {
     flex-direction: column;
     align-items: stretch;
@@ -93,9 +98,7 @@
     max-width: 100%;
     scroll-padding-inline: 0.25rem;
   }
-}
 
-@media (max-width: 480px) {
   .card-visual-wrap {
     width: clamp(8.5rem, 42vw, 11rem);
     height: clamp(11rem, 54vw, 14rem);
