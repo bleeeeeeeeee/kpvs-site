@@ -1,68 +1,97 @@
 # КПВС
 
-Сайт-каталог спецодежды. Статика в `public/`, API и админка на Node.js, данные в PostgreSQL.
+Сайт-каталог спецодежды. Дипломный проект ООО «КПВС».
 
-Нужны Node.js 18+ и PostgreSQL 14+.
+Статика лежит в `public/`, API и админка — в `server/`. База — PostgreSQL.
 
-## Локально
+**Стек:** Node.js, Express, PostgreSQL. На фронте — обычный HTML/CSS/JS без сборщика.
+
+**Страницы:** стартовая (`/welcome.html`), каталог (мужской / женский / весь), карточка товара, вход, админка (`/admin.html`).
+
+---
+
+## Требования
+
+- Node.js 18+
+- PostgreSQL 14+
+
+## Локальный запуск
 
 ```bash
 npm install
 npm start
 ```
 
-В `.env` минимум:
+Создай `.env` в корне проекта:
 
 ```env
-DATABASE_URL=postgresql://user:pass@localhost:5432/kpvs_db
+DATABASE_URL=postgresql://postgres:пароль@localhost:5432/kpvs_db
 ```
 
-Можно вместо `DATABASE_URL` указать `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`.
+Вместо `DATABASE_URL` можно задать `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD` — но `PGPASSWORD` обязателен.
 
-При старте поднимается схема БД (таблицы, колонки, индексы). Из «данных» автоматически появляется только служебная категория `catalog-root`. Товары, разделы, коллекции, размеры — через `/admin`.
+При старте сервер сам накатывает схему (таблицы, колонки, индексы). Автоматически появляется только служебная категория `catalog-root`. Товары, разделы, коллекции и размеры — через админку.
 
-Первого админа создаёшь отдельно:
+**Первый администратор** — отдельной командой, после того как БД доступна:
+
+```env
+ADMIN_EMAIL=you@example.com
+ADMIN_PASSWORD=пароль_от_6_символов
+ADMIN_USERNAME=admin
+```
 
 ```bash
 npm run bootstrap-admin
 ```
 
-В `.env`: `ADMIN_EMAIL`, `ADMIN_PASSWORD` (от 6 символов), по желанию `ADMIN_USERNAME` (по умолчанию `admin`).
-
-Сброс пароля staff:
+Сброс пароля существующего staff-аккаунта:
 
 ```bash
 npm run bootstrap-admin -- --reset-password
 ```
 
-Сайт: http://localhost:3000 (стартовая — `/welcome.html`). Жив ли сервер: `GET /health`.
+Сайт: http://localhost:3000  
+Стартовая страница: `/welcome.html`  
+Проверка сервера: `GET /health`
 
-## Production / Render
+---
+
+## Production
+
+Минимум в `.env`:
 
 ```env
 NODE_ENV=production
 DATABASE_URL=...
-SESSION_SECRET=...   # от 24 символов
+SESSION_SECRET=...   # не короче 24 символов
 JWT_SECRET=...
 TRUST_PROXY=1
-APP_BASE_URL=https://твой-домен.onrender.com
+APP_BASE_URL=https://ваш-домен
 ```
 
-Build: `npm install`. Start: `npm start`. Health check: `/health`.
+`TRUST_PROXY=1` нужен за reverse proxy (Render, nginx и т.п.) — иначе могут ломаться сессии и CSRF.
 
-На Render без `TRUST_PROXY=1` за прокси могут ломаться сессии и CSRF.
+Сборка: `npm install`. Запуск: `npm start`. Health check: `/health`.
 
-По желанию: `STORAGE_*` (S3/R2), `SMTP_*`, `GOOGLE_*`, `PUBLIC_URL`, `COOKIE_SECURE` (в production по умолчанию включён).
+По желанию:
+
+- `STORAGE_*` — загрузка картинок в S3/R2
+- `SMTP_*` или `SMTP_URL` — почта (восстановление пароля)
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — вход через Google
+- `PUBLIC_URL` — базовый URL для медиа в ответах API
+- `COOKIE_SECURE` — в production по умолчанию `true`
+
+---
 
 ## Структура
 
 ```
-server.js          → npm start
-server/            Express, routes, schema, db/queries
-public/            фронт
-scripts/           bootstrap-admin
+server.js              точка входа (npm start)
+server/
+  app.js               Express, middleware, статика
+  routes/              catalog, admin, auth, system
+  db/                  пул, запросы, схема
+public/                HTML, CSS, JS
+scripts/
+  bootstrap-admin.js   создание / сброс пароля админа
 ```
-
----
-
-Дипломный проект ООО «КПВС».
