@@ -5,9 +5,16 @@
 
 .catalog-page .catalog-search-input,
 .catalog-page .catalog-sort-select {
-  background: var(--bg-primary);
   color: var(--text-primary);
   border-color: var(--border-color);
+}
+
+.catalog-page .catalog-search-input {
+  background: var(--bg-primary);
+}
+
+.catalog-page .catalog-sort-select {
+  background-color: var(--bg-primary);
 }
 
 .catalog-page .catalog-search-input::placeholder {
