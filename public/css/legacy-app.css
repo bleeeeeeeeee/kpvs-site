@@ -2620,16 +2620,20 @@ html.modal-open body .notification * {
 
 .admin-page .admin-header-bar {
     width: 100%;
-    min-height: 3.1rem;
+    min-height: 0;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
     align-items: center;
-    gap: 0.75rem 1rem;
+    gap: 0.4rem 0.75rem;
     padding-left: 0;
     padding-right: 0;
+    box-sizing: border-box;
 }
 
 .admin-page .admin-header-bar .admin-logo-link {
+    grid-column: 1;
+    grid-row: 1;
     justify-self: start;
 }
 
@@ -2640,19 +2644,26 @@ html.modal-open body .notification * {
 }
 
 .admin-page .admin-header-title {
-    justify-self: center;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: stretch;
     margin: 0;
     font-size: clamp(1.05rem, 2.2vw, 1.38rem);
     font-weight: 600;
     letter-spacing: -0.02em;
     color: var(--primary-color);
     line-height: 1.2;
-    text-align: center;
-    padding: 0 0.5rem;
+    text-align: left;
+    padding: 0.15rem 0 0;
+    min-width: 0;
+    white-space: normal;
 }
 
 .admin-page .admin-header-bar .admin-header-actions {
+    grid-column: 2;
+    grid-row: 1;
     justify-self: end;
+    min-width: 0;
 }
 
 .admin-page #logout-btn.btn--danger {
@@ -3153,6 +3164,9 @@ html.modal-open body .notification * {
 }
 
 .admin-page .admin-toolbar-row-search {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 0.65rem 0.75rem;
     align-items: stretch;
 }
 
@@ -3294,6 +3308,14 @@ html.modal-open body .notification * {
     color: var(--text-secondary);
 }
 
+.admin-page .admin-toolbar-row-sort {
+    display: grid;
+    grid-template-columns: auto minmax(10rem, 1fr) auto;
+    gap: 0.65rem 0.75rem;
+    align-items: center;
+    margin-bottom: 0 !important;
+}
+
 .admin-toolbar-row-sort {
     margin-bottom: 0 !important;
     flex-wrap: wrap;
@@ -3303,8 +3325,30 @@ html.modal-open body .notification * {
 }
 
 .admin-page .admin-catalog-controls .catalog-sort-select {
+    width: 100%;
+    min-width: 0;
     min-height: 2.5rem;
     border-radius: 0.55rem;
+    box-sizing: border-box;
+}
+
+.admin-page .admin-toolbar-row-sort .catalog-sort-label {
+    white-space: nowrap;
+    margin: 0;
+}
+
+.admin-page .admin-search-scope-btn {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.admin-page .admin-toolbar-sort-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-left: 0;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
 }
 
 .admin-toolbar-sort-actions {
@@ -6067,10 +6111,10 @@ select option.admin-select-action-option,
         grid-column: 1 / -1;
     }
 
-    .admin-toolbar-sort-actions {
+    .admin-page .admin-toolbar-sort-actions {
         width: 100%;
         margin-left: 0;
-        justify-content: flex-end;
+        justify-content: stretch;
     }
 }
 
@@ -7193,19 +7237,7 @@ select option.admin-select-action-option,
     display: none;
 }
 
-@media (max-width: 767px) {
-    .container {
-        width: 100%;
-        max-width: 100%;
-        box-sizing: border-box;
-        margin-top: 1.25rem;
-        margin-bottom: 1.25rem;
-        margin-left: 0;
-        margin-right: 0;
-        padding-left: max(var(--page-inline-pad, 0.75rem), env(safe-area-inset-left));
-        padding-right: max(var(--page-inline-pad, 0.75rem), env(safe-area-inset-right));
-    }
-
+@media (max-width: 1023px) {
     .site-page .container > header .section.site-header-bar {
         grid-template-columns: minmax(0, 1fr) minmax(0, auto);
         grid-template-rows: auto auto;
@@ -7223,7 +7255,7 @@ select option.admin-select-action-option,
     }
 
     .site-page .site-logo-link img {
-        height: 2rem;
+        height: 2.15rem;
     }
 
     .site-page .site-header-actions {
@@ -7231,7 +7263,7 @@ select option.admin-select-action-option,
         grid-row: 1;
         justify-self: end;
         flex-wrap: nowrap;
-        gap: 0.2rem;
+        gap: 0.25rem;
         min-width: 0;
         max-width: 100%;
     }
@@ -7240,7 +7272,8 @@ select option.admin-select-action-option,
         grid-column: 1 / -1;
         grid-row: 2;
         justify-self: stretch;
-        font-size: clamp(1rem, 4.2vw, 1.2rem);
+        text-align: left;
+        font-size: clamp(1rem, 2.8vw, 1.25rem);
         padding: 0.2rem 0 0.15rem;
         min-width: 0;
         overflow: visible;
@@ -7250,6 +7283,156 @@ select option.admin-select-action-option,
 
     .site-page .site-subtitle-spacer {
         height: 0.5rem;
+    }
+
+    .admin-page .admin-header-bar .admin-logo-link img {
+        height: 2.15rem;
+    }
+
+    .admin-page .admin-header-title {
+        font-size: clamp(1rem, 2.8vw, 1.25rem);
+    }
+
+    .admin-page .site-subtitle-spacer {
+        height: 0.5rem;
+    }
+
+    .admin-page .admin-catalog-controls.catalog-controls {
+        padding: 0.85rem;
+    }
+
+    .admin-page .admin-toolbar-row-search {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.5rem;
+        margin-bottom: 0.5rem !important;
+    }
+
+    .admin-page .admin-toolbar-row-search .catalog-search-wrap,
+    .admin-page .admin-toolbar-row-search .catalog-search-input,
+    .admin-page .admin-search-scope,
+    .admin-page .admin-add-product-btn {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .admin-page .admin-search-scope {
+        display: flex;
+    }
+
+    .admin-page .admin-search-scope-btn {
+        flex: 1 1 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .admin-page .admin-toolbar-row-sort {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0.45rem;
+    }
+
+    .admin-page .admin-toolbar-row-sort .catalog-sort-label {
+        margin: 0;
+    }
+
+    .admin-page .admin-catalog-controls .catalog-sort-select {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .admin-page .admin-toolbar-sort-actions {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 2.75rem;
+        gap: 0.5rem;
+    }
+
+    .admin-page .admin-toolbar-sort-actions #open-filters-btn {
+        width: 100%;
+        min-width: 0;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+
+    .admin-page .admin-toolbar-sort-actions #refresh-btn {
+        width: 2.75rem;
+        min-width: 2.75rem;
+        max-width: 2.75rem;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+    }
+}
+
+@media (max-width: 767px) {
+    .container {
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        margin-top: 1.25rem;
+        margin-bottom: 1.25rem;
+        margin-left: 0;
+        margin-right: 0;
+        padding-left: max(var(--page-inline-pad, 0.75rem), env(safe-area-inset-left));
+        padding-right: max(var(--page-inline-pad, 0.75rem), env(safe-area-inset-right));
+    }
+
+    .site-page .site-logo-link img,
+    .admin-page .admin-header-bar .admin-logo-link img {
+        height: 2rem;
+    }
+
+    .admin-page .admin-catalog-controls.catalog-controls {
+        padding: 0.75rem;
+        margin-bottom: 0.65rem;
+    }
+
+    .admin-page .admin-toolbar-row-search .catalog-search-input,
+    .admin-page .admin-search-scope,
+    .admin-page .admin-search-scope-btn,
+    .admin-page .admin-add-product-btn,
+    .admin-page .admin-catalog-controls .catalog-sort-select,
+    .admin-page .admin-toolbar-sort-actions #open-filters-btn,
+    .admin-page .admin-toolbar-sort-actions #refresh-btn,
+    .admin-page #logout-btn.btn--danger {
+        min-height: var(--touch-target, 44px);
+    }
+
+    .admin-page .admin-search-scope-btn {
+        font-size: 0.85rem;
+        padding: 0 0.5rem;
+    }
+
+    .admin-page #logout-btn.btn--danger {
+        padding: 0.45rem 0.85rem;
+        font-size: 0.8125rem;
+    }
+
+    .admin-page .admin-toolbar-sort-actions {
+        grid-template-columns: minmax(0, 1fr) var(--touch-target, 44px);
+    }
+
+    .admin-page .admin-toolbar-sort-actions #refresh-btn {
+        width: var(--touch-target, 44px);
+        min-width: var(--touch-target, 44px);
+        max-width: var(--touch-target, 44px);
+    }
+
+    .admin-page .admin-toolbar-meta-between {
+        margin: 0.25rem auto 0.55rem;
+        font-size: 0.75rem;
+    }
+
+    .admin-page .admin-table-section-title {
+        font-size: 1rem;
+        margin-bottom: 0.45rem;
     }
 
     .site-page .site-header-actions .site-icon-btn {
@@ -7316,9 +7499,101 @@ select option.admin-select-action-option,
         justify-content: center;
     }
 
-    .central {
+    .site-page > .footer,
+    .admin-page > .footer {
+        width: 100%;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    .filter-modal-content {
+        width: calc(100% - 1rem);
+        max-width: calc(100% - 1rem);
+        margin-inline: auto;
+        box-sizing: border-box;
+    }
+
+    .login-page,
+    .error-page {
         padding-left: max(1rem, env(safe-area-inset-left));
         padding-right: max(1rem, env(safe-area-inset-right));
+    }
+
+    .login-container,
+    .login-card {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .central {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+
+    .welcome-page .welcome-shell {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        align-self: stretch;
+    }
+
+    .welcome-page .central .genders {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+        justify-content: space-between;
+        gap: var(--welcome-gap);
+    }
+
+    .welcome-page .central .genders .mens,
+    .welcome-page .central .genders .womens {
+        flex: 1 1 0;
+        min-width: 0;
+        max-width: calc((100% - var(--welcome-gap)) / 2);
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    .welcome-page .central .genders img {
+        width: 100%;
+        max-width: 100%;
+        height: auto;
+        display: block;
+    }
+
+    .welcome-page .central .genders .caption {
+        left: 0;
+        right: 0;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .welcome-page .welcome-actions {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        align-self: stretch;
+        box-sizing: border-box;
+    }
+
+    .welcome-page .welcome-shell .welcome-all-btn,
+    .welcome-page .welcome-shell .welcome-all-btn.btn {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
     .welcome-page .welcome-top-actions {
@@ -7438,52 +7713,6 @@ select option.admin-select-action-option,
     }
 
     .catalog-page .catalog-search-wrap {
-        min-width: 0;
-    }
-}
-
-@media (max-width: 767px) {
-    .site-page > .footer,
-    .admin-page > .footer {
-        width: 100%;
-        max-width: 100%;
-        overflow-x: hidden;
-    }
-
-    .modal-content,
-    .modal-content.modal-content--account,
-    .modal-content.modal-content--cart-favorites,
-    .filter-modal-content {
-        width: calc(100% - 1rem);
-        max-width: calc(100% - 1rem);
-        margin-inline: auto;
-        box-sizing: border-box;
-    }
-
-    .login-page,
-    .error-page {
-        padding-left: max(1rem, env(safe-area-inset-left));
-        padding-right: max(1rem, env(safe-area-inset-right));
-    }
-
-    .login-container,
-    .login-card {
-        width: 100%;
-        max-width: 100%;
-        min-width: 0;
-        box-sizing: border-box;
-    }
-
-    .central {
-        width: 100%;
-        max-width: 100%;
-        min-width: 0;
-        box-sizing: border-box;
-    }
-
-    .central .genders {
-        width: 100%;
-        max-width: 100%;
         min-width: 0;
     }
 }
