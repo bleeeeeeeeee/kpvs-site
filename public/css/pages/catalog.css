@@ -58,39 +58,56 @@
 
 @media (max-width: 767px) {
   .catalog-page .catalog-controls {
-    padding: 0.85rem 0.9rem;
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+    border-radius: 0.65rem;
   }
 
   .catalog-page .catalog-search-input,
   .catalog-page .catalog-sort-select {
     min-height: var(--touch-target, 44px);
+    width: 100%;
+    box-sizing: border-box;
   }
 
   .catalog-page .catalog-search-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 0.55rem;
+    gap: 0.5rem;
+    margin-bottom: 0.5rem !important;
   }
 
   .catalog-page .catalog-search-row .admin-add-product-btn,
   .catalog-page .catalog-search-row #filter-button {
     width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
   }
 
   .catalog-page .catalog-sort-row {
     flex-direction: column;
     align-items: stretch;
-    gap: 0.45rem;
+    gap: 0.4rem;
+    margin-bottom: 0 !important;
+  }
+
+  .catalog-page .catalog-sort-row .catalog-sort-label {
+    font-size: 0.9rem;
   }
 
   .catalog-page .catalog-sort-select {
     width: 100%;
     max-width: none;
+    min-width: 0;
   }
 
   .catalog-search-wrap {
     min-width: 0;
     width: 100%;
+    flex: none;
   }
 
   .catalog-page .section-title {
@@ -112,6 +129,8 @@
   .catalog-page .card {
     width: var(--catalog-card-w);
     max-width: var(--catalog-card-w);
+    min-width: 0;
+    overflow: hidden;
   }
 
   .catalog-page .card-visual-wrap {
@@ -119,31 +138,53 @@
     height: var(--catalog-card-h);
     border-radius: 0.6rem;
     --card-img-radius: 0.6rem;
+    flex-shrink: 0;
   }
 
   .catalog-page .card-content {
-    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    align-self: stretch;
+    width: var(--catalog-card-w);
     max-width: var(--catalog-card-w);
-    padding: 0 0.15rem 0.25rem;
+    min-width: 0;
+    padding: 0.25rem 0 0.2rem;
+    box-sizing: border-box;
+  }
+
+  .catalog-page .card-name,
+  .catalog-page .card-art {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    margin-left: 0;
+    margin-right: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .catalog-page .card-name {
-    width: 100%;
-    max-width: 100%;
-    margin-top: 0.3rem;
+    margin-top: 0;
     font-size: clamp(0.78rem, 3.1vw, 0.9rem);
     line-height: 1.3;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    text-align: center;
   }
 
   .catalog-page .card-art {
-    width: 100%;
-    max-width: 100%;
     font-size: clamp(0.62rem, 2.5vw, 0.7rem);
+    line-height: 1.25;
+    text-align: center;
+  }
+
+  .catalog-page .card-price {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    text-align: center;
+    font-size: clamp(0.72rem, 2.8vw, 0.85rem);
   }
 }

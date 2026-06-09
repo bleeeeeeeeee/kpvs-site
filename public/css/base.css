@@ -141,6 +141,7 @@ body.admin-page > .footer {
     --welcome-inner-w: calc(100vw - 2 * var(--page-inline-pad));
     --welcome-gap: max(0.5rem, calc(var(--welcome-inner-w) * 0.075));
     --welcome-card-w: calc((var(--welcome-inner-w) - var(--welcome-gap)) / 2);
+    --welcome-shell-w: calc(var(--welcome-card-w) * 2 + var(--welcome-gap));
     --welcome-logo-w: min(calc(var(--welcome-inner-w) * 0.58), 12rem);
     --welcome-plaque-fs: clamp(0.62rem, calc(var(--welcome-card-w) * 0.095), 1rem);
     --welcome-plaque-py: clamp(0.3rem, calc(var(--welcome-card-w) * 0.04), 0.55rem);

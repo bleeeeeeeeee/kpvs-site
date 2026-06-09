@@ -4787,7 +4787,8 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
         justify-content: center;
         align-items: flex-end;
         gap: var(--welcome-gap);
-        width: 100%;
+        width: var(--welcome-shell-w);
+        max-width: 100%;
     }
 
     .central {
@@ -4806,7 +4807,24 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 
     .central .welcome-shell {
-        width: min(100%, calc(var(--welcome-card-w) * 2 + var(--welcome-gap)));
+        width: min(100%, var(--welcome-shell-w));
+        max-width: 100%;
+        align-self: center;
+    }
+
+    .welcome-actions {
+        width: var(--welcome-shell-w);
+        max-width: 100%;
+        align-self: center;
+    }
+
+    .welcome-shell .welcome-all-btn,
+    .welcome-shell .welcome-all-btn.btn {
+        width: 100%;
+        max-width: 100%;
+        display: flex;
+        box-sizing: border-box;
+        min-width: 0;
     }
 
     .central header#welcome {
