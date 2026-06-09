@@ -126,17 +126,50 @@ body.admin-page > .footer {
 @media (max-width: 767px) {
   :root {
     --font-base: 14px;
+    --page-inline-pad: clamp(0.75rem, 4.5vw, 1.25rem);
+    --catalog-card-gap: 0.65rem;
+    --catalog-cards-per-view: 2.55;
+    --catalog-card-w: clamp(
+      6.25rem,
+      calc(
+        (100vw - 2 * var(--page-inline-pad) - var(--catalog-card-gap) * 2) /
+          var(--catalog-cards-per-view)
+      ),
+      9.25rem
+    );
+    --catalog-card-h: calc(var(--catalog-card-w) * 18 / 14);
+    --welcome-inner-w: calc(100vw - 2 * var(--page-inline-pad));
+    --welcome-gap: max(0.5rem, calc(var(--welcome-inner-w) * 0.075));
+    --welcome-card-w: calc((var(--welcome-inner-w) - var(--welcome-gap)) / 2);
+    --welcome-logo-w: min(calc(var(--welcome-inner-w) * 0.58), 12rem);
+    --welcome-plaque-fs: clamp(0.62rem, calc(var(--welcome-card-w) * 0.095), 1rem);
+    --welcome-plaque-py: clamp(0.3rem, calc(var(--welcome-card-w) * 0.04), 0.55rem);
+    --welcome-plaque-px: clamp(0.35rem, calc(var(--welcome-card-w) * 0.05), 0.75rem);
   }
 
   .container {
     width: 100%;
     box-sizing: border-box;
-    margin-left: max(0.75rem, env(safe-area-inset-left));
-    margin-right: max(0.75rem, env(safe-area-inset-right));
+    margin-left: max(var(--page-inline-pad), env(safe-area-inset-left));
+    margin-right: max(var(--page-inline-pad), env(safe-area-inset-right));
   }
 
   .hide-mobile {
     display: none !important;
+  }
+}
+
+@media (max-width: 480px) {
+  :root {
+    --page-inline-pad: clamp(0.65rem, 4vw, 1rem);
+    --catalog-cards-per-view: 2.7;
+  }
+}
+
+@media (max-width: 360px) {
+  :root {
+    --page-inline-pad: clamp(0.6rem, 3.5vw, 0.85rem);
+    --catalog-cards-per-view: 2.85;
   }
 }
 

@@ -4754,10 +4754,6 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
 }
 
 @media (max-width: 767px) {
-    .container {
-        margin: 1rem 1.5rem;
-    }
-
     .container .section {
         height: auto;
         flex-direction: row;
@@ -4790,7 +4786,7 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
         flex-wrap: nowrap;
         justify-content: center;
         align-items: flex-end;
-        gap: clamp(0.75rem, 4vw, 2rem);
+        gap: var(--welcome-gap);
         width: 100%;
     }
 
@@ -4800,11 +4796,8 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
         justify-content: center;
         padding-top: max(1rem, env(safe-area-inset-top));
         padding-bottom: max(1.75rem, env(safe-area-inset-bottom));
-        --welcome-plaque-fs: clamp(0.75rem, 3.2vw, 1.1rem);
-        --welcome-plaque-py: clamp(0.35rem, 1.5vw, 0.55rem);
-        --welcome-plaque-px: clamp(0.4rem, 2vw, 0.75rem);
-        --welcome-gap: clamp(0.75rem, 4vw, 2rem);
-        --welcome-card-w: clamp(5.5rem, 28vw, 12rem);
+        padding-left: max(var(--page-inline-pad), env(safe-area-inset-left));
+        padding-right: max(var(--page-inline-pad), env(safe-area-inset-right));
     }
 
     .welcome-page {
@@ -4821,7 +4814,8 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 
     .central header #welcome-logo {
-        width: clamp(6rem, 32vw, 12rem);
+        width: var(--welcome-logo-w);
+        max-width: var(--welcome-inner-w);
     }
 
     .central .genders img {
@@ -4829,16 +4823,17 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
         max-width: var(--welcome-card-w);
     }
 
-    .card-visual-wrap {
-        border-radius: 0.5rem;
-        --card-img-radius: 0.5rem;
-        width: 11rem;
-        height: 14rem;
+    .central .genders .caption {
+        font-size: var(--welcome-plaque-fs);
+        padding: var(--welcome-plaque-py) var(--welcome-plaque-px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
-    .card-name {
-        font-size: 0.98rem;
-        margin: 0.35rem 0 0 0;
+    .welcome-shell .welcome-all-btn {
+        font-size: var(--welcome-plaque-fs);
+        padding: var(--welcome-plaque-py) var(--welcome-plaque-px);
     }
 
     .secTitle {
@@ -4906,10 +4901,6 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
 }
 
 @media (max-width: 480px) {
-    .container {
-        margin: 0.75rem 1rem;
-    }
-
     .container .section {
         padding: 0.5rem 0;
         gap: 0.5rem;
@@ -4933,44 +4924,10 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 
     .central {
-        padding: 1.25rem 1rem;
-        min-height: 100dvh;
-        height: auto;
-        justify-content: center;
-        --welcome-plaque-py: clamp(0.3rem, 1.2vw, 0.5rem);
-        --welcome-plaque-px: clamp(0.35rem, 1.6vw, 0.5rem);
-        --welcome-plaque-fs: clamp(0.68rem, 2.9vw, 0.95rem);
-        --welcome-gap: clamp(0.5rem, 3vw, 1.25rem);
-        --welcome-card-w: clamp(4.75rem, 25vw, 10rem);
-    }
-
-    .central header {
-        margin-bottom: 1.25rem;
-    }
-
-    .central header #welcome-logo {
-        width: clamp(5.5rem, 30vw, 10rem);
-    }
-
-    .central .genders {
-        flex-direction: row;
-        flex-wrap: nowrap;
-        justify-content: center;
-        align-items: flex-end;
-        gap: clamp(0.5rem, 3vw, 1.25rem);
-        width: 100%;
-        max-width: none;
-    }
-
-    .central .welcome-shell {
-        width: min(100%, calc(var(--welcome-card-w) * 2 + var(--welcome-gap)));
-    }
-
-    .central .genders #mens-icon,
-    .central .genders #womens-icon {
-        width: var(--welcome-card-w);
-        max-width: var(--welcome-card-w);
-        height: auto;
+        padding-top: max(1rem, env(safe-area-inset-top));
+        padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+        padding-left: max(var(--page-inline-pad), env(safe-area-inset-left));
+        padding-right: max(var(--page-inline-pad), env(safe-area-inset-right));
     }
 
     .secTitle {
@@ -5012,25 +4969,12 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 
     .itemsContainer .itemsSection .effect-section .items {
-        gap: 0.75rem;
         margin-top: 1rem;
         padding-bottom: 0.75rem;
     }
 
-    .card-visual-wrap {
-        border-radius: 0.5rem;
-        --card-img-radius: 0.5rem;
-        width: 9rem;
-        height: 12rem;
-    }
-
     .card-tags .card-tag--emoji {
         font-size: 1.12rem;
-    }
-
-    .card-name {
-        font-size: 0.95rem;
-        margin: 0.3rem 0 0 0;
     }
 
     .card-hover-btn {
@@ -5190,51 +5134,12 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
 }
 
 @media (max-width: 360px) {
-    .container {
-        margin: 0.5rem 0.75rem;
-    }
-
     .container .section img {
         height: 2rem;
     }
 
     .container .section .right-top-section img {
         height: 1.5rem;
-    }
-
-    .central header #welcome-logo {
-        width: clamp(5rem, 28vw, 8rem);
-    }
-
-    .central {
-        --welcome-plaque-fs: clamp(0.62rem, 2.6vw, 0.85rem);
-        --welcome-plaque-py: 0.3rem;
-        --welcome-plaque-px: 0.35rem;
-        --welcome-gap: clamp(0.4rem, 2.5vw, 0.85rem);
-        --welcome-card-w: clamp(4.25rem, 22vw, 8.5rem);
-    }
-
-    .central .genders {
-        gap: clamp(0.4rem, 2.5vw, 0.85rem);
-    }
-
-    .central .welcome-shell {
-        width: min(100%, calc(var(--welcome-card-w) * 2 + var(--welcome-gap)));
-    }
-
-    .central .genders #mens-icon,
-    .central .genders #womens-icon {
-        width: var(--welcome-card-w);
-        max-width: var(--welcome-card-w);
-    }
-
-    .card-visual-wrap {
-        width: 8rem;
-        height: 10rem;
-    }
-
-    .card-name {
-        font-size: 0.88rem;
     }
 
     .card-art {
