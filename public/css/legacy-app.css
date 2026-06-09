@@ -2619,18 +2619,22 @@ html.modal-open body .notification * {
 }
 
 .admin-page .admin-header-bar {
+    position: relative;
     width: 100%;
     min-height: 3.1rem;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 0.75rem 1rem;
     padding-left: 0;
     padding-right: 0;
+    box-sizing: border-box;
 }
 
 .admin-page .admin-header-bar .admin-logo-link {
-    justify-self: start;
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
 }
 
 .admin-page .admin-header-bar .admin-logo-link img {
@@ -2640,7 +2644,10 @@ html.modal-open body .notification * {
 }
 
 .admin-page .admin-header-title {
-    justify-self: center;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     margin: 0;
     font-size: clamp(1.05rem, 2.2vw, 1.38rem);
     font-weight: 600;
@@ -2649,10 +2656,18 @@ html.modal-open body .notification * {
     line-height: 1.2;
     text-align: center;
     padding: 0 0.5rem;
+    width: max-content;
+    max-width: calc(100% - 9rem);
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 0;
 }
 
 .admin-page .admin-header-bar .admin-header-actions {
-    justify-self: end;
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    margin-left: auto;
 }
 
 .admin-page #logout-btn.btn--danger {
@@ -2851,15 +2866,17 @@ html.modal-open body .notification * {
 }
 
 .site-page .container>header .section.site-header-bar {
+    position: relative;
     width: 100%;
     min-height: 3.1rem;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 0.75rem 1rem;
     height: auto;
     padding-left: 0;
     padding-right: 0;
+    box-sizing: border-box;
 }
 
 
@@ -2929,7 +2946,9 @@ html.modal-open body .notification * {
 }
 
 .site-page .site-logo-link {
-    justify-self: start;
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     line-height: 0;
@@ -2942,7 +2961,10 @@ html.modal-open body .notification * {
 }
 
 .site-page .site-header-title {
-    justify-self: center;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     margin: 0;
     font-size: clamp(1.05rem, 2.2vw, 1.38rem);
     font-weight: 600;
@@ -2951,10 +2973,18 @@ html.modal-open body .notification * {
     line-height: 1.2;
     text-align: center;
     padding: 0 0.5rem;
+    width: max-content;
+    max-width: calc(100% - 11rem);
+    box-sizing: border-box;
+    pointer-events: none;
+    z-index: 0;
 }
 
 .site-page .site-header-actions {
-    justify-self: end;
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+    margin-left: auto;
     display: inline-flex;
     align-items: center;
     gap: 0.5rem;
@@ -7195,6 +7225,7 @@ select option.admin-select-action-option,
 
 @media (max-width: 1023px) {
     .site-page .container > header .section.site-header-bar {
+        display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, auto);
         grid-template-rows: auto auto;
         gap: 0.35rem 0.5rem;
@@ -7202,6 +7233,7 @@ select option.admin-select-action-option,
         max-width: 100%;
         min-width: 0;
         box-sizing: border-box;
+        justify-content: stretch;
     }
 
     .site-page .site-logo-link {
@@ -7218,6 +7250,7 @@ select option.admin-select-action-option,
         grid-column: 2;
         grid-row: 1;
         justify-self: end;
+        margin-left: 0;
         flex-wrap: nowrap;
         gap: 0.25rem;
         min-width: 0;
@@ -7225,16 +7258,24 @@ select option.admin-select-action-option,
     }
 
     .site-page .site-header-title {
+        position: static;
+        left: auto;
+        top: auto;
+        transform: none;
         grid-column: 1 / -1;
         grid-row: 2;
         justify-self: stretch;
-        text-align: left;
+        align-self: stretch;
+        width: 100%;
+        max-width: 100%;
+        text-align: center;
         font-size: clamp(1rem, 2.8vw, 1.25rem);
         padding: 0.2rem 0 0.15rem;
         min-width: 0;
         overflow: visible;
         text-overflow: unset;
         white-space: normal;
+        pointer-events: auto;
     }
 
     .site-page .site-subtitle-spacer {
@@ -7242,6 +7283,7 @@ select option.admin-select-action-option,
     }
 
     .admin-page .container > header .section.admin-header-bar {
+        display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, auto);
         grid-template-rows: auto auto;
         gap: 0.35rem 0.5rem;
@@ -7249,6 +7291,7 @@ select option.admin-select-action-option,
         max-width: 100%;
         min-width: 0;
         box-sizing: border-box;
+        justify-content: stretch;
     }
 
     .admin-page .admin-header-bar .admin-logo-link {
@@ -7265,18 +7308,27 @@ select option.admin-select-action-option,
         grid-column: 2;
         grid-row: 1;
         justify-self: end;
+        margin-left: 0;
         min-width: 0;
     }
 
     .admin-page .admin-header-title {
+        position: static;
+        left: auto;
+        top: auto;
+        transform: none;
         grid-column: 1 / -1;
         grid-row: 2;
         justify-self: stretch;
-        text-align: left;
+        align-self: stretch;
+        width: 100%;
+        max-width: 100%;
+        text-align: center;
         font-size: clamp(1rem, 2.8vw, 1.25rem);
         padding: 0.2rem 0 0.15rem;
         min-width: 0;
         white-space: normal;
+        pointer-events: auto;
     }
 
     .admin-page .site-subtitle-spacer {
