@@ -5,8 +5,6 @@
 .container {
     margin: 1.5rem 4rem;
     max-width: 1400px;
-    width: 100%;
-    box-sizing: border-box;
 }
 
 .container .section {
@@ -4788,46 +4786,46 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 
     .central .genders {
-        flex-direction: column;
-        gap: clamp(1.5rem, 5vw, 2.5rem);
+        flex-direction: row;
         flex-wrap: nowrap;
         justify-content: center;
-        align-items: center;
+        align-items: flex-end;
+        gap: clamp(0.75rem, 4vw, 2rem);
         width: 100%;
     }
 
     .central {
-        --welcome-plaque-fs: 1.25rem;
-        --welcome-gap: clamp(1.5rem, 5vw, 2.5rem);
-        --welcome-card-w: clamp(9rem, 72vw, 14rem);
+        min-height: 100dvh;
+        height: auto;
+        justify-content: center;
+        padding-top: max(1rem, env(safe-area-inset-top));
+        padding-bottom: max(1.75rem, env(safe-area-inset-bottom));
+        --welcome-plaque-fs: clamp(0.75rem, 3.2vw, 1.1rem);
+        --welcome-plaque-py: clamp(0.35rem, 1.5vw, 0.55rem);
+        --welcome-plaque-px: clamp(0.4rem, 2vw, 0.75rem);
+        --welcome-gap: clamp(0.75rem, 4vw, 2rem);
+        --welcome-card-w: clamp(5.5rem, 28vw, 12rem);
+    }
+
+    .welcome-page {
+        overflow-x: hidden;
+        overflow-y: auto;
     }
 
     .central .welcome-shell {
-        width: min(100%, var(--welcome-card-w));
+        width: min(100%, calc(var(--welcome-card-w) * 2 + var(--welcome-gap)));
     }
 
-    .central .genders .mens,
-    .central .genders .womens {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        width: 100%;
-        max-width: var(--welcome-card-w);
-    }
-
-    .central .genders .caption {
-        position: static;
-        width: 100%;
-        max-width: none;
-        margin-top: 0.55rem;
+    .central header#welcome {
+        margin-bottom: clamp(1rem, 3vh, 2.25rem);
     }
 
     .central header #welcome-logo {
-        width: clamp(8rem, 42vw, 12rem);
+        width: clamp(6rem, 32vw, 12rem);
     }
 
     .central .genders img {
-        width: 100%;
+        width: var(--welcome-card-w);
         max-width: var(--welcome-card-w);
     }
 
@@ -4936,10 +4934,14 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
 
     .central {
         padding: 1.25rem 1rem;
-        height: 100dvh;
-        --welcome-plaque-py: 0.5rem;
-        --welcome-plaque-px: 0.5rem;
-        --welcome-plaque-fs: 1rem;
+        min-height: 100dvh;
+        height: auto;
+        justify-content: center;
+        --welcome-plaque-py: clamp(0.3rem, 1.2vw, 0.5rem);
+        --welcome-plaque-px: clamp(0.35rem, 1.6vw, 0.5rem);
+        --welcome-plaque-fs: clamp(0.68rem, 2.9vw, 0.95rem);
+        --welcome-gap: clamp(0.5rem, 3vw, 1.25rem);
+        --welcome-card-w: clamp(4.75rem, 25vw, 10rem);
     }
 
     .central header {
@@ -4947,28 +4949,28 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 
     .central header #welcome-logo {
-        width: clamp(8rem, 45vw, 10rem);
+        width: clamp(5.5rem, 30vw, 10rem);
     }
 
     .central .genders {
-        flex-direction: column;
-        gap: 2rem;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        justify-content: center;
+        align-items: flex-end;
+        gap: clamp(0.5rem, 3vw, 1.25rem);
         width: 100%;
         max-width: none;
+    }
+
+    .central .welcome-shell {
+        width: min(100%, calc(var(--welcome-card-w) * 2 + var(--welcome-gap)));
     }
 
     .central .genders #mens-icon,
     .central .genders #womens-icon {
-        width: 100%;
-        max-width: var(--welcome-card-w, 14rem);
+        width: var(--welcome-card-w);
+        max-width: var(--welcome-card-w);
         height: auto;
-    }
-
-    .central .genders .caption {
-        position: static;
-        width: 100%;
-        max-width: none;
-        margin-top: 0.55rem;
     }
 
     .secTitle {
@@ -5201,20 +5203,29 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     }
 
     .central header #welcome-logo {
-        width: 8rem;
+        width: clamp(5rem, 28vw, 8rem);
+    }
+
+    .central {
+        --welcome-plaque-fs: clamp(0.62rem, 2.6vw, 0.85rem);
+        --welcome-plaque-py: 0.3rem;
+        --welcome-plaque-px: 0.35rem;
+        --welcome-gap: clamp(0.4rem, 2.5vw, 0.85rem);
+        --welcome-card-w: clamp(4.25rem, 22vw, 8.5rem);
+    }
+
+    .central .genders {
+        gap: clamp(0.4rem, 2.5vw, 0.85rem);
+    }
+
+    .central .welcome-shell {
+        width: min(100%, calc(var(--welcome-card-w) * 2 + var(--welcome-gap)));
     }
 
     .central .genders #mens-icon,
     .central .genders #womens-icon {
-        max-width: 12rem;
-    }
-
-    .central {
-        --welcome-plaque-fs: 0.9rem;
-    }
-
-    .central .genders .caption {
-        max-width: 12rem;
+        width: var(--welcome-card-w);
+        max-width: var(--welcome-card-w);
     }
 
     .card-visual-wrap {
@@ -7261,27 +7272,44 @@ select option.admin-select-action-option,
 
 @media (max-width: 767px) {
     .site-page .container > header .section.site-header-bar {
-        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-columns: 1fr auto;
+        grid-template-rows: auto auto;
         gap: 0.35rem 0.5rem;
         align-items: center;
+    }
+
+    .site-page .site-logo-link {
+        grid-column: 1;
+        grid-row: 1;
+        justify-self: start;
     }
 
     .site-page .site-logo-link img {
         height: 2rem;
     }
 
-    .site-page .site-header-title {
-        font-size: clamp(0.82rem, 3.6vw, 1rem);
-        padding: 0;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
     .site-page .site-header-actions {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
         flex-wrap: nowrap;
         gap: 0.2rem;
+    }
+
+    .site-page .site-header-title {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        justify-self: stretch;
+        font-size: clamp(1rem, 4.2vw, 1.2rem);
+        padding: 0.2rem 0 0.15rem;
+        min-width: 0;
+        overflow: visible;
+        text-overflow: unset;
+        white-space: normal;
+    }
+
+    .site-page .site-subtitle-spacer {
+        height: 0.5rem;
     }
 
     .site-page .site-header-actions .site-icon-btn {
