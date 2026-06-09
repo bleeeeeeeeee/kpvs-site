@@ -2,10 +2,8 @@ node_modules/
 .DS_Store
 .env
 .env.*
-.cursor/
 public/img/uploads/
 public/img/Товары/
-project-export.txt
 *.log
 server.log
 npm-debug.log*

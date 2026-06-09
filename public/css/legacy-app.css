@@ -2620,20 +2620,16 @@ html.modal-open body .notification * {
 
 .admin-page .admin-header-bar {
     width: 100%;
-    min-height: 0;
+    min-height: 3.1rem;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-rows: auto auto;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: center;
-    gap: 0.4rem 0.75rem;
+    gap: 0.75rem 1rem;
     padding-left: 0;
     padding-right: 0;
-    box-sizing: border-box;
 }
 
 .admin-page .admin-header-bar .admin-logo-link {
-    grid-column: 1;
-    grid-row: 1;
     justify-self: start;
 }
 
@@ -2644,26 +2640,19 @@ html.modal-open body .notification * {
 }
 
 .admin-page .admin-header-title {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    justify-self: stretch;
+    justify-self: center;
     margin: 0;
     font-size: clamp(1.05rem, 2.2vw, 1.38rem);
     font-weight: 600;
     letter-spacing: -0.02em;
     color: var(--primary-color);
     line-height: 1.2;
-    text-align: left;
-    padding: 0.15rem 0 0;
-    min-width: 0;
-    white-space: normal;
+    text-align: center;
+    padding: 0 0.5rem;
 }
 
 .admin-page .admin-header-bar .admin-header-actions {
-    grid-column: 2;
-    grid-row: 1;
     justify-self: end;
-    min-width: 0;
 }
 
 .admin-page #logout-btn.btn--danger {
@@ -3164,9 +3153,6 @@ html.modal-open body .notification * {
 }
 
 .admin-page .admin-toolbar-row-search {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
-    gap: 0.65rem 0.75rem;
     align-items: stretch;
 }
 
@@ -3308,14 +3294,6 @@ html.modal-open body .notification * {
     color: var(--text-secondary);
 }
 
-.admin-page .admin-toolbar-row-sort {
-    display: grid;
-    grid-template-columns: auto minmax(10rem, 1fr) auto;
-    gap: 0.65rem 0.75rem;
-    align-items: center;
-    margin-bottom: 0 !important;
-}
-
 .admin-toolbar-row-sort {
     margin-bottom: 0 !important;
     flex-wrap: wrap;
@@ -3325,30 +3303,8 @@ html.modal-open body .notification * {
 }
 
 .admin-page .admin-catalog-controls .catalog-sort-select {
-    width: 100%;
-    min-width: 0;
     min-height: 2.5rem;
     border-radius: 0.55rem;
-    box-sizing: border-box;
-}
-
-.admin-page .admin-toolbar-row-sort .catalog-sort-label {
-    white-space: nowrap;
-    margin: 0;
-}
-
-.admin-page .admin-search-scope-btn {
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.admin-page .admin-toolbar-sort-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    margin-left: 0;
-    flex-wrap: nowrap;
-    flex-shrink: 0;
 }
 
 .admin-toolbar-sort-actions {
@@ -7285,12 +7241,42 @@ select option.admin-select-action-option,
         height: 0.5rem;
     }
 
+    .admin-page .container > header .section.admin-header-bar {
+        grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+        grid-template-rows: auto auto;
+        gap: 0.35rem 0.5rem;
+        min-height: 0;
+        max-width: 100%;
+        min-width: 0;
+        box-sizing: border-box;
+    }
+
+    .admin-page .admin-header-bar .admin-logo-link {
+        grid-column: 1;
+        grid-row: 1;
+        justify-self: start;
+    }
+
     .admin-page .admin-header-bar .admin-logo-link img {
         height: 2.15rem;
     }
 
+    .admin-page .admin-header-bar .admin-header-actions {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+        min-width: 0;
+    }
+
     .admin-page .admin-header-title {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        justify-self: stretch;
+        text-align: left;
         font-size: clamp(1rem, 2.8vw, 1.25rem);
+        padding: 0.2rem 0 0.15rem;
+        min-width: 0;
+        white-space: normal;
     }
 
     .admin-page .site-subtitle-spacer {
@@ -7302,6 +7288,7 @@ select option.admin-select-action-option,
     }
 
     .admin-page .admin-toolbar-row-search {
+        display: grid;
         grid-template-columns: minmax(0, 1fr);
         gap: 0.5rem;
         margin-bottom: 0.5rem !important;
@@ -7330,8 +7317,10 @@ select option.admin-select-action-option,
     }
 
     .admin-page .admin-toolbar-row-sort {
+        display: grid;
         grid-template-columns: minmax(0, 1fr);
         gap: 0.45rem;
+        margin-bottom: 0 !important;
     }
 
     .admin-page .admin-toolbar-row-sort .catalog-sort-label {
