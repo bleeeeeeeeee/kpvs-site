@@ -29,6 +29,106 @@ function formatProductDescriptionHtml(raw) {
     return '<p class="product-desc-p">' + inner + "</p>";
   }).join("");
 }
+function normalizeDescriptionSentence(text) {
+  let t = String(text || "").trim();
+  if (!t) return "";
+  if (/[.!?…]$/.test(t)) t = t.replace(/[.!?…]+$/, "").trim();
+  return t;
+}
+function parseDescriptionBlock(block) {
+  const intro = [];
+  const specs = [];
+  String(block || "")
+    .trim()
+    .split(/(?<=[.!?…])\s+/)
+    .map(function(s) {
+      return s.trim();
+    })
+    .filter(Boolean)
+    .forEach(function(part) {
+      const m = part.match(/^([^:]{2,120}):\s*(.+)$/);
+      if (m) {
+        specs.push({
+          label: m[1].trim(),
+          value: normalizeDescriptionSentence(m[2])
+        });
+      } else {
+        const line = normalizeDescriptionSentence(part);
+        if (line) intro.push(line);
+      }
+    });
+  return { intro: intro, specs: specs };
+}
+function buildProductDescriptionHtml(raw, placeholder) {
+  const text = raw != null ? String(raw).trim() : "";
+  const emptyText = placeholder || "\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435 \u0442\u043E\u0432\u0430\u0440\u0430 \u0431\u0443\u0434\u0435\u0442 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0437\u0436\u0435.";
+  if (!text) {
+    return '<p class="product-desc-p product-desc-intro product-desc-intro--placeholder">' + escapeHtml(emptyText) + "</p>";
+  }
+  const blocks = text.split(/\n\s*\n/).map(function(b) {
+    return b.trim();
+  }).filter(Boolean);
+  const sourceBlocks = blocks.length ? blocks : [text];
+  let introHtml = "";
+  const specs = [];
+  sourceBlocks.forEach(function(block) {
+    const parsed = parseDescriptionBlock(block);
+    parsed.intro.forEach(function(line) {
+      introHtml += '<p class="product-desc-p product-desc-intro">' + escapeHtml(line) + ".</p>";
+    });
+    parsed.specs.forEach(function(row) {
+      specs.push(row);
+    });
+  });
+  if (!introHtml && !specs.length) {
+    return formatProductDescriptionHtml(text);
+  }
+  let html = introHtml;
+  if (specs.length) {
+    html += '<table class="product-attr-table product-desc-table"><tbody>';
+    specs.forEach(function(row) {
+      html += '<tr class="product-attr-row"><th scope="row" class="product-attr-name">' + escapeHtml(row.label) + '</th><td class="product-attr-value">' + escapeHtml(row.value) + "</td></tr>";
+    });
+    html += "</tbody></table>";
+  }
+  return html;
+}
+function buildProductAvailabilityChipHtml(avail) {
+  const inStock = avail === "in";
+  return '<span class="product-availability product-availability-chip ' + (inStock ? "product-availability--in" : "product-availability--out") + '">' + (inStock ? "\u0412 \u043D\u0430\u043B\u0438\u0447\u0438\u0438" : "\u041D\u0435\u0442 \u0432 \u043D\u0430\u043B\u0438\u0447\u0438\u0438") + "</span>";
+}
+function buildProductInfoIdsHtml(art, brandName) {
+  if (!art && !brandName) return "";
+  let inner = '<dl class="product-info-ids">';
+  if (art) {
+    inner += '<div class="product-info-id"><dt>\u0410\u0440\u0442\u0438\u043A\u0443\u043B</dt><dd>' + escapeHtml(art) + "</dd></div>";
+  }
+  if (brandName) {
+    inner += '<div class="product-info-id"><dt>\u0411\u0440\u0435\u043D\u0434</dt><dd>' + escapeHtml(brandName) + "</dd></div>";
+  }
+  inner += "</dl>";
+  return '<div class="product-info-ids-wrap">' + inner + "</div>";
+}
+function buildProductInfoPanelHtml(product, metaGender, catPart, priceHtml, avail) {
+  const descPlaceholder = "\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435 \u0442\u043E\u0432\u0430\u0440\u0430 \u0431\u0443\u0434\u0435\u0442 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0437\u0436\u0435.";
+  const descInner = buildProductDescriptionHtml(product.description, descPlaceholder);
+  return (
+    '<header class="product-info-head">' +
+    '<h1 class="product-title">' + escapeHtml(product.name || "") + '</h1>' +
+    '<p class="product-meta">' + escapeHtml(metaGender) + catPart + "</p>" +
+    "</header>" +
+    '<div class="product-info-commerce">' +
+    priceHtml +
+    buildProductAvailabilityChipHtml(avail) +
+    "</div>" +
+    buildProductInfoIdsHtml(product.art, product.brand_name) +
+    '<section class="product-summary">' +
+    '<p class="product-spec-heading product-summary-heading">\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435</p>' +
+    '<div class="product-spec-content"><div class="product-description">' +
+    descInner +
+    "</div></div></section>"
+  );
+}
 function formatProductSpecMultilineHtml(raw) {
   if (raw == null) return "";
   const text = String(raw).trim();
@@ -224,6 +324,213 @@ function requestProductBackAlign() {
   }
 }
 let productAdaptiveColorsState = null;
+let productAdaptiveLayoutLock = false;
+const PRODUCT_COLOR_MORE_RESERVE_PX = 30;
+const PRODUCT_COLOR_MORE_GAP_PX = 8;
+let productSwatchTipsState = null;
+let productSwatchFloatingTipEl = null;
+let productSwatchFloatingTipWrap = null;
+function teardownProductSwatchFloatingTipEl() {
+  if (productSwatchFloatingTipEl && productSwatchFloatingTipEl.parentNode) {
+    productSwatchFloatingTipEl.parentNode.removeChild(productSwatchFloatingTipEl);
+  }
+  productSwatchFloatingTipEl = null;
+  productSwatchFloatingTipWrap = null;
+}
+function ensureProductSwatchFloatingTip() {
+  if (!productSwatchFloatingTipEl) {
+    productSwatchFloatingTipEl = document.createElement("div");
+    productSwatchFloatingTipEl.className = "product-color-swatch-floating-tip";
+    productSwatchFloatingTipEl.setAttribute("role", "tooltip");
+    document.body.appendChild(productSwatchFloatingTipEl);
+  }
+  return productSwatchFloatingTipEl;
+}
+function hideProductSwatchFloatingTip() {
+  if (!productSwatchFloatingTipEl) return;
+  parkProductFloatingEl(productSwatchFloatingTipEl);
+  productSwatchFloatingTipEl.classList.remove("is-visible");
+  productSwatchFloatingTipEl.textContent = "";
+  productSwatchFloatingTipWrap = null;
+}
+function positionProductSwatchFloatingTip(wrap) {
+  if (!wrap || wrap.hasAttribute("hidden")) {
+    hideProductSwatchFloatingTip();
+    return;
+  }
+  const tipText = wrap.getAttribute("data-tip");
+  if (!tipText || !String(tipText).trim()) {
+    hideProductSwatchFloatingTip();
+    return;
+  }
+  const el = ensureProductSwatchFloatingTip();
+  productSwatchFloatingTipWrap = wrap;
+  el.classList.remove("is-visible");
+  el.textContent = String(tipText).trim();
+  parkProductFloatingEl(el);
+  const tipW = el.offsetWidth;
+  const tipH = el.offsetHeight;
+  const wrapRect = wrap.getBoundingClientRect();
+  const gap = 6;
+  const pad = 8;
+  let left = wrapRect.left + wrapRect.width / 2 - tipW / 2;
+  let top = wrapRect.top - tipH - gap;
+  left = Math.max(pad, Math.min(left, window.innerWidth - pad - tipW));
+  if (top < pad) top = wrapRect.bottom + gap;
+  el.style.left = Math.round(left) + "px";
+  el.style.top = Math.round(top) + "px";
+  el.style.visibility = "";
+  el.classList.add("is-visible");
+}
+function refreshProductSwatchFloatingTip() {
+  if (productSwatchFloatingTipWrap) positionProductSwatchFloatingTip(productSwatchFloatingTipWrap);
+}
+let productMoreFloatingPopEl = null;
+let productMoreFloatingPopBound = false;
+let productMoreFloatingWrap = null;
+const PRODUCT_MORE_POP_CLOSE_MS = 140;
+const PRODUCT_FLOATING_OFFSCREEN = "-10000px";
+function parkProductFloatingEl(el) {
+  if (!el) return;
+  el.style.left = PRODUCT_FLOATING_OFFSCREEN;
+  el.style.top = PRODUCT_FLOATING_OFFSCREEN;
+  el.style.visibility = "hidden";
+}
+function ensureProductMoreFloatingPopover() {
+  if (!productMoreFloatingPopEl) {
+    productMoreFloatingPopEl = document.createElement("div");
+    productMoreFloatingPopEl.className = "product-color-more-floating-popover";
+    productMoreFloatingPopEl.setAttribute("role", "listbox");
+    productMoreFloatingPopEl.setAttribute("tabindex", "-1");
+    document.body.appendChild(productMoreFloatingPopEl);
+  }
+  if (!productMoreFloatingPopBound) {
+    productMoreFloatingPopBound = true;
+    const keepOpen = function() {
+      if (productMoreFloatingWrap) clearProductColorMoreCloseTimer(productMoreFloatingWrap);
+    };
+    const closeSoon = function() {
+      if (productMoreFloatingWrap) scheduleProductColorMoreClose(productMoreFloatingWrap);
+    };
+    productMoreFloatingPopEl.addEventListener("mouseenter", keepOpen);
+    productMoreFloatingPopEl.addEventListener("mouseleave", closeSoon);
+    productMoreFloatingPopEl.addEventListener("pointerenter", keepOpen);
+    productMoreFloatingPopEl.addEventListener("pointerleave", closeSoon);
+  }
+  return productMoreFloatingPopEl;
+}
+function hideProductMoreFloatingPopover() {
+  if (!productMoreFloatingPopEl) return;
+  parkProductFloatingEl(productMoreFloatingPopEl);
+  productMoreFloatingPopEl.classList.remove("is-visible");
+  productMoreFloatingPopEl.innerHTML = "";
+  productMoreFloatingWrap = null;
+}
+function teardownProductMoreFloatingPopoverEl() {
+  hideProductMoreFloatingPopover();
+  if (productMoreFloatingPopEl && productMoreFloatingPopEl.parentNode) {
+    productMoreFloatingPopEl.parentNode.removeChild(productMoreFloatingPopEl);
+  }
+  productMoreFloatingPopEl = null;
+  productMoreFloatingPopBound = false;
+}
+function positionProductMoreFloatingPopover(wrap) {
+  if (!wrap || wrap.hasAttribute("hidden")) {
+    hideProductMoreFloatingPopover();
+    return;
+  }
+  const btn = wrap.querySelector(".product-color-more-circle");
+  const source = wrap.querySelector(".product-color-more-popover");
+  if (!btn || !source) {
+    hideProductMoreFloatingPopover();
+    return;
+  }
+  const html = source.innerHTML;
+  if (!html || !String(html).trim()) {
+    hideProductMoreFloatingPopover();
+    return;
+  }
+  const el = ensureProductMoreFloatingPopover();
+  productMoreFloatingWrap = wrap;
+  el.classList.remove("is-visible");
+  el.innerHTML = html;
+  parkProductFloatingEl(el);
+  const popW = el.offsetWidth;
+  const popH = el.offsetHeight;
+  const btnRect = btn.getBoundingClientRect();
+  const gap = 8;
+  const pad = 10;
+  let left = btnRect.left + btnRect.width / 2 - popW / 2;
+  let top = btnRect.top - popH - gap;
+  left = Math.max(pad, Math.min(left, window.innerWidth - pad - popW));
+  if (top < pad) top = btnRect.bottom + gap;
+  el.style.left = Math.round(left) + "px";
+  el.style.top = Math.round(top) + "px";
+  el.style.visibility = "";
+  el.classList.add("is-visible");
+}
+function showProductMoreFloatingPopover(wrap) {
+  positionProductMoreFloatingPopover(wrap);
+}
+function refreshProductMoreFloatingPopover() {
+  if (productMoreFloatingWrap) positionProductMoreFloatingPopover(productMoreFloatingWrap);
+}
+function teardownProductSwatchTips() {
+  if (!productSwatchTipsState) return;
+  const s = productSwatchTipsState;
+  if (s.root) {
+    s.root.removeEventListener("mouseover", s.onOver);
+    s.root.removeEventListener("mouseout", s.onOut);
+    s.root.removeEventListener("focusin", s.onFocus);
+    s.root.removeEventListener("focusout", s.onBlur);
+    s.root.removeEventListener("scroll", s.onScroll, true);
+  }
+  if (s.onResize) window.removeEventListener("resize", s.onResize);
+  if (s.onScrollWin) window.removeEventListener("scroll", s.onScrollWin, true);
+  productSwatchTipsState = null;
+  hideProductSwatchFloatingTip();
+}
+function setupProductSwatchTips(root) {
+  teardownProductSwatchTips();
+  const scope = root && root.querySelector ? root : document;
+  const host = (scope.querySelector && scope.querySelector(".product-page")) || scope;
+  if (!host || !host.querySelector(".product-color-swatch-wrap")) return;
+  const showForEvent = function(ev) {
+    const wrap = ev.target && ev.target.closest ? ev.target.closest(".product-color-swatch-wrap") : null;
+    if (!wrap || !host.contains(wrap)) return;
+    positionProductSwatchFloatingTip(wrap);
+  };
+  const hideForEvent = function(ev) {
+    const wrap = ev.target && ev.target.closest ? ev.target.closest(".product-color-swatch-wrap") : null;
+    if (!wrap || !host.contains(wrap)) return;
+    const rel = ev.relatedTarget;
+    if (rel && wrap.contains(rel)) return;
+    if (productSwatchFloatingTipWrap === wrap) hideProductSwatchFloatingTip();
+  };
+  const onScroll = function() {
+    hideProductSwatchFloatingTip();
+  };
+  const onResize = function() {
+    refreshProductSwatchFloatingTip();
+  };
+  host.addEventListener("mouseover", showForEvent);
+  host.addEventListener("mouseout", hideForEvent);
+  host.addEventListener("focusin", showForEvent);
+  host.addEventListener("focusout", hideForEvent);
+  host.addEventListener("scroll", onScroll, true);
+  window.addEventListener("resize", onResize);
+  window.addEventListener("scroll", onScroll, true);
+  productSwatchTipsState = {
+    root: host,
+    onOver: showForEvent,
+    onOut: hideForEvent,
+    onFocus: showForEvent,
+    onBlur: hideForEvent,
+    onScroll: onScroll,
+    onScrollWin: onScroll,
+    onResize: onResize
+  };
+}
 function clearProductColorMoreCloseTimer(wrap) {
   if (!wrap || wrap._morePopCloseTimer == null) return;
   clearTimeout(wrap._morePopCloseTimer);
@@ -238,16 +545,21 @@ function setProductColorMoreOpen(wrap, open) {
 function scheduleProductColorMoreClose(wrap) {
   if (!wrap) return;
   clearProductColorMoreCloseTimer(wrap);
-  setProductColorMoreOpen(wrap, false);
+  wrap._morePopCloseTimer = window.setTimeout(function() {
+    wrap._morePopCloseTimer = null;
+    setProductColorMoreOpen(wrap, false);
+    if (productMoreFloatingWrap === wrap) hideProductMoreFloatingPopover();
+  }, PRODUCT_MORE_POP_CLOSE_MS);
 }
 function bindProductColorMoreWrap(wrap) {
   if (!wrap || wrap.dataset.morePopBound === "1") return;
   wrap.dataset.morePopBound = "1";
   const btn = wrap.querySelector(".product-color-more-circle");
-  const pop = wrap.querySelector(".product-color-more-popover");
   const openNow = function() {
     clearProductColorMoreCloseTimer(wrap);
+    hideProductSwatchFloatingTip();
     setProductColorMoreOpen(wrap, true);
+    showProductMoreFloatingPopover(wrap);
   };
   const leaveLater = function() {
     scheduleProductColorMoreClose(wrap);
@@ -256,30 +568,24 @@ function bindProductColorMoreWrap(wrap) {
   wrap.addEventListener("mouseleave", leaveLater);
   wrap.addEventListener("pointerenter", openNow);
   wrap.addEventListener("pointerleave", leaveLater);
-  if (pop) {
-    pop.addEventListener("mouseenter", openNow);
-    pop.addEventListener("mouseleave", leaveLater);
-    pop.addEventListener("pointerenter", openNow);
-    pop.addEventListener("pointerleave", leaveLater);
-  }
   if (btn) {
     btn.addEventListener("click", function(e) {
       e.preventDefault();
       e.stopPropagation();
-      if (wrap.classList.contains("product-color-more-wrap--open")) {
-        clearProductColorMoreCloseTimer(wrap);
-        setProductColorMoreOpen(wrap, false);
-      } else {
-        openNow();
-      }
+      openNow();
     });
+    btn.setAttribute("type", "button");
     btn.setAttribute("aria-haspopup", "listbox");
     btn.setAttribute("aria-expanded", "false");
   }
 }
 function onDocumentClickCloseColorMore(e) {
+  const t = e.target;
+  if (productMoreFloatingPopEl && productMoreFloatingPopEl.classList.contains("is-visible") && productMoreFloatingPopEl.contains(t)) {
+    return;
+  }
   document.querySelectorAll(".product-color-more-wrap.product-color-more-wrap--open").forEach(function(wrap) {
-    if (!wrap.contains(e.target)) scheduleProductColorMoreClose(wrap);
+    if (!wrap.contains(t)) scheduleProductColorMoreClose(wrap);
   });
 }
 function bindAllProductColorMoreWraps(root) {
@@ -292,6 +598,9 @@ function teardownProductAdaptiveColorRows() {
     if (productAdaptiveColorsState.onResize) {
       window.removeEventListener("resize", productAdaptiveColorsState.onResize);
     }
+    if (productAdaptiveColorsState.onScroll) {
+      window.removeEventListener("scroll", productAdaptiveColorsState.onScroll, true);
+    }
     if (productAdaptiveColorsState.onDocumentClick) {
       document.removeEventListener("click", productAdaptiveColorsState.onDocumentClick);
     }
@@ -301,31 +610,95 @@ function teardownProductAdaptiveColorRows() {
     wrap.classList.remove("product-color-more-wrap--open");
     clearProductColorMoreCloseTimer(wrap);
   });
+  hideProductMoreFloatingPopover();
+}
+function productColorSwatchMetrics() {
+  const group = document.querySelector(".product-page .product-spec-group--sizes-colors");
+  const cs = group ? getComputedStyle(group) : null;
+  const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  const parseRem = function(raw, fallback) {
+    const v = raw && String(raw).trim();
+    if (v && v.endsWith("rem")) return (parseFloat(v) || fallback) * root;
+    if (v && v.endsWith("px")) return parseFloat(v) || fallback;
+    return fallback * root;
+  };
+  const colSize = cs ? parseRem(cs.getPropertyValue("--product-swatch-size"), 1.4) : 1.4 * root;
+  const gap = cs ? parseRem(cs.getPropertyValue("--product-swatch-gap"), 0.14) : 0.14 * root;
+  return { colSize, gap };
+}
+function productColorSwatchesWidthPx(count, metrics) {
+  const n = Math.max(0, count);
+  if (!n) return 0;
+  return n * metrics.colSize + Math.max(0, n - 1) * metrics.gap;
+}
+function productColorColsThatFitWidth(available, metrics, reserveMorePx) {
+  const budget = Math.max(0, available - Math.max(0, reserveMorePx || 0));
+  let fit = 0;
+  while (fit < 999) {
+    const next = fit + 1;
+    if (productColorSwatchesWidthPx(next, metrics) > budget + 0.5) break;
+    fit = next;
+  }
+  return fit;
+}
+function productColorVisibleCap() {
+  if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches) {
+    return 8;
+  }
+  return 20;
+}
+function productColorSyncClipWidth(clip, visibleCount, metrics) {
+  if (!clip || visibleCount <= 0) return;
+  const w = Math.ceil(productColorSwatchesWidthPx(visibleCount, metrics));
+  clip.style.width = w + "px";
+  clip.style.maxWidth = w + "px";
+  clip.style.flex = "0 0 auto";
+}
+function productColorResetClipWidth(clip) {
+  if (!clip) return;
+  clip.style.removeProperty("width");
+  clip.style.removeProperty("max-width");
+  clip.style.removeProperty("flex");
+}
+function productColorRowBudget(host) {
+  const swatchCell = host ? host.closest(".product-size-color-swatches") : null;
+  if (swatchCell) {
+    const cellW = swatchCell.clientWidth || swatchCell.getBoundingClientRect().width;
+    if (cellW > 0) return Math.max(48, cellW - 4);
+  }
+  const spec = host ? host.closest(".product-spec-content") : null;
+  if (!spec) return 120;
+  const row = host ? host.closest("tr.product-size-color-row") : null;
+  const label = row ? row.querySelector(".product-size-color-label") : null;
+  const totalCell = row ? row.querySelector(".product-size-color-total-cell") : null;
+  let budget = spec.clientWidth || spec.getBoundingClientRect().width;
+  if (label) budget -= label.getBoundingClientRect().width + 12;
+  if (totalCell) budget -= totalCell.getBoundingClientRect().width + 8;
+  return Math.max(48, budget - 8);
+}
+function productColorRowBaseWidth(host) {
+  return productColorRowBudget(host);
+}
+function productColorHideMoreControl(moreWrap, btn) {
+  if (!moreWrap) return;
+  if (productMoreFloatingWrap === moreWrap) hideProductMoreFloatingPopover();
+  moreWrap.classList.remove("product-color-more-wrap--open");
+  moreWrap.setAttribute("hidden", "");
+  if (btn) {
+    btn.textContent = "+0";
+    btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430");
+    btn.setAttribute("aria-expanded", "false");
+  }
+}
+function productColorMeasureMoreReserve(moreWrap, btn, overflowHint) {
+  if (!moreWrap) return PRODUCT_COLOR_MORE_RESERVE_PX + PRODUCT_COLOR_MORE_GAP_PX;
+  if (btn && overflowHint > 0) btn.textContent = "+" + overflowHint;
+  moreWrap.removeAttribute("hidden");
+  void moreWrap.offsetWidth;
+  return (moreWrap.offsetWidth || PRODUCT_COLOR_MORE_RESERVE_PX) + PRODUCT_COLOR_MORE_GAP_PX;
 }
 function productColorTrackClip(host) {
   return host.querySelector(".product-size-colors-track-clip");
-}
-function productColorGridMetrics(track) {
-  const raw = track ? track.style.getPropertyValue("--product-color-cols") || getComputedStyle(track).getPropertyValue("--product-color-cols") : "";
-  const masterCols = Math.max(1, parseInt(String(raw).trim(), 10) || 1);
-  if (!track) return { masterCols, colSize: 22.4, gap: 2.24 };
-  void track.offsetWidth;
-  const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
-  const totalW = track.scrollWidth;
-  const colSize = masterCols > 0 ? (totalW - gap * Math.max(0, masterCols - 1)) / masterCols : 22.4;
-  return { masterCols, colSize, gap };
-}
-function productColorColsThatFit(available, metrics, reserveMorePx) {
-  const { masterCols, colSize, gap } = metrics;
-  const budget = Math.max(0, available - Math.max(0, reserveMorePx || 0));
-  if (!budget || !colSize) return masterCols;
-  let fit = masterCols;
-  while (fit > 0) {
-    const need = fit * colSize + Math.max(0, fit - 1) * gap;
-    if (need <= budget + 0.5) break;
-    fit -= 1;
-  }
-  return fit;
 }
 function productColorSwatchIndex(wrap) {
   const idx = parseInt(wrap && wrap.getAttribute("data-color-idx"), 10);
@@ -383,68 +756,62 @@ function layoutOneAdaptiveColorRow(host) {
   const wraps = productColorFilledWraps(wrapsAll);
   const btn = moreWrap ? moreWrap.querySelector(".product-color-more-circle") : null;
   const headingLine = moreWrap ? moreWrap.getAttribute("data-heading") || "" : "";
-  const metrics = productColorGridMetrics(track);
-  const masterCols = metrics.masterCols;
   if (!track || !clip || !wraps.length) return;
+  const metrics = productColorSwatchMetrics();
   wrapsAll.forEach(function(w) {
     w.removeAttribute("hidden");
     w.style.removeProperty("z-index");
   });
-  if (moreWrap) {
-    moreWrap.setAttribute("hidden", "");
-    if (btn) {
-      btn.textContent = "+0";
-      btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430");
+  hideProductSwatchFloatingTip();
+  productColorHideMoreControl(moreWrap, btn);
+  productColorResetClipWidth(clip);
+  void host.offsetWidth;
+  const budget = productColorRowBudget(host);
+  const totalCount = wraps.length;
+  const cap = productColorVisibleCap();
+  let colsFit = Math.min(totalCount, productColorColsThatFitWidth(budget, metrics, 0));
+  if (totalCount > cap) colsFit = Math.min(colsFit, cap);
+  let hidden = totalCount - colsFit;
+  if (hidden > 0 && moreWrap) {
+    let moreReserve = productColorMeasureMoreReserve(moreWrap, btn, hidden);
+    colsFit = Math.min(totalCount, productColorColsThatFitWidth(budget, metrics, moreReserve));
+    if (totalCount > cap) colsFit = Math.min(colsFit, cap);
+    hidden = totalCount - colsFit;
+    if (hidden > 0) {
+      moreReserve = productColorMeasureMoreReserve(moreWrap, btn, hidden);
+      colsFit = Math.min(totalCount, productColorColsThatFitWidth(budget, metrics, moreReserve));
+      if (totalCount > cap) colsFit = Math.min(colsFit, cap);
+      hidden = totalCount - colsFit;
     }
   }
-  let available = productColorRowAvailableWidth(host);
-  if (!available && clip) available = Math.max(0, clip.clientWidth);
-  let colsFit = productColorColsThatFit(available, metrics, 0);
-  const maxIdx = wraps.reduce(function(m, w) {
-    return Math.max(m, productColorSwatchIndex(w));
-  }, 0);
-  if (colsFit > maxIdx + 1) colsFit = maxIdx + 1;
-  if (!moreWrap || colsFit >= masterCols || maxIdx < colsFit) {
-    productColorSetVisibleByColumn(wrapsAll, masterCols);
-    return;
-  }
-  moreWrap.removeAttribute("hidden");
-  void moreWrap.offsetWidth;
-  const moreReserve = moreWrap.offsetWidth + 8;
-  available = productColorRowAvailableWidth(host);
-  if (!available && clip) available = Math.max(0, clip.clientWidth - moreReserve);
-  colsFit = productColorColsThatFit(available, metrics, 0);
-  if (colsFit > maxIdx + 1) colsFit = maxIdx + 1;
-  while (colsFit > 0) {
-    productColorSetVisibleByColumn(wrapsAll, colsFit);
-    void track.offsetWidth;
-    const need = colsFit * metrics.colSize + Math.max(0, colsFit - 1) * metrics.gap;
-    if (need <= available + 0.5) break;
-    colsFit -= 1;
-  }
-  let overflow = wraps.filter(function(w) {
-    return productColorSwatchIndex(w) >= colsFit;
-  }).length;
-  if (overflow <= 0) {
-    moreWrap.setAttribute("hidden", "");
-    if (btn) {
-      btn.textContent = "+0";
-      btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430");
-    }
-    productColorSetVisibleByColumn(wrapsAll, masterCols);
+  if (hidden <= 0 || !moreWrap) {
+    productColorHideMoreControl(moreWrap, btn);
+    productColorResetClipWidth(clip);
+    wrapsAll.forEach(function(w) {
+      w.removeAttribute("hidden");
+    });
     return;
   }
   productColorSetVisibleByColumn(wrapsAll, colsFit);
+  productColorSyncClipWidth(clip, colsFit, metrics);
   if (btn) {
-    btn.textContent = "+" + overflow;
-    btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0435\u0449\u0451 " + overflow + " " + (overflow === 1 ? "\u0446\u0432\u0435\u0442" : overflow < 5 ? "\u0446\u0432\u0435\u0442\u0430" : "\u0446\u0432\u0435\u0442\u043E\u0432"));
+    btn.textContent = "+" + hidden;
+    btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0435\u0449\u0451 " + hidden + " " + (hidden === 1 ? "\u0446\u0432\u0435\u0442" : hidden < 5 ? "\u0446\u0432\u0435\u0442\u0430" : "\u0446\u0432\u0435\u0442\u043E\u0432"));
   }
   refreshMorePopover(moreWrap, wraps, colsFit, headingLine);
   bindProductColorMoreWrap(moreWrap);
+  if (moreWrap.classList.contains("product-color-more-wrap--open")) {
+    showProductMoreFloatingPopover(moreWrap);
+  }
 }
 function layoutProductAdaptiveColorRows(root) {
+  if (productAdaptiveLayoutLock) return;
+  productAdaptiveLayoutLock = true;
   const scope = root && root.querySelectorAll ? root : document;
   scope.querySelectorAll(".product-size-colors-adaptive").forEach(layoutOneAdaptiveColorRow);
+  productAdaptiveLayoutLock = false;
+  refreshProductSwatchFloatingTip();
+  refreshProductMoreFloatingPopover();
 }
 function setupProductAdaptiveColorRows(productMainEl) {
   teardownProductAdaptiveColorRows();
@@ -468,17 +835,28 @@ function setupProductAdaptiveColorRows(productMainEl) {
       run();
     });
     ro.observe(productMainEl);
-    productMainEl.querySelectorAll(".product-size-color-swatches, .product-size-colors-adaptive").forEach(function(row) {
+    productMainEl.querySelectorAll(".product-size-color-table").forEach(function(el) {
+      ro.observe(el);
+    });
+    productMainEl.querySelectorAll(".product-spec-group--sizes-colors .product-spec-content").forEach(function(el) {
+      ro.observe(el);
+    });
+    productMainEl.querySelectorAll(".product-size-color-swatches").forEach(function(row) {
       ro.observe(row);
     });
   }
   const onResize = function() {
     run();
+    refreshProductMoreFloatingPopover();
+  };
+  const onScroll = function() {
+    refreshProductMoreFloatingPopover();
   };
   window.addEventListener("resize", onResize);
+  window.addEventListener("scroll", onScroll, true);
   document.addEventListener("click", onDocumentClickCloseColorMore);
   bindAllProductColorMoreWraps(productMainEl);
-  productAdaptiveColorsState = { ro, onResize, onDocumentClick: onDocumentClickCloseColorMore };
+  productAdaptiveColorsState = { ro, onResize, onScroll, onDocumentClick: onDocumentClickCloseColorMore };
 }
 function setupProductBackAlign() {
   teardownProductBackAlign();
@@ -622,6 +1000,7 @@ async function loadProduct() {
   if (!productMainEl) return;
   teardownProductBackAlign();
   teardownProductAdaptiveColorRows();
+  teardownProductSwatchTips();
   if (!identifier) {
     productMainEl.innerHTML = '<p class="catalog-empty">\u0422\u043E\u0432\u0430\u0440 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D. \u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043A\u043E\u0440\u0440\u0435\u043A\u0442\u043D\u0443\u044E \u0441\u0441\u044B\u043B\u043A\u0443 \u0438\u043B\u0438 \u043E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 <a href="/mens.html">\u043A\u0430\u0442\u0430\u043B\u043E\u0433</a>.</p>';
     return;
@@ -669,8 +1048,6 @@ async function loadProduct() {
     }
     const variantsHtml = buildVariantsHtml(product.variants);
     const attributesHtml = buildAttributesHtml(product.attributes);
-    const artHtml = product.art ? '<p class="product-sku">\u0410\u0440\u0442\u0438\u043A\u0443\u043B: ' + escapeHtml(product.art) + "</p>" : "";
-    const brandHtml = product.brand_name ? '<p class="product-brand">\u0411\u0440\u0435\u043D\u0434: ' + escapeHtml(product.brand_name) + "</p>" : "";
     const seasonHtml = buildSeasonSpecGroup(product.season);
     const materialsHtml = buildCompositionSpecGroup(product);
     const metaGender = genderDisplayLabel(product.gender) || "\u0422\u043E\u0432\u0430\u0440";
@@ -678,10 +1055,8 @@ async function loadProduct() {
     const priceFormatted = formatProductPrice(product.price);
     const priceHtml = priceFormatted ? '<p class="product-price">' + escapeHtml(priceFormatted) + "</p>" : '<p class="product-price product-price--placeholder">\u0426\u0435\u043D\u0430 \u043F\u043E \u0437\u0430\u043F\u0440\u043E\u0441\u0443</p>';
     const avail = productAvailabilityState(product);
-    const availHtml = '<p class="product-availability ' + (avail === "in" ? "product-availability--in" : "product-availability--out") + '">' + (avail === "in" ? "\u0412 \u043D\u0430\u043B\u0438\u0447\u0438\u0438" : "\u041D\u0435\u0442 \u0432 \u043D\u0430\u043B\u0438\u0447\u0438\u0438") + "</p>";
-    const descPlaceholder = "\u041E\u043F\u0438\u0441\u0430\u043D\u0438\u0435 \u0442\u043E\u0432\u0430\u0440\u0430 \u0431\u0443\u0434\u0435\u0442 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E \u043F\u043E\u0437\u0436\u0435.";
-    const descSummaryInner = product.description && String(product.description).trim() ? formatProductDescriptionHtml(product.description) : '<p class="product-desc-p">' + escapeHtml(descPlaceholder) + "</p>";
-    productMainEl.innerHTML = '<div class="product-page"><div class="product-image-block"><div class="product-gallery-stage">' + navHtml + '<div class="product-image-wrapper"><img src="' + escapeAttr(stageSrc) + '" alt="' + escapeAttr(product.name || "") + '" class="product-image product-image--main" data-gallery-idx="' + startIdx + '"></div></div>' + thumbsHtml + '<div class="product-actions site-product-actions"><button type="button" class="btn btn--primary product-page-action-btn favorite-action-btn ' + (isFavorite ? "in-favorites" : "") + '" data-action="product-favorite">' + (isFavorite ? BTN_REMOVE_FAVORITE : BTN_ADD_FAVORITE) + '</button><button type="button" class="btn btn--primary product-page-action-btn cart-action-btn ' + (isInCart ? "in-cart" : "") + '" data-action="product-cart">' + (isInCart ? BTN_REMOVE_CART : BTN_ADD_CART) + '</button><button type="button" class="btn inquire-action-btn" data-action="product-inquire">\u0417\u0430\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u0446\u0435\u043D\u0443</button></div></div><div class="product-info"><h1 class="product-title">' + escapeHtml(product.name || "") + '</h1><p class="product-meta">' + escapeHtml(metaGender) + catPart + "</p>" + priceHtml + availHtml + artHtml + brandHtml + '<div class="product-summary"><div class="product-description">' + descSummaryInner + '</div></div><div class="product-specs">' + seasonHtml + materialsHtml + variantsHtml + attributesHtml + "</div></div></div>";
+    const productInfoHtml = buildProductInfoPanelHtml(product, metaGender, catPart, priceHtml, avail);
+    productMainEl.innerHTML = '<div class="product-page"><div class="product-image-block"><div class="product-gallery-stage">' + navHtml + '<div class="product-image-wrapper"><img src="' + escapeAttr(stageSrc) + '" alt="' + escapeAttr(product.name || "") + '" class="product-image product-image--main" data-gallery-idx="' + startIdx + '"></div></div>' + thumbsHtml + '<div class="product-actions site-product-actions"><button type="button" class="btn btn--primary product-page-action-btn favorite-action-btn ' + (isFavorite ? "in-favorites" : "") + '" data-action="product-favorite">' + (isFavorite ? BTN_REMOVE_FAVORITE : BTN_ADD_FAVORITE) + '</button><button type="button" class="btn btn--primary product-page-action-btn cart-action-btn ' + (isInCart ? "in-cart" : "") + '" data-action="product-cart">' + (isInCart ? BTN_REMOVE_CART : BTN_ADD_CART) + '</button><button type="button" class="btn inquire-action-btn" data-action="product-inquire">\u0417\u0430\u043F\u0440\u043E\u0441\u0438\u0442\u044C \u0446\u0435\u043D\u0443</button></div></div><div class="product-info">' + productInfoHtml + '<div class="product-specs">' + seasonHtml + materialsHtml + variantsHtml + attributesHtml + "</div></div></div>";
     const favBtn = productMainEl.querySelector('[data-action="product-favorite"]');
     const cartBtnEl = productMainEl.querySelector('[data-action="product-cart"]');
     const inqBtn = productMainEl.querySelector('[data-action="product-inquire"]');
@@ -704,6 +1079,7 @@ async function loadProduct() {
     wireProductBackButton(product);
     setupProductBackAlign();
     setupProductAdaptiveColorRows(productMainEl);
+    setupProductSwatchTips(productMainEl);
     wireProductGallery(productMainEl, imageUrls, startIdx);
     requestProductBackAlign();
     const legacyDlg = document.getElementById("product-colors-dialog");
@@ -804,14 +1180,13 @@ function uniqueColorsForSize(activeVariants, sizeLabel, masterOrder) {
 function uniqueColorsAll(activeVariants, masterOrder) {
   return Array.isArray(masterOrder) ? masterOrder.slice() : buildMasterColorOrder(activeVariants);
 }
-function renderProductSwatchButton(c, gridIndex) {
+function renderProductSwatchButton(c, displayIndex) {
   const name = c.name || "\u2014";
   const st = swatchInlineStyle(c.hex);
   const styleAttr = st ? ' style="' + escapeAttr(st) + '"' : "";
   const cls = "product-color-swatch" + (st ? "" : " product-color-swatch--muted");
-  const idxAttr = gridIndex != null && Number.isFinite(Number(gridIndex)) ? ' data-color-idx="' + Number(gridIndex) + '"' : "";
-  const wrapGrid = gridIndex != null && Number.isFinite(Number(gridIndex)) ? ' style="grid-column:' + (Number(gridIndex) + 1) + '"' : "";
-  return '<span class="product-color-swatch-wrap"' + idxAttr + wrapGrid + ' data-tip="' + escapeAttr(name) + '" data-hex="' + escapeAttr(c.hex || "") + '"><button type="button" class="' + cls + '"' + styleAttr + ' aria-label="' + escapeAttr(name) + '"></button></span>';
+  const idxAttr = displayIndex != null && Number.isFinite(Number(displayIndex)) ? ' data-color-idx="' + Number(displayIndex) + '"' : "";
+  return '<span class="product-color-swatch-wrap"' + idxAttr + ' data-tip="' + escapeAttr(name) + '" data-hex="' + escapeAttr(c.hex || "") + '"><button type="button" class="' + cls + '"' + styleAttr + ' aria-label="' + escapeAttr(name) + '"></button></span>';
 }
 function renderProductColorOverflowPopover(allColors, headingLine) {
   const arr = Array.isArray(allColors) ? allColors : [];
@@ -848,21 +1223,13 @@ function buildProductColorsAdaptiveRow(masterOrder, rowColors, headingLine, pale
   const master = Array.isArray(masterOrder) ? masterOrder : [];
   const row = Array.isArray(rowColors) ? rowColors : [];
   if (!row.length) return "";
-  const cols = Math.max(1, Number(paletteCols) > 0 ? Number(paletteCols) : master.length || 1);
-  const rowKeyToIndex = new Map();
-  master.forEach(function(c, idx) {
-    rowKeyToIndex.set(c.key, idx);
-  });
   let trackHtml = "";
-  row.forEach(function(c) {
-    const idx = rowKeyToIndex.has(c.key) ? rowKeyToIndex.get(c.key) : master.findIndex(function(x) {
-      return x.key === c.key;
-    });
-    trackHtml += renderProductSwatchButton(c, idx >= 0 ? idx : null);
+  row.forEach(function(c, displayIdx) {
+    trackHtml += renderProductSwatchButton(c, displayIdx);
   });
   const overflow = renderProductColorOverflowPopover(row, headingLine);
   const total = includeTotal ? renderProductColorCountLabel(row.length) : "";
-  return '<div class="product-size-colors-adaptive" data-color-cols="' + cols + '"><div class="product-size-colors-track-clip"><div class="product-size-colors-track product-color-align-track" style="--product-color-cols:' + cols + '">' + trackHtml + "</div></div>" + overflow + total + "</div>";
+  return '<div class="product-size-colors-adaptive" data-color-cols="' + row.length + '"><div class="product-size-colors-track-clip"><div class="product-size-colors-track">' + trackHtml + "</div></div>" + overflow + total + "</div>";
 }
 function buildVariantsHtml(variants) {
   if (!Array.isArray(variants) || !variants.length) return "";

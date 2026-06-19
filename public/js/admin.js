@@ -59,6 +59,7 @@ const Admin = (() => {
   let productMaterials = [];
   let referenceMaterials = [];
   const REF_MATERIAL_ADD_SENTINEL = "__KPVS_REF_ADD__";
+  const ADMIN_CELL_EMPTY = "\u2014";
   let productModalBaselineSerialized = null;
   let productModalBaselineReady = false;
   const PRODUCT_DRAFT_STORAGE_PREFIX = "kpvs_admin_product_draft_v1_";
@@ -125,7 +126,7 @@ const Admin = (() => {
   }
   function formatProductCollectionsCell(p) {
     const arr = normalizeProductCollectionsRow(p);
-    if (!arr.length) return "\u2014";
+    if (!arr.length) return ADMIN_CELL_EMPTY;
     return arr.map(function(c) {
       return c && c.name != null ? String(c.name) : "";
     }).filter(Boolean).join(", ");
@@ -1532,6 +1533,23 @@ const Admin = (() => {
       void renderVariantsList();
     });
   }
+  function syncVariantsDedupedSilent() {
+    collectVariants();
+    const deduped = dedupeVariantsBySizeColor(productVariants);
+    if (deduped.length !== productVariants.length) {
+      productVariants = deduped;
+      void renderVariantsList();
+    }
+  }
+  function bindVariantAutoDedupeOnce() {
+    const c = ui.productVariantsContainer;
+    if (!c || c.dataset.varAutoDedupe) return;
+    c.dataset.varAutoDedupe = "1";
+    c.addEventListener("change", function(ev) {
+      if (!ev.target.closest(".variant-size") && !ev.target.closest(".variant-color")) return;
+      syncVariantsDedupedSilent();
+    });
+  }
   function normalizeVariantArtsForSave(baseArt, variants) {
     const used = new Set();
     const upperBase = String(baseArt || "").trim().toUpperCase();
@@ -1641,6 +1659,38 @@ const Admin = (() => {
     if (!row) return "\u0420\u0430\u0437\u043C\u0435\u0440 #" + sid;
     const hint = row.equivalent_hint && String(row.equivalent_hint).trim() ? " \u2014 " + row.equivalent_hint : "";
     return String(row.value) + " (" + row.size_type + ")" + hint;
+  }
+  function variantColorDisplayLabel(colorId) {
+    const cid = Number(colorId);
+    if (!Number.isFinite(cid) || cid <= 0) return "\u0426\u0432\u0435\u0442\u2026";
+    const row = availableColors.find(function(c) {
+      return Number(c.id) === cid;
+    });
+    if (!row) return "\u0426\u0432\u0435\u0442 #" + cid;
+    const hex = row.hex != null ? String(row.hex).trim() : "";
+    return String(row.name || "\u0426\u0432\u0435\u0442") + (hex ? " (" + hex + ")" : "");
+  }
+  function variantSizeColorKey(v) {
+    const sid = v && v.size_id != null && Number.isFinite(Number(v.size_id)) ? Number(v.size_id) : null;
+    const cid = v && v.color_id != null && Number.isFinite(Number(v.color_id)) ? Number(v.color_id) : null;
+    if (sid == null || cid == null) return null;
+    return sid + ":" + cid;
+  }
+  function dedupeVariantsBySizeColor(variants) {
+    const arr = Array.isArray(variants) ? variants : [];
+    const seen = new Set();
+    const out = [];
+    arr.forEach(function(v) {
+      const key = variantSizeColorKey(v);
+      if (!key) {
+        out.push(v);
+        return;
+      }
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(v);
+    });
+    return out;
   }
   function categoryParentIdsWithChildren() {
     const set = new Set();
@@ -1886,9 +1936,10 @@ const Admin = (() => {
     }
     const genderLabels = { mens: "\u041C\u0443\u0436\u0441\u043A\u043E\u0439", womens: "\u0416\u0435\u043D\u0441\u043A\u0438\u0439", unisex: "\u0423\u043D\u0438\u0441\u0435\u043A\u0441", male: "\u041C\u0443\u0436\u0441\u043A\u043E\u0439", female: "\u0416\u0435\u043D\u0441\u043A\u0438\u0439" };
     ui.productsBody.innerHTML = products.map(function(p) {
-      const genderLabel = genderLabels[p.gender] || (p.gender || "-");
-      const desc = p.description || "-";
-      const shortDesc = desc.length > 80 ? desc.slice(0, 80) + "\u2026" : desc;
+      const genderLabel = genderLabels[p.gender] || ADMIN_CELL_EMPTY;
+      const descRaw = p.description != null ? String(p.description).trim() : "";
+      const desc = descRaw ? (descRaw.length > 80 ? descRaw.slice(0, 80) + "\u2026" : descRaw) : ADMIN_CELL_EMPTY;
+      const descTitle = descRaw || ADMIN_CELL_EMPTY;
       const slugAttr = p.slug ? ' data-slug="' + escapeHtml(p.slug) + '"' : "";
       const genderAttr = ' data-gender="' + escapeHtml(p.gender || "") + '"';
       const isVisible = p.is_active !== false;
@@ -1896,7 +1947,7 @@ const Admin = (() => {
       const iconSrc = isVisible ? "/img/visible.svg" : "/img/invisible.svg";
       const toggleHint = isVisible ? "\u0421\u043A\u0440\u044B\u0442\u044C \u0438\u0437 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430" : "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0432 \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0435";
       const openLabel = "\u041E\u0442\u043A\u0440\u044B\u0442\u044C \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0443 \u0442\u043E\u0432\u0430\u0440\u0430 \u0432 \u043D\u043E\u0432\u043E\u0439 \u0432\u043A\u043B\u0430\u0434\u043A\u0435";
-      return '<tr data-product-id="' + p.id + '"><td class="cell-visible"><button type="button" class="catalog-visibility-hit" data-action="toggle-catalog-visibility" data-id="' + p.id + '" data-visible="' + (isVisible ? "1" : "0") + '" aria-pressed="' + (isVisible ? "true" : "false") + '" title="' + escapeHtml(toggleHint) + '" aria-label="' + escapeHtml(visibleTitle + ". " + toggleHint + ".") + '"><img src="' + escapeHtml(iconSrc) + '" alt="" width="28" height="28" draggable="false" /></button></td><td class="cell-id">' + p.id + '</td><td class="cell-name-with-open"><div class="cell-name-block"><button type="button" class="admin-product-open" data-action="open-page" data-id="' + p.id + '"' + genderAttr + slugAttr + ' title="' + escapeHtml(openLabel) + '" aria-label="' + escapeHtml(openLabel) + '"><img src="/img/link.svg" alt="" class="admin-product-open-icon" draggable="false" /></button><span class="cell-name-title">' + escapeHtml(p.name) + "</span>" + (p.art ? '<span class="cell-art">' + escapeHtml(p.art) + "</span>" : "") + '</div></td><td title="' + escapeHtml(desc) + '"><div class="cell-description">' + escapeHtml(shortDesc) + "</div></td><td>" + escapeHtml(p.category_name || "-") + "</td><td>" + escapeHtml(genderLabel) + "</td><td>" + escapeHtml(p.brand_name || "-") + '</td><td class="cell-collections" title="' + escapeHtml(formatProductCollectionsCell(p)) + '"><div class="cell-collections-inner">' + escapeHtml(formatProductCollectionsCell(p)) + "</div></td></tr>";
+      return '<tr data-product-id="' + p.id + '"><td class="cell-visible"><button type="button" class="catalog-visibility-hit" data-action="toggle-catalog-visibility" data-id="' + p.id + '" data-visible="' + (isVisible ? "1" : "0") + '" aria-pressed="' + (isVisible ? "true" : "false") + '" title="' + escapeHtml(toggleHint) + '" aria-label="' + escapeHtml(visibleTitle + ". " + toggleHint + ".") + '"><img src="' + escapeHtml(iconSrc) + '" alt="" width="28" height="28" draggable="false" /></button></td><td class="cell-id">' + p.id + '</td><td class="cell-name-with-open"><div class="cell-name-block"><button type="button" class="admin-product-open" data-action="open-page" data-id="' + p.id + '"' + genderAttr + slugAttr + ' title="' + escapeHtml(openLabel) + '" aria-label="' + escapeHtml(openLabel) + '"><img src="/img/link.svg" alt="" class="admin-product-open-icon" draggable="false" /></button><span class="cell-name-title">' + escapeHtml(p.name) + "</span>" + (p.art ? '<span class="cell-art">' + escapeHtml(p.art) + "</span>" : "") + '</div></td><td title="' + escapeHtml(descTitle) + '"><div class="cell-description">' + escapeHtml(desc) + "</div></td><td>" + escapeHtml(p.category_name || ADMIN_CELL_EMPTY) + "</td><td>" + escapeHtml(genderLabel) + "</td><td>" + escapeHtml(p.brand_name || ADMIN_CELL_EMPTY) + '</td><td class="cell-collections" title="' + escapeHtml(formatProductCollectionsCell(p)) + '"><div class="cell-collections-inner">' + escapeHtml(formatProductCollectionsCell(p)) + "</div></td></tr>";
     }).join("");
     if (effectiveAdminSearchScope() !== "users") {
       ui.productCount.textContent = formatProductCount(products.length);
@@ -2520,7 +2571,7 @@ const Admin = (() => {
       if (table.classList.contains("admin-users-table")) {
         setupFor(table, [48, 52, 120, 72, 112, 160, 360]);
       } else {
-        setupFor(table, [56, 52, 240, 200, 128, 84, 112]);
+        setupFor(table, [72, 56, 240, 200, 128, 92, 124, 140]);
       }
     });
   }
@@ -2546,6 +2597,13 @@ const Admin = (() => {
     list.querySelectorAll('[data-action="remove-image"]').forEach(function(btn) {
       btn.addEventListener("click", function() {
         const idx = Number(btn.dataset.index);
+        const img = productImages[idx];
+        let confirmMsg = "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0444\u043E\u0442\u043E " + (idx + 1);
+        if (img && img.is_primary) {
+          confirmMsg += " (\u0433\u043B\u0430\u0432\u043D\u043E\u0435)";
+        }
+        confirmMsg += "? \u042D\u0442\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u043D\u0435\u043B\u044C\u0437\u044F \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C.";
+        if (!confirm(confirmMsg)) return;
         productImages.splice(idx, 1);
         if (productImages.length && !productImages.some(function(i) {
           return i.is_primary;
@@ -2641,6 +2699,55 @@ const Admin = (() => {
     }).filter(function(m) {
       return m.name;
     });
+  }
+  function adminMaterialKey(name) {
+    return String(name || "").trim().toLocaleLowerCase("ru-RU");
+  }
+  function mergeProductMaterials(rows) {
+    const arr = Array.isArray(rows) ? rows : [];
+    const byName = new Map();
+    const order = [];
+    arr.forEach(function(row) {
+      if (!row) return;
+      const name = String(row.name != null ? row.name : "").trim();
+      if (!name) return;
+      const key = adminMaterialKey(name);
+      const p = Number(row.percent);
+      const add = Number.isFinite(p) && p >= 1 && p <= 100 ? p : 0;
+      if (byName.has(key)) {
+        byName.get(key).percent += add;
+      } else {
+        byName.set(key, { name: name, percent: add });
+        order.push(key);
+      }
+    });
+    return order
+      .map(function(key) {
+        const row = byName.get(key);
+        let percent = row.percent;
+        if (percent > 100) percent = 100;
+        return { name: row.name, percent: percent };
+      })
+      .filter(function(m) {
+        return m.name && m.percent >= 1;
+      });
+  }
+  function productMaterialsFromStored(full) {
+    let rows = [];
+    if (full && Array.isArray(full.materials_list) && full.materials_list.length) {
+      rows = full.materials_list
+        .map(function(m) {
+          if (!m || typeof m !== "object") return null;
+          const name = m.name != null ? String(m.name).trim() : "";
+          const percent = m.percent != null ? parseInt(m.percent, 10) : NaN;
+          if (!name) return null;
+          return { name: name, percent: Number.isFinite(percent) ? percent : 0 };
+        })
+        .filter(Boolean);
+    } else if (full && typeof full.materials === "string" && full.materials.trim()) {
+      rows = parseMaterialsString(full.materials);
+    }
+    return mergeProductMaterials(rows);
   }
   function normalizeGenderForForm(raw) {
     if (!raw) return "";
@@ -2931,9 +3038,29 @@ const Admin = (() => {
       btn.addEventListener("click", function() {
         collectVariants();
         const idx = Number(btn.dataset.index);
-        if (Number.isFinite(idx) && idx >= 0 && idx < productVariants.length) {
-          productVariants.splice(idx, 1);
+        if (!Number.isFinite(idx) || idx < 0 || idx >= productVariants.length) return;
+        const v = productVariants[idx];
+        const catEl = document.getElementById("product-category");
+        const categoryId = catEl ? catEl.value : "";
+        let confirmMsg = "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u044D\u0442\u043E\u0442 \u0432\u0430\u0440\u0438\u0430\u043D\u0442?";
+        if (v) {
+          const hasSize = v.size_id != null && Number.isFinite(Number(v.size_id));
+          const hasColor = v.color_id != null && Number.isFinite(Number(v.color_id));
+          const art = v.art != null ? String(v.art).trim() : "";
+          if (hasSize && hasColor) {
+            confirmMsg =
+              "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0430\u0440\u0438\u0430\u043D\u0442 \xAB" +
+              variantSizeDisplayLabel(categoryId, v.size_id) +
+              "\xBB / \xAB" +
+              variantColorDisplayLabel(v.color_id) +
+              "\xBB?";
+          } else if (art) {
+            confirmMsg = "\u0423\u0434\u0430\u043B\u0438\u0442\u044C \u0432\u0430\u0440\u0438\u0430\u043D\u0442 \xAB" + art + "\xBB?";
+          }
         }
+        confirmMsg += " \u042D\u0442\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u043D\u0435\u043B\u044C\u0437\u044F \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C.";
+        if (!confirm(confirmMsg)) return;
+        productVariants.splice(idx, 1);
         void renderVariantsList();
       });
     });
@@ -3246,13 +3373,7 @@ const Admin = (() => {
             catSel.value = "";
           }
           populateBrandSelect(brandSel, full.brand_id);
-          if (Array.isArray(full.materials_list) && full.materials_list.length) {
-            productMaterials = full.materials_list;
-          } else if (typeof full.materials === "string" && full.materials) {
-            productMaterials = parseMaterialsString(full.materials);
-          } else {
-            productMaterials = [];
-          }
+          productMaterials = productMaterialsFromStored(full);
           productImages = Array.isArray(full.images) ? full.images.map(function(img) {
             return {
               url: img.url || "",
@@ -3263,14 +3384,17 @@ const Admin = (() => {
           }).filter(function(i) {
             return i.url;
           }) : [];
-          productVariants = Array.isArray(full.variants) ? full.variants.map(function(v) {
-            return {
-              size_id: v.size_id,
-              color_id: v.color_id,
-              art: v.art || "",
-              is_active: v.is_active !== false
-            };
-          }) : [];
+          const loadedVariants = Array.isArray(full.variants)
+            ? full.variants.map(function(v) {
+                return {
+                  size_id: v.size_id,
+                  color_id: v.color_id,
+                  art: v.art || "",
+                  is_active: v.is_active !== false
+                };
+              })
+            : [];
+          productVariants = dedupeVariantsBySizeColor(loadedVariants);
           productAttributes = Array.isArray(full.attributes) ? full.attributes.map(function(a) {
             return {
               name: a.name || "",
@@ -3336,6 +3460,7 @@ const Admin = (() => {
     clearFieldErrors();
     updateSelectedCollections();
     collectVariants();
+    productVariants = dedupeVariantsBySizeColor(productVariants);
     collectAttributes();
     const materialsError = collectMaterials();
     const g = function(id) {
@@ -3459,7 +3584,7 @@ const Admin = (() => {
     })) {
       productImages[0].is_primary = true;
     }
-    const materialsStr = materialsToString(productMaterials);
+    const materialsStr = materialsToString(mergeProductMaterials(productMaterials));
     const payload = {
       name,
       art: artRaw || null,
@@ -3824,6 +3949,7 @@ const Admin = (() => {
     bindProductMaterialsListDelegationOnce();
     bindVariantSizeSelectDelegationOnce();
     bindVariantSameColorButtonOnce();
+    bindVariantAutoDedupeOnce();
     bindProductBrandNewOptionOnce();
     bindProductCategoryForVariantsOnce();
     bindBrandQuickModalOnce();

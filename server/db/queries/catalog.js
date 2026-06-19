@@ -1098,7 +1098,19 @@ async function replaceProductVariants(pool, client, productId, variants) {
   prepared.sort(function(a, b) {
     return compareProductVariantsForSaveOrder(a, b, idToValue);
   });
+  const seenSizeColor = new Set();
+  const dedupedPrepared = [];
   for (const v of prepared) {
+    const rawSid = v.size_id != null && Number.isFinite(Number(v.size_id)) ? Number(v.size_id) : null;
+    const cid = v.color_id != null && Number.isFinite(Number(v.color_id)) ? Number(v.color_id) : null;
+    if (rawSid != null && cid != null) {
+      const comboKey = rawSid + ":" + cid;
+      if (seenSizeColor.has(comboKey)) continue;
+      seenSizeColor.add(comboKey);
+    }
+    dedupedPrepared.push(v);
+  }
+  for (const v of dedupedPrepared) {
     const art = v.art && String(v.art).trim() ? String(v.art).trim().toUpperCase() : null;
     if (!art) continue;
     const rawSid = v.size_id != null && Number.isFinite(Number(v.size_id)) ? Number(v.size_id) : null;
