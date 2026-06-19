@@ -1562,8 +1562,12 @@ document.addEventListener("DOMContentLoaded", function() {
   try {
     const el = document.querySelector("[data-account-action]");
     if (el) {
-      const next = encodeURIComponent(window.location.pathname + window.location.search);
-      el.setAttribute("href", "/login.html?mode=user&next=" + next);
+      const next = window.KpvsApi && window.KpvsApi.currentReturnPath
+        ? window.KpvsApi.currentReturnPath()
+        : window.location.pathname + window.location.search;
+      el.setAttribute("href", window.KpvsApi && window.KpvsApi.loginUrlWithNext
+        ? window.KpvsApi.loginUrlWithNext()
+        : "/login.html?mode=user&next=" + encodeURIComponent(next));
       fetch("/api/user/auth/me", { credentials: "include" }).then(function(r) {
         function showLoginBtn() {
           el.className = "btn btn--primary site-account-login-btn";

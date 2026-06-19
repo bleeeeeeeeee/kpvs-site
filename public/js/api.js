@@ -54,6 +54,16 @@ function notifyProfileChanged(kind) {
   }
 }
 
+function currentReturnPath() {
+  return (window.location.pathname || "/") + (window.location.search || "");
+}
+
+function loginUrlWithNext(nextPath) {
+  const raw = String(nextPath != null ? nextPath : currentReturnPath()).trim() || "/welcome.html";
+  const path = raw.startsWith("/") ? raw : "/" + raw;
+  return "/login.html?mode=user&next=" + encodeURIComponent(path);
+}
+
 const FOOTER_MAP_URL =
   "https://www.google.com/maps/search/?api=1&query=" +
   encodeURIComponent("Брест, ул. л-та Рябцева, 44");
@@ -75,4 +85,4 @@ if (document.readyState === "loading") {
   initFooterContacts();
 }
 
-window.KpvsApi = { apiFetch, readCookie, notifyProfileChanged, PROFILE_SYNC_KEY };
+window.KpvsApi = { apiFetch, readCookie, notifyProfileChanged, PROFILE_SYNC_KEY, currentReturnPath, loginUrlWithNext };

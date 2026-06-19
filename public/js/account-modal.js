@@ -68,7 +68,11 @@
     if (t) setTheme(t);
   }
   function openLogin(nextPath) {
-    var p = nextPath || window.location.pathname;
+    if (window.KpvsApi && window.KpvsApi.loginUrlWithNext) {
+      window.location.href = window.KpvsApi.loginUrlWithNext(nextPath);
+      return;
+    }
+    var p = nextPath || window.location.pathname + (window.location.search || "");
     window.location.href = "/login.html?mode=user&next=" + encodeURIComponent(p);
   }
   function lock() {
@@ -905,7 +909,7 @@
     });
     built.btnLogin.addEventListener("click", function() {
       hideModal();
-      openLogin(window.location.pathname);
+      openLogin();
     });
     function setRenameMode(on) {
       if (!built.renameInput || !built.btnRenameSave || !built.btnRenameCancel || !built.btnRename) return;
