@@ -653,11 +653,41 @@ function productColorColsThatFitWidth(available, metrics, reserveMorePx) {
   }
   return fit;
 }
-function productColorVisibleCap() {
-  if (typeof window !== "undefined" && window.matchMedia && window.matchMedia("(max-width: 640px)").matches) {
-    return 8;
+function productColorAdaptiveGapPx(host) {
+  if (!host) return PRODUCT_COLOR_MORE_GAP_PX;
+  const gap = parseFloat(getComputedStyle(host).gap);
+  return Number.isFinite(gap) && gap > 0 ? gap : PRODUCT_COLOR_MORE_GAP_PX;
+}
+function productColorNeutralizeForMeasure(clip, moreWrap) {
+  if (clip) {
+    clip.style.width = "0";
+    clip.style.maxWidth = "0";
+    clip.style.minWidth = "0";
+    clip.style.flex = "0 0 0";
+    clip.style.overflow = "hidden";
   }
-  return 20;
+  if (moreWrap) moreWrap.setAttribute("hidden", "");
+}
+function productColorRowBudget(host, metrics) {
+  const minBudget = metrics.colSize;
+  const pad = 4;
+  const row = host ? host.closest("tr.product-size-color-row") : null;
+  if (row) {
+    const label = row.querySelector(".product-size-color-label");
+    const totalCell = row.querySelector(".product-size-color-total-cell");
+    const spec = row.closest(".product-spec-content");
+    const baseW = spec && spec.clientWidth > 0 ? spec.clientWidth : row.clientWidth;
+    let budget = baseW;
+    if (label) budget -= label.getBoundingClientRect().width + pad;
+    if (totalCell) budget -= totalCell.getBoundingClientRect().width + pad;
+    return Math.max(minBudget, budget - pad);
+  }
+  const colorsWrap = host ? host.closest(".product-size-colors") : null;
+  const spec = host ? host.closest(".product-spec-content") : null;
+  const totalEl = host ? host.querySelector(".product-size-colors-total") : null;
+  let budget = spec && spec.clientWidth > 0 ? spec.clientWidth : colorsWrap ? colorsWrap.clientWidth : 0;
+  if (totalEl) budget -= totalEl.getBoundingClientRect().width + productColorAdaptiveGapPx(host);
+  return Math.max(minBudget, budget - pad);
 }
 function productColorSyncClipWidth(clip, visibleCount, metrics) {
   if (!clip || visibleCount <= 0) return;
@@ -665,31 +695,15 @@ function productColorSyncClipWidth(clip, visibleCount, metrics) {
   clip.style.width = w + "px";
   clip.style.maxWidth = w + "px";
   clip.style.flex = "0 0 auto";
+  clip.style.overflow = "hidden";
 }
 function productColorResetClipWidth(clip) {
   if (!clip) return;
   clip.style.removeProperty("width");
   clip.style.removeProperty("max-width");
+  clip.style.removeProperty("min-width");
   clip.style.removeProperty("flex");
-}
-function productColorRowBudget(host) {
-  const swatchCell = host ? host.closest(".product-size-color-swatches") : null;
-  if (swatchCell) {
-    const cellW = swatchCell.clientWidth || swatchCell.getBoundingClientRect().width;
-    if (cellW > 0) return Math.max(48, cellW - 4);
-  }
-  const spec = host ? host.closest(".product-spec-content") : null;
-  if (!spec) return 120;
-  const row = host ? host.closest("tr.product-size-color-row") : null;
-  const label = row ? row.querySelector(".product-size-color-label") : null;
-  const totalCell = row ? row.querySelector(".product-size-color-total-cell") : null;
-  let budget = spec.clientWidth || spec.getBoundingClientRect().width;
-  if (label) budget -= label.getBoundingClientRect().width + 12;
-  if (totalCell) budget -= totalCell.getBoundingClientRect().width + 8;
-  return Math.max(48, budget - 8);
-}
-function productColorRowBaseWidth(host) {
-  return productColorRowBudget(host);
+  clip.style.removeProperty("overflow");
 }
 function productColorHideMoreControl(moreWrap, btn) {
   if (!moreWrap) return;
@@ -733,17 +747,6 @@ function swatchMetaFromWrap(w) {
     hex: w.getAttribute("data-hex") || ""
   };
 }
-function productColorRowAvailableWidth(host) {
-  const swatchCell = host ? host.closest(".product-size-color-swatches") : null;
-  const colorsWrap = swatchCell ? null : host ? host.closest(".product-size-colors") : null;
-  const moreWrap = host ? host.querySelector(".product-color-more-wrap") : null;
-  const gap = 8;
-  const baseEl = swatchCell || colorsWrap;
-  if (!baseEl) return 0;
-  let base = baseEl.clientWidth;
-  if (moreWrap && !moreWrap.hasAttribute("hidden")) base -= moreWrap.offsetWidth + gap;
-  return Math.max(0, base);
-}
 function refreshMorePopover(moreWrap, wraps, colsFit, headingLine) {
   if (!moreWrap) return;
   const pop = moreWrap.querySelector(".product-color-more-popover");
@@ -759,6 +762,45 @@ function refreshMorePopover(moreWrap, wraps, colsFit, headingLine) {
   }).join("");
   const head = headingLine && String(headingLine).trim() ? '<span class="product-color-more-pop-heading">' + escapeHtml(String(headingLine).trim()) + "</span>" : "";
   pop.innerHTML = head + rows;
+}
+function productColorResolveColsFit(host, clip, budget, metrics, totalCount, moreWrap, btn, wrapsAll) {
+  const gap = productColorAdaptiveGapPx(host);
+  const allWidth = productColorSwatchesWidthPx(totalCount, metrics);
+  if (allWidth <= budget + 0.5) {
+    return { colsFit: totalCount, hidden: 0 };
+  }
+  if (!moreWrap) {
+    return { colsFit: totalCount, hidden: 0 };
+  }
+  let colsFit = productColorColsThatFitWidth(budget, metrics, 0);
+  let hidden = totalCount - colsFit;
+  if (hidden <= 0) {
+    return { colsFit: totalCount, hidden: 0 };
+  }
+  let moreReserve = productColorMeasureMoreReserve(moreWrap, btn, hidden) + gap;
+  colsFit = productColorColsThatFitWidth(budget, metrics, moreReserve);
+  hidden = totalCount - colsFit;
+  if (hidden > 0) {
+    moreReserve = productColorMeasureMoreReserve(moreWrap, btn, hidden) + gap;
+    colsFit = productColorColsThatFitWidth(budget, metrics, moreReserve);
+    hidden = totalCount - colsFit;
+  }
+  while (colsFit > 1 && hidden > 0) {
+    productColorSetVisibleByColumn(wrapsAll, colsFit);
+    productColorSyncClipWidth(clip, colsFit, metrics);
+    moreWrap.removeAttribute("hidden");
+    if (btn) btn.textContent = "+" + hidden;
+    void host.offsetWidth;
+    const used = productColorSwatchesWidthPx(colsFit, metrics) + (moreWrap.offsetWidth || PRODUCT_COLOR_MORE_RESERVE_PX) + gap;
+    if (used <= budget + 0.5) break;
+    colsFit--;
+    hidden = totalCount - colsFit;
+  }
+  if (hidden <= 0) {
+    return { colsFit: totalCount, hidden: 0 };
+  }
+  colsFit = Math.max(1, Math.min(colsFit, totalCount - 1));
+  return { colsFit: colsFit, hidden: totalCount - colsFit };
 }
 function layoutOneAdaptiveColorRow(host) {
   const clip = productColorTrackClip(host);
@@ -777,35 +819,26 @@ function layoutOneAdaptiveColorRow(host) {
   hideProductSwatchFloatingTip();
   productColorHideMoreControl(moreWrap, btn);
   productColorResetClipWidth(clip);
+  host.classList.remove("product-size-colors-adaptive--collapsed");
+  productColorNeutralizeForMeasure(clip, moreWrap);
   void host.offsetWidth;
-  const budget = productColorRowBudget(host);
-  const totalCount = wraps.length;
-  const cap = productColorVisibleCap();
-  let colsFit = Math.min(totalCount, productColorColsThatFitWidth(budget, metrics, 0));
-  if (totalCount > cap) colsFit = Math.min(colsFit, cap);
-  let hidden = totalCount - colsFit;
-  if (hidden > 0 && moreWrap) {
-    let moreReserve = productColorMeasureMoreReserve(moreWrap, btn, hidden);
-    colsFit = Math.min(totalCount, productColorColsThatFitWidth(budget, metrics, moreReserve));
-    if (totalCount > cap) colsFit = Math.min(colsFit, cap);
-    hidden = totalCount - colsFit;
-    if (hidden > 0) {
-      moreReserve = productColorMeasureMoreReserve(moreWrap, btn, hidden);
-      colsFit = Math.min(totalCount, productColorColsThatFitWidth(budget, metrics, moreReserve));
-      if (totalCount > cap) colsFit = Math.min(colsFit, cap);
-      hidden = totalCount - colsFit;
-    }
-  }
+  const budget = productColorRowBudget(host, metrics);
+  const resolved = productColorResolveColsFit(host, clip, budget, metrics, wraps.length, moreWrap, btn, wrapsAll);
+  const colsFit = resolved.colsFit;
+  const hidden = resolved.hidden;
   if (hidden <= 0 || !moreWrap) {
     productColorHideMoreControl(moreWrap, btn);
     productColorResetClipWidth(clip);
+    host.classList.remove("product-size-colors-adaptive--collapsed");
     wrapsAll.forEach(function(w) {
       w.removeAttribute("hidden");
     });
     return;
   }
+  host.classList.add("product-size-colors-adaptive--collapsed");
   productColorSetVisibleByColumn(wrapsAll, colsFit);
   productColorSyncClipWidth(clip, colsFit, metrics);
+  moreWrap.removeAttribute("hidden");
   if (btn) {
     btn.textContent = "+" + hidden;
     btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0435\u0449\u0451 " + hidden + " " + (hidden === 1 ? "\u0446\u0432\u0435\u0442" : hidden < 5 ? "\u0446\u0432\u0435\u0442\u0430" : "\u0446\u0432\u0435\u0442\u043E\u0432"));
@@ -855,6 +888,12 @@ function setupProductAdaptiveColorRows(productMainEl) {
     });
     productMainEl.querySelectorAll(".product-size-color-swatches").forEach(function(row) {
       ro.observe(row);
+    });
+    productMainEl.querySelectorAll(".product-size-color-label").forEach(function(el) {
+      ro.observe(el);
+    });
+    productMainEl.querySelectorAll("tr.product-size-color-row").forEach(function(el) {
+      ro.observe(el);
     });
   }
   const onResize = function() {

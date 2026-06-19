@@ -319,9 +319,13 @@
     --product-spec-content-inset: 1.25rem;
   }
 
-  .product-page .product-attr-table .product-attr-name,
-  .product-page .product-size-color-table .product-size-color-label {
+  .product-page .product-attr-table .product-attr-name {
     white-space: normal;
+    padding-right: 0.5rem;
+  }
+
+  .product-page .product-size-color-table .product-size-color-label {
+    white-space: nowrap;
     padding-right: 0.5rem;
   }
 }
@@ -598,6 +602,10 @@
   flex: 0 0 auto;
   min-width: 0;
   overflow: visible;
+}
+
+.product-page .product-size-colors-adaptive--collapsed .product-size-colors-track-clip {
+  overflow: hidden;
 }
 
 .product-page .product-size-color-table .product-size-color-swatches,
