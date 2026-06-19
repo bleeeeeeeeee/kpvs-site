@@ -163,7 +163,6 @@
   margin-bottom: 0;
 }
 
-/* legacy availability block (if used elsewhere on product page) */
 .product-page .product-availability:not(.product-availability-chip) {
   margin: 0 0 0.5rem;
   font-size: 1.0625rem;
