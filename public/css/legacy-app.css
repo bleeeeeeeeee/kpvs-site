@@ -4891,13 +4891,11 @@ details.admin-product-meta-details[open] .admin-product-meta-dropdown {
     color: var(--light-accent);
 }
 
-.footer-contact a {
+.footer-contact a,
+.footer-contact a:hover,
+.footer-contact:hover a {
     color: inherit;
     text-decoration: none;
-}
-
-.footer-contact a:hover {
-    text-decoration: underline;
 }
 
 .footer-icon {
