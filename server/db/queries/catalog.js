@@ -31,6 +31,29 @@ function mapProductRowMedia(row) {
   return row;
 }
 
+const storageService = require("../../services/storage");
+
+async function cleanupUnreferencedProductImageUrls(urls) {
+  const list = Array.isArray(urls) ? urls : [];
+  if (!list.length) return;
+  try {
+    await storageService.deleteMediaUrls(list);
+  } catch (e) {
+    console.warn("[media] cleanup failed:", e && e.message);
+  }
+}
+
+async function findUnreferencedProductImageUrls(client, urls) {
+  const unique = [...new Set((Array.isArray(urls) ? urls : []).map((u) => String(u || "").trim()).filter(Boolean))];
+  if (!unique.length) return [];
+  const r = await client.query(
+    `SELECT u.url
+     FROM unnest($1::text[]) AS u(url)
+     WHERE NOT EXISTS (SELECT 1 FROM product_images pi WHERE pi.url = u.url)`,
+    [unique]
+  );
+  return r.rows.map((row) => row.url);
+}
 const { slugify } = require("../lib/slugify");
 const { otherScalesHintSubquery, allProductFields } = require("../lib/sql-constants");
 const { buildProductListWhere } = require("../lib/product-list-filters");
@@ -289,6 +312,12 @@ async function deleteCategory(pool, id) {
   const prod = await pool.query("SELECT 1 FROM products WHERE category_id = $1 LIMIT 1", [catId]);
   if (prod.rows.length) throw new Error("В категории есть товары — переназначьте их или удалите");
   await pool.query("DELETE FROM categories WHERE id = $1", [catId]);
+  try {
+    const users = require("./users");
+    await users.removeCatalogFilterIdsFromAllUsers(pool, "categories", [catId]);
+  } catch (e) {
+    console.warn("[preferences] prune after category delete:", e && e.message);
+  }
   return true;
 }
 async function getBrands(pool) {
@@ -640,7 +669,16 @@ async function updateCollection(pool, id, data) {
 }
 async function deleteCollection(pool, id) {
   const r = await pool.query("DELETE FROM collections WHERE id = $1 RETURNING id", [id]);
-  return r.rowCount > 0;
+  const deleted = r.rowCount > 0;
+  if (deleted) {
+    try {
+      const users = require("./users");
+      await users.removeCatalogFilterIdsFromAllUsers(pool, "collections", [id]);
+    } catch (e) {
+      console.warn("[preferences] prune after collection delete:", e && e.message);
+    }
+  }
+  return deleted;
 }
 async function getSectionCollectionsWithProducts(pool, pageGender) {
   const g = String(pageGender || "mens").toLowerCase();
@@ -841,8 +879,9 @@ async function createProduct(pool, data, ctx = {}) {
       editorId
     ]);
     const productId = res.rows[0].id;
+    let imageUrlsToCleanup = [];
     if (Array.isArray(data.images) && data.images.length) {
-      await replaceProductImages(client, productId, data.images);
+      imageUrlsToCleanup = await replaceProductImages(client, productId, data.images);
     }
     if (Array.isArray(data.collections)) {
       await replaceProductCollections(client, productId, data.collections);
@@ -854,6 +893,9 @@ async function createProduct(pool, data, ctx = {}) {
       await replaceProductAttributes(client, productId, data.attributes);
     }
     await client.query("COMMIT");
+    if (imageUrlsToCleanup.length) {
+      await cleanupUnreferencedProductImageUrls(imageUrlsToCleanup);
+    }
     return getProduct(pool, String(productId), { includeInactive: true });
   } catch (err) {
     try {
@@ -905,8 +947,9 @@ async function updateProduct(pool, id, data, ctx = {}) {
       await client.query("ROLLBACK");
       return null;
     }
+    let imageUrlsToCleanup = [];
     if (Array.isArray(data.images)) {
-      await replaceProductImages(client, id, data.images);
+      imageUrlsToCleanup = await replaceProductImages(client, id, data.images);
     }
     if (Array.isArray(data.collections)) {
       await replaceProductCollections(client, id, data.collections);
@@ -918,6 +961,9 @@ async function updateProduct(pool, id, data, ctx = {}) {
       await replaceProductAttributes(client, id, data.attributes);
     }
     await client.query("COMMIT");
+    if (imageUrlsToCleanup.length) {
+      await cleanupUnreferencedProductImageUrls(imageUrlsToCleanup);
+    }
     return getProduct(pool, String(id), { includeInactive: true });
   } catch (err) {
     try {
@@ -930,17 +976,35 @@ async function updateProduct(pool, id, data, ctx = {}) {
   }
 }
 async function deleteProduct(pool, id) {
-  const result = await pool.query("DELETE FROM products WHERE id = $1", [id]);
-  const deleted = result.rowCount > 0;
-  if (deleted) {
-    try {
+  const pid = Number(id);
+  if (!Number.isFinite(pid) || pid <= 0) return false;
+  const client = await pool.connect();
+  let imageUrls = [];
+  try {
+    await client.query("BEGIN");
+    const imgRes = await client.query("SELECT url FROM product_images WHERE product_id = $1", [pid]);
+    imageUrls = imgRes.rows.map((row) => row.url).filter(Boolean);
+    const result = await client.query("DELETE FROM products WHERE id = $1", [pid]);
+    const deleted = result.rowCount > 0;
+    if (deleted) {
       const users = require("./users");
-      await users.removeProductIdFromAllUserLists(pool, id);
-    } catch (e) {
-      console.warn("[lists] prune after product delete:", e && e.message);
+      await users.removeProductIdFromAllUserLists(client, pid);
     }
+    await client.query("COMMIT");
+    if (deleted && imageUrls.length) {
+      const orphans = await findUnreferencedProductImageUrls(pool, imageUrls);
+      await cleanupUnreferencedProductImageUrls(orphans);
+    }
+    return deleted;
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+    }
+    throw err;
+  } finally {
+    client.release();
   }
-  return deleted;
 }
 async function updateProductActiveFlag(pool, id, isActive) {
   const result = await pool.query(
@@ -950,18 +1014,26 @@ async function updateProductActiveFlag(pool, id, isActive) {
   return result.rows[0] || null;
 }
 async function replaceProductImages(client, productId, images) {
+  const prev = await client.query("SELECT url FROM product_images WHERE product_id = $1", [productId]);
+  const oldUrls = prev.rows.map((row) => row.url).filter(Boolean);
   await client.query("DELETE FROM product_images WHERE product_id = $1", [productId]);
-  if (!Array.isArray(images) || !images.length) return;
+  if (!Array.isArray(images) || !images.length) {
+    return findUnreferencedProductImageUrls(client, oldUrls);
+  }
   const hasPrimary = images.some((i) => i.is_primary);
+  const newUrls = new Set();
   for (let i = 0; i < images.length; i++) {
     const img = images[i];
     const url = typeof img.url === "string" ? img.url.trim() : "";
     if (!url) continue;
+    newUrls.add(url);
     await client.query(
       "INSERT INTO product_images (product_id, url, alt_text, is_primary, sort_order) VALUES ($1,$2,$3,$4,$5)",
       [productId, url, img.alt_text || null, hasPrimary ? Boolean(img.is_primary) : i === 0, img.sort_order ?? i]
     );
   }
+  const candidates = oldUrls.filter((url) => !newUrls.has(url));
+  return findUnreferencedProductImageUrls(client, candidates);
 }
 async function replaceProductCollections(client, productId, collections) {
   await client.query("DELETE FROM product_collections WHERE product_id = $1", [productId]);

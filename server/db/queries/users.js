@@ -388,8 +388,41 @@ async function changeUsername(db, id, newUsername) {
   return result.rows[0] || null;
 }
 async function deleteUserById(db, id) {
-  const result = await db.query("DELETE FROM users WHERE id = $1 RETURNING id, username, role", [id]);
-  return result.rows[0] || null;
+  const uid = Number(id);
+  if (!Number.isFinite(uid) || uid <= 0) return null;
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const userRes = await client.query("SELECT id, email FROM users WHERE id = $1", [uid]);
+    const user = userRes.rows[0];
+    if (!user) {
+      await client.query("ROLLBACK");
+      return null;
+    }
+    await client.query(
+      `DELETE FROM session
+       WHERE (sess::jsonb->'user'->>'id')::bigint = $1`,
+      [uid]
+    );
+    if (user.email) {
+      await client.query(
+        `DELETE FROM email_verifications
+         WHERE lower(trim(email::text)) = lower(trim($1::text))`,
+        [String(user.email)]
+      );
+    }
+    const result = await client.query("DELETE FROM users WHERE id = $1 RETURNING id, username, role", [uid]);
+    await client.query("COMMIT");
+    return result.rows[0] || null;
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (_) {
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 function sanitizeListItems(raw) {
   if (!Array.isArray(raw)) return [];
@@ -499,8 +532,7 @@ async function removeProductIdFromAllUserLists(db, productId) {
         FROM jsonb_array_elements(COALESCE(u.favorites_json, '[]'::jsonb)) AS e
         WHERE (e->>'id')::bigint <> $1
       ), '[]'::jsonb)
-    WHERE role = 'user'
-      AND (
+    WHERE (
         EXISTS (
           SELECT 1 FROM jsonb_array_elements(COALESCE(u.cart_json, '[]'::jsonb)) e
           WHERE (e->>'id')::bigint = $1
@@ -514,6 +546,155 @@ async function removeProductIdFromAllUserLists(db, productId) {
   );
   return r.rowCount || 0;
 }
+const CATALOG_FILTER_KEYS = ["categories", "brands", "colors", "collections", "sizes"];
+function collectCatalogFilterIdsFromPreferences(prefs) {
+  const out = { categories: new Set(), brands: new Set(), colors: new Set(), collections: new Set(), sizes: new Set() };
+  const p = sanitizePreferences(prefs);
+  for (const g of CATALOG_STATE_GENDERS) {
+    const filters = p.catalogState[g] && p.catalogState[g].filters;
+    if (!filters) continue;
+    for (const key of CATALOG_FILTER_KEYS) {
+      const arr = filters[key];
+      if (!Array.isArray(arr)) continue;
+      for (const id of arr) out[key].add(String(id));
+    }
+    const labels = filters.sizeLabels;
+    if (labels && typeof labels === "object") {
+      for (const k of Object.keys(labels)) out.sizes.add(String(k));
+    }
+  }
+  return out;
+}
+function removeIdsFromPreferences(prefs, removals) {
+  const idSets = {};
+  for (const key of CATALOG_FILTER_KEYS) {
+    idSets[key] = new Set((removals[key] || []).map(String));
+  }
+  const p = sanitizePreferences(prefs);
+  let changed = false;
+  for (const g of CATALOG_STATE_GENDERS) {
+    const block = p.catalogState[g];
+    if (!block || !block.filters) continue;
+    for (const key of CATALOG_FILTER_KEYS) {
+      const arr = block.filters[key];
+      if (!Array.isArray(arr) || !arr.length || !idSets[key].size) continue;
+      const next = arr.filter((id) => !idSets[key].has(String(id)));
+      if (next.length !== arr.length) {
+        block.filters[key] = next;
+        changed = true;
+      }
+    }
+    if (idSets.sizes.size && block.filters.sizeLabels && typeof block.filters.sizeLabels === "object") {
+      for (const k of Object.keys(block.filters.sizeLabels)) {
+        if (idSets.sizes.has(String(k))) {
+          delete block.filters.sizeLabels[k];
+          changed = true;
+        }
+      }
+    }
+  }
+  return { prefs: p, changed };
+}
+async function loadValidCatalogFilterIdSets(db, collected) {
+  const valid = {
+    categories: new Set(),
+    brands: new Set(),
+    colors: new Set(),
+    collections: new Set(),
+    sizes: new Set()
+  };
+  const toNums = (set) => [...set].map(Number).filter((n) => Number.isFinite(n) && n > 0);
+  const categoryIds = toNums(collected.categories);
+  if (categoryIds.length) {
+    const r = await db.query("SELECT id::text FROM categories WHERE id = ANY($1::int[])", [categoryIds]);
+    r.rows.forEach((row) => valid.categories.add(String(row.id)));
+  }
+  const brandIds = toNums(collected.brands);
+  if (brandIds.length) {
+    const r = await db.query("SELECT id::text FROM brands WHERE id = ANY($1::int[])", [brandIds]);
+    r.rows.forEach((row) => valid.brands.add(String(row.id)));
+  }
+  const colorIds = toNums(collected.colors);
+  if (colorIds.length) {
+    const r = await db.query("SELECT id::text FROM colors WHERE id = ANY($1::int[])", [colorIds]);
+    r.rows.forEach((row) => valid.colors.add(String(row.id)));
+  }
+  const collectionIds = toNums(collected.collections);
+  if (collectionIds.length) {
+    const r = await db.query("SELECT id::text FROM collections WHERE id = ANY($1::int[])", [collectionIds]);
+    r.rows.forEach((row) => valid.collections.add(String(row.id)));
+  }
+  const sizeIds = toNums(collected.sizes);
+  if (sizeIds.length) {
+    const r = await db.query("SELECT id::text FROM sizes WHERE id = ANY($1::int[])", [sizeIds]);
+    r.rows.forEach((row) => valid.sizes.add(String(row.id)));
+  }
+  return valid;
+}
+function prunePreferencesAgainstValidIds(prefs, valid) {
+  const p = sanitizePreferences(prefs);
+  let changed = false;
+  for (const g of CATALOG_STATE_GENDERS) {
+    const block = p.catalogState[g];
+    if (!block || !block.filters) continue;
+    for (const key of CATALOG_FILTER_KEYS) {
+      const arr = block.filters[key];
+      if (!Array.isArray(arr) || !arr.length) continue;
+      const next = arr.filter((id) => valid[key].has(String(id)));
+      if (next.length !== arr.length) {
+        block.filters[key] = next;
+        changed = true;
+      }
+    }
+    const labels = block.filters.sizeLabels;
+    if (labels && typeof labels === "object") {
+      for (const k of Object.keys(labels)) {
+        if (!valid.sizes.has(String(k))) {
+          delete labels[k];
+          changed = true;
+        }
+      }
+    }
+  }
+  return { prefs: p, changed };
+}
+async function pruneCatalogFiltersAgainstDb(db, prefs) {
+  const collected = collectCatalogFilterIdsFromPreferences(prefs);
+  const hasAny = CATALOG_FILTER_KEYS.some((k) => collected[k].size > 0);
+  if (!hasAny) return { prefs: sanitizePreferences(prefs), changed: false };
+  const valid = await loadValidCatalogFilterIdSets(db, collected);
+  return prunePreferencesAgainstValidIds(prefs, valid);
+}
+async function removeCatalogFilterIdsFromAllUsers(db, filterKey, ids) {
+  const key = String(filterKey || "").trim();
+  if (!CATALOG_FILTER_KEYS.includes(key)) return 0;
+  const idList = [...new Set((Array.isArray(ids) ? ids : [ids]).map(String).filter(Boolean))];
+  if (!idList.length) return 0;
+  const removals = { categories: [], brands: [], colors: [], collections: [], sizes: [] };
+  removals[key] = idList;
+  const r = await db.query(
+    `SELECT id, preferences_json FROM users
+     WHERE preferences_json IS NOT NULL
+       AND preferences_json->'catalogState' IS NOT NULL
+       AND preferences_json->'catalogState' <> '{}'::jsonb`
+  );
+  let updated = 0;
+  for (const row of r.rows) {
+    const { prefs, changed } = removeIdsFromPreferences(row.preferences_json, removals);
+    if (!changed) continue;
+    await db.query("UPDATE users SET preferences_json = $2::jsonb WHERE id = $1", [row.id, JSON.stringify(prefs)]);
+    updated += 1;
+  }
+  return updated;
+}
+async function purgeExpiredEmailVerifications(db) {
+  const r = await db.query("DELETE FROM email_verifications WHERE expires_at < NOW()");
+  return r.rowCount || 0;
+}
+async function purgeExpiredSessions(db) {
+  const r = await db.query('DELETE FROM session WHERE expire < NOW()');
+  return r.rowCount || 0;
+}
 async function getUserLists(db, userId) {
   const r = await db.query(
     "SELECT cart_json, favorites_json, preferences_json FROM users WHERE id = $1 LIMIT 1",
@@ -525,11 +706,14 @@ async function getUserLists(db, userId) {
   const favRaw = sanitizeListItems(row.favorites_json);
   const cart = await pruneListItemsAgainstProducts(db, cartRaw);
   const favorites = await pruneListItemsAgainstProducts(db, favRaw);
-  const preferences = sanitizePreferences(row.preferences_json);
-  if (!listsPayloadEqual(cart, cartRaw) || !listsPayloadEqual(favorites, favRaw)) {
+  let preferences = sanitizePreferences(row.preferences_json);
+  const prunedPrefs = await pruneCatalogFiltersAgainstDb(db, preferences);
+  preferences = prunedPrefs.prefs;
+  const prefsChanged = prunedPrefs.changed;
+  if (!listsPayloadEqual(cart, cartRaw) || !listsPayloadEqual(favorites, favRaw) || prefsChanged) {
     await db.query(
-      "UPDATE users SET cart_json = $2::jsonb, favorites_json = $3::jsonb WHERE id = $1",
-      [userId, JSON.stringify(cart), JSON.stringify(favorites)]
+      "UPDATE users SET cart_json = $2::jsonb, favorites_json = $3::jsonb, preferences_json = $4::jsonb WHERE id = $1",
+      [userId, JSON.stringify(cart), JSON.stringify(favorites), JSON.stringify(preferences)]
     );
   }
   return { cart, favorites, preferences };
@@ -537,7 +721,8 @@ async function getUserLists(db, userId) {
 async function setUserLists(db, userId, cart, favorites, preferences) {
   const cartSafe = await pruneListItemsAgainstProducts(db, sanitizeListItems(cart));
   const favSafe = await pruneListItemsAgainstProducts(db, sanitizeListItems(favorites));
-  const prefsSafe = sanitizePreferences(preferences);
+  const prunedPrefs = await pruneCatalogFiltersAgainstDb(db, preferences);
+  const prefsSafe = prunedPrefs.prefs;
   await db.query(
     "UPDATE users SET cart_json = $2::jsonb, favorites_json = $3::jsonb, preferences_json = $4::jsonb WHERE id = $1",
     [userId, JSON.stringify(cartSafe), JSON.stringify(favSafe), JSON.stringify(prefsSafe)]
@@ -677,5 +862,9 @@ module.exports.consumeEmailVerificationCode = consumeEmailVerificationCode;
 module.exports.getUserLists = getUserLists;
 module.exports.setUserLists = setUserLists;
 module.exports.removeProductIdFromAllUserLists = removeProductIdFromAllUserLists;
+module.exports.removeCatalogFilterIdsFromAllUsers = removeCatalogFilterIdsFromAllUsers;
+module.exports.pruneCatalogFiltersAgainstDb = pruneCatalogFiltersAgainstDb;
+module.exports.purgeExpiredEmailVerifications = purgeExpiredEmailVerifications;
+module.exports.purgeExpiredSessions = purgeExpiredSessions;
 module.exports.ensureUserAuthSchema = ensureUserAuthSchema;
 module.exports.ensureUserListsColumns = ensureUserListsColumns;

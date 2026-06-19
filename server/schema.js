@@ -35,6 +35,18 @@ async function ensureDatabaseSchema(pool) {
   await sizes.ensureSizeGroupsSchema(pool);
   await sizes.ensureSizesUniqueValueIndex(pool);
   await catalog.ensureReferenceMaterialsSchema(pool);
+  try {
+    const purgedVerifications = await users.purgeExpiredEmailVerifications(pool);
+    if (purgedVerifications > 0) {
+      console.log(`  - Purged ${purgedVerifications} expired email verification(s)`);
+    }
+    const purgedSessions = await users.purgeExpiredSessions(pool);
+    if (purgedSessions > 0) {
+      console.log(`  - Purged ${purgedSessions} expired session(s)`);
+    }
+  } catch (e) {
+    console.warn("[schema] orphan maintenance:", e && e.message);
+  }
 }
 
 module.exports = { ensureDatabaseSchema, ensureSessionTable };

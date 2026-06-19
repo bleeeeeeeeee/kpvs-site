@@ -176,7 +176,6 @@ function requestProductBackAlign() {
   }
 }
 let productAdaptiveColorsState = null;
-const PRODUCT_COLOR_MORE_CLOSE_MS = 220;
 function clearProductColorMoreCloseTimer(wrap) {
   if (!wrap || wrap._morePopCloseTimer == null) return;
   clearTimeout(wrap._morePopCloseTimer);
@@ -191,10 +190,7 @@ function setProductColorMoreOpen(wrap, open) {
 function scheduleProductColorMoreClose(wrap) {
   if (!wrap) return;
   clearProductColorMoreCloseTimer(wrap);
-  wrap._morePopCloseTimer = setTimeout(function() {
-    wrap._morePopCloseTimer = null;
-    setProductColorMoreOpen(wrap, false);
-  }, PRODUCT_COLOR_MORE_CLOSE_MS);
+  setProductColorMoreOpen(wrap, false);
 }
 function bindProductColorMoreWrap(wrap) {
   if (!wrap || wrap.dataset.morePopBound === "1") return;
@@ -222,11 +218,21 @@ function bindProductColorMoreWrap(wrap) {
     btn.addEventListener("click", function(e) {
       e.preventDefault();
       e.stopPropagation();
-      openNow();
+      if (wrap.classList.contains("product-color-more-wrap--open")) {
+        clearProductColorMoreCloseTimer(wrap);
+        setProductColorMoreOpen(wrap, false);
+      } else {
+        openNow();
+      }
     });
     btn.setAttribute("aria-haspopup", "listbox");
     btn.setAttribute("aria-expanded", "false");
   }
+}
+function onDocumentClickCloseColorMore(e) {
+  document.querySelectorAll(".product-color-more-wrap.product-color-more-wrap--open").forEach(function(wrap) {
+    if (!wrap.contains(e.target)) scheduleProductColorMoreClose(wrap);
+  });
 }
 function bindAllProductColorMoreWraps(root) {
   const scope = root && root.querySelectorAll ? root : document;
@@ -238,6 +244,9 @@ function teardownProductAdaptiveColorRows() {
     if (productAdaptiveColorsState.onResize) {
       window.removeEventListener("resize", productAdaptiveColorsState.onResize);
     }
+    if (productAdaptiveColorsState.onDocumentClick) {
+      document.removeEventListener("click", productAdaptiveColorsState.onDocumentClick);
+    }
     productAdaptiveColorsState = null;
   }
   document.querySelectorAll(".product-color-more-wrap").forEach(function(wrap) {
@@ -248,61 +257,48 @@ function teardownProductAdaptiveColorRows() {
 function productColorTrackClip(host) {
   return host.querySelector(".product-size-colors-track-clip");
 }
-function productColorSetVisibleCount(wraps, count) {
-  wraps.forEach(function(w, i) {
-    if (i < count) w.removeAttribute("hidden");
+function productColorGridMetrics(track) {
+  const raw = track ? track.style.getPropertyValue("--product-color-cols") || getComputedStyle(track).getPropertyValue("--product-color-cols") : "";
+  const masterCols = Math.max(1, parseInt(String(raw).trim(), 10) || 1);
+  if (!track) return { masterCols, colSize: 22.4, gap: 2.24 };
+  void track.offsetWidth;
+  const gap = parseFloat(getComputedStyle(track).columnGap) || 0;
+  const totalW = track.scrollWidth;
+  const colSize = masterCols > 0 ? (totalW - gap * Math.max(0, masterCols - 1)) / masterCols : 22.4;
+  return { masterCols, colSize, gap };
+}
+function productColorColsThatFit(available, metrics, reserveMorePx) {
+  const { masterCols, colSize, gap } = metrics;
+  const budget = Math.max(0, available - Math.max(0, reserveMorePx || 0));
+  if (!budget || !colSize) return masterCols;
+  let fit = masterCols;
+  while (fit > 0) {
+    const need = fit * colSize + Math.max(0, fit - 1) * gap;
+    if (need <= budget + 0.5) break;
+    fit -= 1;
+  }
+  return fit;
+}
+function productColorSwatchIndex(wrap) {
+  const idx = parseInt(wrap && wrap.getAttribute("data-color-idx"), 10);
+  return Number.isFinite(idx) && idx >= 0 ? idx : 0;
+}
+function productColorSetVisibleByColumn(wraps, colsFit) {
+  wraps.forEach(function(w) {
+    if (productColorSwatchIndex(w) < colsFit) w.removeAttribute("hidden");
     else w.setAttribute("hidden", "");
   });
 }
-function productColorRowCountFit(track, clip, wraps) {
-  const limit = clip ? clip.clientWidth : 0;
-  const n = wraps.length;
-  if (!limit || !n) return n;
-  let lo = 0;
-  let hi = n;
-  while (lo < hi) {
-    const mid = Math.ceil((lo + hi) / 2);
-    productColorSetVisibleCount(wraps, mid);
-    void track.offsetWidth;
-    if (track.scrollWidth <= limit) lo = mid;
-    else hi = mid - 1;
-  }
-  productColorSetVisibleCount(wraps, lo);
-  void track.offsetWidth;
-  return lo;
-}
-function productColorTightenRowFit(track, clip, wraps, fit) {
-  const limit = clip ? clip.clientWidth : 0;
-  const n = wraps.length;
-  if (!limit || !n) return fit;
-  let f = Math.min(Math.max(0, fit), n);
-  while (f > 0) {
-    productColorSetVisibleCount(wraps, f);
-    void track.offsetWidth;
-    if (track.scrollWidth <= limit) break;
-    f -= 1;
-  }
-  return f;
+function productColorFilledWraps(wraps) {
+  return wraps.filter(function(w) {
+    return !w.classList.contains("product-color-swatch-wrap--placeholder");
+  });
 }
 function swatchMetaFromWrap(w) {
   return {
     name: w.getAttribute("data-tip") || "",
     hex: w.getAttribute("data-hex") || ""
   };
-}
-function refreshMorePopover(moreWrap, wraps, fit, headingLine) {
-  if (!moreWrap) return;
-  const pop = moreWrap.querySelector(".product-color-more-popover");
-  if (!pop) return;
-  const hidden = wraps.slice(fit).map(swatchMetaFromWrap);
-  const rows = hidden.map(function(c) {
-    const st = swatchInlineStyle(c.hex);
-    const styleAttr = st ? ' style="' + escapeAttr(st) + '"' : "";
-    const dotCls = "product-color-more-pop-dot" + (st ? "" : " product-color-more-pop-dot--muted");
-    return '<div class="product-color-more-pop-row"><span class="' + dotCls + '"' + styleAttr + ' aria-hidden="true"></span><span class="product-color-more-pop-name">' + escapeHtml(c.name || "\u2014") + "</span></div>";
-  }).join("");
-  const head = headingLine && String(headingLine).trim() ? '<span class="product-color-more-pop-heading">' + escapeHtml(String(headingLine).trim()) + "</span>" : "";
-  pop.innerHTML = head + rows;
 }
 function alignProductSwatchTooltips(track, host) {
   if (!track) return;
@@ -323,16 +319,46 @@ function alignProductSwatchTooltips(track, host) {
     }
   });
 }
+function productColorRowAvailableWidth(host) {
+  const adaptive = host;
+  const colorsWrap = adaptive ? adaptive.closest(".product-size-colors") : null;
+  const totalEl = adaptive ? adaptive.querySelector(".product-size-colors-total") : null;
+  const moreWrap = adaptive ? adaptive.querySelector(".product-color-more-wrap") : null;
+  const gap = 8;
+  let base = colorsWrap ? colorsWrap.clientWidth : adaptive ? adaptive.clientWidth : 0;
+  if (totalEl) base -= totalEl.offsetWidth + gap;
+  if (moreWrap && !moreWrap.hasAttribute("hidden")) base -= moreWrap.offsetWidth + gap;
+  return Math.max(0, base);
+}
+function refreshMorePopover(moreWrap, wraps, colsFit, headingLine) {
+  if (!moreWrap) return;
+  const pop = moreWrap.querySelector(".product-color-more-popover");
+  if (!pop) return;
+  const hidden = wraps.filter(function(w) {
+    return productColorSwatchIndex(w) >= colsFit;
+  }).map(swatchMetaFromWrap);
+  const rows = hidden.map(function(c) {
+    const st = swatchInlineStyle(c.hex);
+    const styleAttr = st ? ' style="' + escapeAttr(st) + '"' : "";
+    const dotCls = "product-color-more-pop-dot" + (st ? "" : " product-color-more-pop-dot--muted");
+    return '<div class="product-color-more-pop-row"><span class="' + dotCls + '"' + styleAttr + ' aria-hidden="true"></span><span class="product-color-more-pop-name">' + escapeHtml(c.name || "\u2014") + "</span></div>";
+  }).join("");
+  const head = headingLine && String(headingLine).trim() ? '<span class="product-color-more-pop-heading">' + escapeHtml(String(headingLine).trim()) + "</span>" : "";
+  pop.innerHTML = head + rows;
+}
 function layoutOneAdaptiveColorRow(host) {
   const clip = productColorTrackClip(host);
   const track = host.querySelector(".product-size-colors-track");
   const moreWrap = host.querySelector(".product-color-more-wrap");
-  const wraps = track ? Array.from(track.querySelectorAll(".product-color-swatch-wrap")) : [];
+  const wrapsAll = track ? Array.from(track.querySelectorAll(".product-color-swatch-wrap")) : [];
+  const wraps = productColorFilledWraps(wrapsAll);
   const btn = moreWrap ? moreWrap.querySelector(".product-color-more-circle") : null;
   const headingLine = moreWrap ? moreWrap.getAttribute("data-heading") || "" : "";
-  const n = wraps.length;
-  if (!track || !clip || !n) return;
-  wraps.forEach(function(w) {
+  const totalEl = host.querySelector(".product-size-colors-total");
+  const metrics = productColorGridMetrics(track);
+  const masterCols = metrics.masterCols;
+  if (!track || !clip || !wraps.length) return;
+  wrapsAll.forEach(function(w) {
     w.removeAttribute("hidden");
     w.style.removeProperty("z-index");
   });
@@ -343,40 +369,53 @@ function layoutOneAdaptiveColorRow(host) {
       btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430");
     }
   }
-  if (!moreWrap || n <= 1) {
-    alignProductSwatchTooltips(track, host);
-    return;
-  }
-  let fit = productColorRowCountFit(track, clip, wraps);
-  if (fit >= n) {
+  const totalReserve = totalEl ? totalEl.offsetWidth + 8 : 0;
+  let available = productColorRowAvailableWidth(host);
+  if (!available && clip) available = Math.max(0, clip.clientWidth - totalReserve);
+  let colsFit = productColorColsThatFit(available, metrics, 0);
+  const maxIdx = wraps.reduce(function(m, w) {
+    return Math.max(m, productColorSwatchIndex(w));
+  }, 0);
+  if (colsFit > maxIdx + 1) colsFit = maxIdx + 1;
+  if (!moreWrap || colsFit >= masterCols || maxIdx < colsFit) {
+    productColorSetVisibleByColumn(wrapsAll, masterCols);
     alignProductSwatchTooltips(track, host);
     return;
   }
   moreWrap.removeAttribute("hidden");
   void moreWrap.offsetWidth;
-  fit = productColorRowCountFit(track, clip, wraps);
-  fit = productColorTightenRowFit(track, clip, wraps, fit);
-  let overflow = n - fit;
+  const moreReserve = moreWrap.offsetWidth + 8;
+  available = productColorRowAvailableWidth(host);
+  if (!available && clip) available = Math.max(0, clip.clientWidth - totalReserve - moreReserve);
+  colsFit = productColorColsThatFit(available, metrics, 0);
+  if (colsFit > maxIdx + 1) colsFit = maxIdx + 1;
+  while (colsFit > 0) {
+    productColorSetVisibleByColumn(wrapsAll, colsFit);
+    void track.offsetWidth;
+    const need = colsFit * metrics.colSize + Math.max(0, colsFit - 1) * metrics.gap;
+    if (need <= available + 0.5) break;
+    colsFit -= 1;
+  }
+  let overflow = wraps.filter(function(w) {
+    return productColorSwatchIndex(w) >= colsFit;
+  }).length;
   if (overflow <= 0) {
     moreWrap.setAttribute("hidden", "");
     if (btn) {
       btn.textContent = "+0";
       btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430");
     }
-    wraps.forEach(function(w) {
-      w.removeAttribute("hidden");
-    });
+    productColorSetVisibleByColumn(wrapsAll, masterCols);
     alignProductSwatchTooltips(track, host);
     return;
   }
-  productColorSetVisibleCount(wraps, fit);
-  overflow = n - fit;
+  productColorSetVisibleByColumn(wrapsAll, colsFit);
   if (btn) {
     btn.textContent = "+" + overflow;
     btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0435\u0449\u0451 " + overflow + " " + (overflow === 1 ? "\u0446\u0432\u0435\u0442" : overflow < 5 ? "\u0446\u0432\u0435\u0442\u0430" : "\u0446\u0432\u0435\u0442\u043E\u0432"));
   }
-  refreshMorePopover(moreWrap, wraps, fit, headingLine);
-  if (moreWrap) bindProductColorMoreWrap(moreWrap);
+  refreshMorePopover(moreWrap, wraps, colsFit, headingLine);
+  bindProductColorMoreWrap(moreWrap);
   alignProductSwatchTooltips(track, host);
 }
 function layoutProductAdaptiveColorRows(root) {
@@ -400,7 +439,7 @@ function setupProductAdaptiveColorRows(productMainEl) {
       run();
     });
     ro.observe(productMainEl);
-    productMainEl.querySelectorAll(".product-size-colors-adaptive").forEach(function(row) {
+    productMainEl.querySelectorAll(".product-size-color-list, .product-size-colors-adaptive").forEach(function(row) {
       ro.observe(row);
     });
   }
@@ -408,8 +447,9 @@ function setupProductAdaptiveColorRows(productMainEl) {
     run();
   };
   window.addEventListener("resize", onResize);
+  document.addEventListener("click", onDocumentClickCloseColorMore);
   bindAllProductColorMoreWraps(productMainEl);
-  productAdaptiveColorsState = { ro, onResize };
+  productAdaptiveColorsState = { ro, onResize, onDocumentClick: onDocumentClickCloseColorMore };
 }
 function setupProductBackAlign() {
   teardownProductBackAlign();
@@ -680,39 +720,69 @@ function swatchInlineStyle(hex) {
   if (/^[0-9A-Fa-f]{3,8}$/.test(h)) return "background-color:#" + h + ";";
   return "";
 }
-function uniqueColorsForSize(activeVariants, sizeLabel) {
+function catalogColorKey(v) {
+  const id = v && v.color_id != null && Number.isFinite(Number(v.color_id)) ? Number(v.color_id) : null;
+  const name = v && v.color_name != null ? String(v.color_name).trim() : "";
+  const hex = v && v.color_hex != null ? String(v.color_hex).trim() : "";
+  if (id != null && id > 0) return "id:" + id;
+  if (!name && !hex) return "";
+  return "n:" + name + "|" + hex;
+}
+function catalogColorFromVariant(v) {
+  const key = catalogColorKey(v);
+  if (!key) return null;
+  const colorId = v.color_id != null && Number.isFinite(Number(v.color_id)) ? Number(v.color_id) : null;
+  const name = v.color_name != null ? String(v.color_name).trim() : "";
+  const hex = v.color_hex != null ? String(v.color_hex).trim() : "";
+  return {
+    key,
+    colorId,
+    name: name || "\u0426\u0432\u0435\u0442",
+    hex
+  };
+}
+function compareCatalogColors(a, b) {
+  const idA = a.colorId != null && a.colorId > 0 ? a.colorId : Number.MAX_SAFE_INTEGER;
+  const idB = b.colorId != null && b.colorId > 0 ? b.colorId : Number.MAX_SAFE_INTEGER;
+  if (idA !== idB) return idA - idB;
+  return String(a.name).localeCompare(String(b.name), "ru");
+}
+function buildMasterColorOrder(activeVariants) {
   const map = new Map();
+  activeVariants.forEach(function(v) {
+    const c = catalogColorFromVariant(v);
+    if (!c || map.has(c.key)) return;
+    map.set(c.key, c);
+  });
+  return Array.from(map.values()).sort(compareCatalogColors);
+}
+function colorKeysForSize(activeVariants, sizeLabel) {
+  const set = new Set();
   activeVariants.forEach(function(v) {
     if (String(v.size_value || "") !== String(sizeLabel)) return;
-    const name = v.color_name != null ? String(v.color_name).trim() : "";
-    const hex = v.color_hex != null ? String(v.color_hex).trim() : "";
-    if (!name && !hex) return;
-    const key = v.color_id != null && Number.isFinite(Number(v.color_id)) ? "id:" + v.color_id : "n:" + name + "|" + hex;
-    if (!map.has(key)) map.set(key, { name: name || "\u0426\u0432\u0435\u0442", hex });
+    const key = catalogColorKey(v);
+    if (key) set.add(key);
   });
-  return Array.from(map.values()).sort(function(a, b) {
-    return String(a.name).localeCompare(String(b.name), "ru");
+  return set;
+}
+function uniqueColorsForSize(activeVariants, sizeLabel, masterOrder) {
+  const keys = colorKeysForSize(activeVariants, sizeLabel);
+  const order = Array.isArray(masterOrder) ? masterOrder : buildMasterColorOrder(activeVariants);
+  return order.filter(function(c) {
+    return keys.has(c.key);
   });
 }
-function uniqueColorsAll(activeVariants) {
-  const map = new Map();
-  activeVariants.forEach(function(v) {
-    const name = v.color_name != null ? String(v.color_name).trim() : "";
-    const hex = v.color_hex != null ? String(v.color_hex).trim() : "";
-    if (!name && !hex) return;
-    const key = v.color_id != null && Number.isFinite(Number(v.color_id)) ? "id:" + v.color_id : "n:" + name + "|" + hex;
-    if (!map.has(key)) map.set(key, { name: name || "\u0426\u0432\u0435\u0442", hex });
-  });
-  return Array.from(map.values()).sort(function(a, b) {
-    return String(a.name).localeCompare(String(b.name), "ru");
-  });
+function uniqueColorsAll(activeVariants, masterOrder) {
+  return Array.isArray(masterOrder) ? masterOrder.slice() : buildMasterColorOrder(activeVariants);
 }
-function renderProductSwatchButton(c) {
+function renderProductSwatchButton(c, gridIndex) {
   const name = c.name || "\u2014";
   const st = swatchInlineStyle(c.hex);
   const styleAttr = st ? ' style="' + escapeAttr(st) + '"' : "";
   const cls = "product-color-swatch" + (st ? "" : " product-color-swatch--muted");
-  return '<span class="product-color-swatch-wrap" data-tip="' + escapeAttr(name) + '" data-hex="' + escapeAttr(c.hex || "") + '"><button type="button" class="' + cls + '"' + styleAttr + ' title="' + escapeAttr(name) + '" aria-label="' + escapeAttr(name) + '"></button></span>';
+  const idxAttr = gridIndex != null && Number.isFinite(Number(gridIndex)) ? ' data-color-idx="' + Number(gridIndex) + '"' : "";
+  const wrapGrid = gridIndex != null && Number.isFinite(Number(gridIndex)) ? ' style="grid-column:' + (Number(gridIndex) + 1) + '"' : "";
+  return '<span class="product-color-swatch-wrap"' + idxAttr + wrapGrid + ' data-tip="' + escapeAttr(name) + '" data-hex="' + escapeAttr(c.hex || "") + '"><button type="button" class="' + cls + '"' + styleAttr + ' aria-label="' + escapeAttr(name) + '"></button></span>';
 }
 function renderProductColorOverflowPopover(allColors, headingLine) {
   const arr = Array.isArray(allColors) ? allColors : [];
@@ -726,16 +796,25 @@ function renderProductColorOverflowPopover(allColors, headingLine) {
   const head = headingLine && String(headingLine).trim() ? '<span class="product-color-more-pop-heading">' + escapeHtml(String(headingLine).trim()) + "</span>" : "";
   return '<span class="product-color-more-wrap" hidden data-heading="' + escapeAttr(headingLine || "") + '"><button type="button" class="product-color-more-circle" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430" aria-haspopup="listbox" aria-expanded="false">+0</button><span class="product-color-more-popover" role="listbox" tabindex="-1">' + head + rows + "</span></span>";
 }
-function buildProductColorsAdaptiveRow(colors, headingLine) {
-  const arr = Array.isArray(colors) ? colors : [];
-  if (!arr.length) return "";
-  let row = "";
-  arr.forEach(function(c) {
-    row += renderProductSwatchButton(c);
+function buildProductColorsAdaptiveRow(masterOrder, rowColors, headingLine) {
+  const master = Array.isArray(masterOrder) ? masterOrder : [];
+  const row = Array.isArray(rowColors) ? rowColors : [];
+  if (!row.length) return "";
+  const cols = Math.max(master.length, 1);
+  const rowKeyToIndex = new Map();
+  master.forEach(function(c, idx) {
+    rowKeyToIndex.set(c.key, idx);
   });
-  const overflow = renderProductColorOverflowPopover(arr, headingLine);
-  const total = '<span class="product-size-colors-total" title="\u0412\u0441\u0435\u0433\u043E \u043E\u0442\u0442\u0435\u043D\u043A\u043E\u0432">' + escapeHtml(colorCountLabelRu(arr.length)) + "</span>";
-  return '<div class="product-size-colors-adaptive"><div class="product-size-colors-track-clip"><div class="product-size-colors-track">' + row + "</div></div>" + overflow + total + "</div>";
+  let trackHtml = "";
+  row.forEach(function(c) {
+    const idx = rowKeyToIndex.has(c.key) ? rowKeyToIndex.get(c.key) : master.findIndex(function(x) {
+      return x.key === c.key;
+    });
+    trackHtml += renderProductSwatchButton(c, idx >= 0 ? idx : null);
+  });
+  const overflow = renderProductColorOverflowPopover(row, headingLine);
+  const total = '<span class="product-size-colors-total" title="\u0412\u0441\u0435\u0433\u043E \u043E\u0442\u0442\u0435\u043D\u043A\u043E\u0432">' + escapeHtml(colorCountLabelRu(row.length)) + "</span>";
+  return '<div class="product-size-colors-adaptive" data-color-cols="' + cols + '"><div class="product-size-colors-track-clip"><div class="product-size-colors-track product-color-align-track" style="--product-color-cols:' + cols + '">' + trackHtml + "</div></div>" + overflow + total + "</div>";
 }
 function buildVariantsHtml(variants) {
   if (!Array.isArray(variants) || !variants.length) return "";
@@ -743,6 +822,7 @@ function buildVariantsHtml(variants) {
     return v.is_active !== false;
   });
   if (!active.length) return "";
+  const masterOrder = buildMasterColorOrder(active);
   const bySize = {};
   active.forEach(function(v) {
     if (!v.size_value) return;
@@ -759,20 +839,20 @@ function buildVariantsHtml(variants) {
     sizes.forEach(function(size) {
       const meta = bySize[size];
       const hint = meta && meta.hint ? ' <span class="product-size-equiv">\u2248 ' + escapeHtml(meta.hint) + "</span>" : "";
-      const colors = uniqueColorsForSize(active, size);
+      const colors = uniqueColorsForSize(active, size, masterOrder);
       let chips = "";
       if (!colors.length) {
         chips = '<span class="product-size-colors-empty">\u0446\u0432\u0435\u0442 \u043D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D</span>';
       } else {
-        chips = buildProductColorsAdaptiveRow(colors, "\u0420\u0430\u0437\u043C\u0435\u0440 " + size);
+        chips = buildProductColorsAdaptiveRow(masterOrder, colors, "\u0420\u0430\u0437\u043C\u0435\u0440 " + size);
       }
       html += '<li class="product-size-color-row"><span class="product-size-color-label">' + escapeHtml(size) + hint + '</span><div class="product-size-colors">' + chips + "</div></li>";
     });
     html += "</ul></div>";
   } else {
-    const flat = uniqueColorsAll(active);
+    const flat = uniqueColorsAll(active, masterOrder);
     if (flat.length) {
-      html += '<div class="product-spec-group product-spec-group--sizes-colors"><p class="product-spec-heading">\u0426\u0432\u0435\u0442\u0430</p><div class="product-size-color-row product-size-color-row--solo"><div class="product-size-colors">' + buildProductColorsAdaptiveRow(flat, "\u0412\u0441\u0435 \u0446\u0432\u0435\u0442\u0430") + "</div></div></div>";
+      html += '<div class="product-spec-group product-spec-group--sizes-colors"><p class="product-spec-heading">\u0426\u0432\u0435\u0442\u0430</p><div class="product-size-color-row product-size-color-row--solo"><div class="product-size-colors">' + buildProductColorsAdaptiveRow(masterOrder, flat, "\u0412\u0441\u0435 \u0446\u0432\u0435\u0442\u0430") + "</div></div></div>";
     }
   }
   html += "</div>";

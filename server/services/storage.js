@@ -1,5 +1,7 @@
 const path = require("path");
+const fs = require("fs").promises;
 const crypto = require("crypto");
+const { PUB_ROOT } = require("../config");
 const { S3Client, PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
 const JPEG = Buffer.from([255, 216, 255]);
 const PNG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
@@ -70,6 +72,41 @@ async function deleteByPublicUrl(url) {
   const client = createClient(cfg);
   await client.send(new DeleteObjectCommand({ Bucket: cfg.bucket, Key: key }));
 }
+function resolveLocalUploadPath(url) {
+  const raw = String(url || "").trim();
+  if (!raw) return null;
+  const mediaBase = String(process.env.PUBLIC_URL || process.env.MEDIA_CDN_BASE || "").replace(/\/$/, "");
+  let rel = raw;
+  if (mediaBase && raw.startsWith(mediaBase)) rel = raw.slice(mediaBase.length);
+  if (!rel.startsWith("/")) rel = `/${rel}`;
+  const match = rel.match(/^\/img\/uploads\/([^/]+)$/);
+  if (!match) return null;
+  const filename = match[1];
+  if (!filename || filename.includes("..")) return null;
+  return path.join(PUB_ROOT, "img", "uploads", filename);
+}
+async function deleteMediaUrl(url) {
+  const u = String(url || "").trim();
+  if (!u) return;
+  try {
+    await deleteByPublicUrl(u);
+  } catch (err) {
+    console.warn("[storage] S3 delete failed:", err && err.message);
+  }
+  const localPath = resolveLocalUploadPath(u);
+  if (!localPath) return;
+  try {
+    await fs.unlink(localPath);
+  } catch (err) {
+    if (err && err.code !== "ENOENT") console.warn("[storage] local delete failed:", err && err.message);
+  }
+}
+async function deleteMediaUrls(urls) {
+  const unique = [...new Set((Array.isArray(urls) ? urls : []).map((u) => String(u || "").trim()).filter(Boolean))];
+  for (const url of unique) {
+    await deleteMediaUrl(url);
+  }
+}
 function getPublicUrlForKey(key) {
   const cfg = getS3Config();
   if (!cfg) return "";
@@ -81,6 +118,8 @@ function isConfigured() {
 module.exports = {
   uploadBuffer,
   deleteByPublicUrl,
+  deleteMediaUrl,
+  deleteMediaUrls,
   getPublicUrlForKey,
   isConfigured,
   MAX_BYTES,
