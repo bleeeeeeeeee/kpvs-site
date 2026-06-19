@@ -64,9 +64,25 @@ function loginUrlWithNext(nextPath) {
   return "/login.html?mode=user&next=" + encodeURIComponent(path);
 }
 
+const FOOTER_MAP_PLACE = "КПВС ООО";
+const FOOTER_MAP_ADDRESS = "ул. Лейтенанта Рябцева 44, Брест";
+const FOOTER_MAP_LAT = 52.1179672;
+const FOOTER_MAP_LNG = 23.6695065;
+const FOOTER_MAP_PLACE_REF = "0x47210bdbccd7789b:0x18c9ae031a4dfc67";
 const FOOTER_MAP_URL =
-  "https://www.google.com/maps/search/?api=1&query=" +
-  encodeURIComponent("Брест, ул. л-та Рябцева, 44");
+  "https://www.google.com/maps/place/" +
+  encodeURIComponent(FOOTER_MAP_PLACE + ", " + FOOTER_MAP_ADDRESS) +
+  "/@" +
+  FOOTER_MAP_LAT +
+  "," +
+  FOOTER_MAP_LNG +
+  ",17z/data=!3m1!4b1!4m6!3m5!1s" +
+  FOOTER_MAP_PLACE_REF +
+  "!8m2!3d" +
+  FOOTER_MAP_LAT +
+  "!4d" +
+  FOOTER_MAP_LNG +
+  "!16s%2Fg%2F1hc329r6q?hl=ru";
 
 function initFooterContacts() {
   document.querySelectorAll(".footer-contact").forEach(function (el) {

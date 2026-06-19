@@ -3229,6 +3229,14 @@ html.modal-open body .notification * {
     align-self: center;
     box-sizing: border-box;
 
+    min-height: 2.75rem;
+    height: auto;
+    padding: 0.65rem 1.15rem;
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.2;
+    border-radius: 0.65rem;
+
     --btn-min-h: 2.75rem;
     
     --btn-pad-y: 0.65rem;
@@ -7659,9 +7667,15 @@ select option.admin-select-action-option,
         margin-left: 0;
         min-inline-size: 0;
         min-width: 0;
-        --btn-pad-x: 0.55rem;
-        --btn-pad-y: 0.45rem;
-        --btn-fz: 0.75rem;
+        min-height: 2.75rem;
+        height: auto;
+        padding: 0.65rem 0.9rem;
+        font-size: 0.875rem;
+        border-radius: 0.65rem;
+        --btn-min-h: 2.75rem;
+        --btn-pad-x: 0.9rem;
+        --btn-pad-y: 0.65rem;
+        --btn-fz: 0.875rem;
         white-space: nowrap;
     }
 
@@ -7937,8 +7951,12 @@ select option.admin-select-action-option,
     }
 
     .site-header-actions .site-account-login-btn {
-        --btn-fz: 0.6875rem;
-        --btn-pad-x: 0.35rem;
-        --btn-pad-y: 0.4rem;
+        min-height: 2.75rem;
+        height: auto;
+        padding: 0.65rem 0.75rem;
+        font-size: 0.8125rem;
+        --btn-pad-x: 0.75rem;
+        --btn-pad-y: 0.65rem;
+        --btn-fz: 0.8125rem;
     }
 }

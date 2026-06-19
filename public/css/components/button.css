@@ -112,4 +112,13 @@
   .product-page .site-product-actions .btn {
     min-width: 0;
   }
+
+  .site-header-actions .site-account-login-btn {
+    min-height: 2.75rem;
+    height: auto;
+    padding: 0.65rem 0.9rem;
+    font-size: 0.875rem;
+    line-height: 1.2;
+    border-radius: 0.65rem;
+  }
 }
