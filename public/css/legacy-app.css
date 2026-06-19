@@ -1648,10 +1648,19 @@ html.modal-open body .notification * {
     flex-wrap: wrap;
     gap: 0.65rem;
     justify-content: flex-end;
+    align-items: stretch;
 }
 
-#account-modal .account-logout-confirm__btn {
+#account-modal .account-logout-confirm__actions .account-logout-confirm__btn {
     min-width: 5.5rem;
+    min-height: 2.75rem;
+    height: 2.75rem;
+    padding: 0.85rem 1.4rem;
+    font-size: 1rem;
+    font-weight: 700;
+    line-height: 1.2;
+    box-sizing: border-box;
+    align-self: auto;
 }
 
 .modal-content.modal-content--oauth-pwd {
