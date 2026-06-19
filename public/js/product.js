@@ -57,7 +57,7 @@ function capitalizeSeasonDisplaySource(season) {
 function buildSeasonSpecGroup(season) {
   if (!season || !String(season).trim()) return "";
   const inner = formatProductSpecMultilineHtml(capitalizeSeasonDisplaySource(season));
-  return '<div class="product-spec-group product-spec-group--season"><p class="product-spec-heading">\u0421\u0435\u0437\u043E\u043D</p><div class="product-spec-indent">' + inner + "</div></div>";
+  return '<div class="product-spec-group product-spec-group--season"><p class="product-spec-heading">\u0421\u0435\u0437\u043E\u043D</p><div class="product-spec-content">' + inner + "</div></div>";
 }
 function parseProductMaterialsString(str) {
   const out = [];
@@ -75,6 +75,54 @@ function parseProductMaterialsString(str) {
       }
     });
   return out;
+}
+function compositionMaterialKey(name) {
+  return String(name || "").trim().toLocaleLowerCase("ru-RU");
+}
+function mergeCompositionRows(rows) {
+  const arr = Array.isArray(rows) ? rows : [];
+  const byName = new Map();
+  const fallbacks = [];
+  arr.forEach(function(row) {
+    if (!row) return;
+    if (row.fallback) {
+      fallbacks.push(row);
+      return;
+    }
+    const name = String(row.name || "").trim();
+    if (!name) return;
+    const key = compositionMaterialKey(name);
+    const p = Number(row.percent);
+    const add = Number.isFinite(p) && p >= 1 && p <= 100 ? p : 0;
+    if (byName.has(key)) {
+      const existing = byName.get(key);
+      existing.percent += add;
+    } else {
+      byName.set(key, { name: name, percent: add });
+    }
+  });
+  const merged = Array.from(byName.values()).map(function(row) {
+    let percent = row.percent;
+    if (percent > 100) percent = 100;
+    return { name: row.name, percent: percent };
+  });
+  return merged.concat(fallbacks);
+}
+function sortCompositionRows(rows) {
+  const arr = Array.isArray(rows) ? rows.slice() : [];
+  return arr.sort(function(a, b) {
+    if (a.fallback && b.fallback) return 0;
+    if (a.fallback) return 1;
+    if (b.fallback) return -1;
+    const pa = Number(a.percent);
+    const pb = Number(b.percent);
+    const aValid = Number.isFinite(pa) && pa >= 1 && pa <= 100;
+    const bValid = Number.isFinite(pb) && pb >= 1 && pb <= 100;
+    const aSort = aValid ? pa : -1;
+    const bSort = bValid ? pb : -1;
+    if (bSort !== aSort) return bSort - aSort;
+    return String(a.name || "").localeCompare(String(b.name || ""), "ru");
+  });
 }
 function normalizeCompositionRows(product) {
   if (product && Array.isArray(product.materials_list) && product.materials_list.length) {
@@ -94,24 +142,24 @@ function normalizeCompositionRows(product) {
   return parseProductMaterialsString(raw);
 }
 function buildCompositionSpecGroup(product) {
-  const rows = normalizeCompositionRows(product || null);
+  const rows = sortCompositionRows(mergeCompositionRows(normalizeCompositionRows(product || null)));
   if (!rows.length) return "";
-  let html = '<div class="product-spec-group product-spec-group--composition"><p class="product-spec-heading">\u0421\u043E\u0441\u0442\u0430\u0432</p><ul class="product-attr-rows">';
+  let html = '<div class="product-spec-group product-spec-group--composition"><p class="product-spec-heading">\u0421\u043E\u0441\u0442\u0430\u0432</p><div class="product-spec-content"><table class="product-attr-table"><tbody>';
   rows.forEach(function(row) {
     if (row.fallback) {
-      html += '<li class="product-attr-row product-composition-row--freeform"><div class="product-attr-value">' + escapeHtml(row.text) + "</div></li>";
+      html += '<tr class="product-attr-row product-composition-row--freeform"><td class="product-attr-value" colspan="2">' + escapeHtml(row.text) + "</td></tr>";
     } else {
       let val = "\u2014";
       if (row.percent != null && row.percent >= 1 && row.percent <= 100) val = String(row.percent) + "%";
       html +=
-        '<li class="product-attr-row"><span class="product-attr-name">' +
+        '<tr class="product-attr-row"><th scope="row" class="product-attr-name">' +
         escapeHtml(row.name) +
-        ':</span><div class="product-attr-value">' +
+        '</th><td class="product-attr-value">' +
         escapeHtml(val) +
-        "</div></li>";
+        "</td></tr>";
     }
   });
-  html += "</ul></div>";
+  html += "</tbody></table></div></div>";
   return html;
 }
 function formatProductPrice(n) {
@@ -300,33 +348,14 @@ function swatchMetaFromWrap(w) {
     hex: w.getAttribute("data-hex") || ""
   };
 }
-function alignProductSwatchTooltips(track, host) {
-  if (!track) return;
-  const row = host || track.closest(".product-size-colors-adaptive");
-  const bounds = row ? row.getBoundingClientRect() : track.getBoundingClientRect();
-  const tipHalf = 80;
-  track.querySelectorAll(".product-color-swatch-wrap").forEach(function(w) {
-    w.classList.remove("swatch-tip-left", "swatch-tip-right", "swatch-tip-center");
-    if (w.hasAttribute("hidden")) return;
-    const r = w.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    if (cx - tipHalf < bounds.left + 2) {
-      w.classList.add("swatch-tip-left");
-    } else if (cx + tipHalf > bounds.right - 2) {
-      w.classList.add("swatch-tip-right");
-    } else {
-      w.classList.add("swatch-tip-center");
-    }
-  });
-}
 function productColorRowAvailableWidth(host) {
-  const adaptive = host;
-  const colorsWrap = adaptive ? adaptive.closest(".product-size-colors") : null;
-  const totalEl = adaptive ? adaptive.querySelector(".product-size-colors-total") : null;
-  const moreWrap = adaptive ? adaptive.querySelector(".product-color-more-wrap") : null;
+  const swatchCell = host ? host.closest(".product-size-color-swatches") : null;
+  const colorsWrap = swatchCell ? null : host ? host.closest(".product-size-colors") : null;
+  const moreWrap = host ? host.querySelector(".product-color-more-wrap") : null;
   const gap = 8;
-  let base = colorsWrap ? colorsWrap.clientWidth : adaptive ? adaptive.clientWidth : 0;
-  if (totalEl) base -= totalEl.offsetWidth + gap;
+  const baseEl = swatchCell || colorsWrap;
+  if (!baseEl) return 0;
+  let base = baseEl.clientWidth;
   if (moreWrap && !moreWrap.hasAttribute("hidden")) base -= moreWrap.offsetWidth + gap;
   return Math.max(0, base);
 }
@@ -354,7 +383,6 @@ function layoutOneAdaptiveColorRow(host) {
   const wraps = productColorFilledWraps(wrapsAll);
   const btn = moreWrap ? moreWrap.querySelector(".product-color-more-circle") : null;
   const headingLine = moreWrap ? moreWrap.getAttribute("data-heading") || "" : "";
-  const totalEl = host.querySelector(".product-size-colors-total");
   const metrics = productColorGridMetrics(track);
   const masterCols = metrics.masterCols;
   if (!track || !clip || !wraps.length) return;
@@ -369,9 +397,8 @@ function layoutOneAdaptiveColorRow(host) {
       btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430");
     }
   }
-  const totalReserve = totalEl ? totalEl.offsetWidth + 8 : 0;
   let available = productColorRowAvailableWidth(host);
-  if (!available && clip) available = Math.max(0, clip.clientWidth - totalReserve);
+  if (!available && clip) available = Math.max(0, clip.clientWidth);
   let colsFit = productColorColsThatFit(available, metrics, 0);
   const maxIdx = wraps.reduce(function(m, w) {
     return Math.max(m, productColorSwatchIndex(w));
@@ -379,14 +406,13 @@ function layoutOneAdaptiveColorRow(host) {
   if (colsFit > maxIdx + 1) colsFit = maxIdx + 1;
   if (!moreWrap || colsFit >= masterCols || maxIdx < colsFit) {
     productColorSetVisibleByColumn(wrapsAll, masterCols);
-    alignProductSwatchTooltips(track, host);
     return;
   }
   moreWrap.removeAttribute("hidden");
   void moreWrap.offsetWidth;
   const moreReserve = moreWrap.offsetWidth + 8;
   available = productColorRowAvailableWidth(host);
-  if (!available && clip) available = Math.max(0, clip.clientWidth - totalReserve - moreReserve);
+  if (!available && clip) available = Math.max(0, clip.clientWidth - moreReserve);
   colsFit = productColorColsThatFit(available, metrics, 0);
   if (colsFit > maxIdx + 1) colsFit = maxIdx + 1;
   while (colsFit > 0) {
@@ -406,7 +432,6 @@ function layoutOneAdaptiveColorRow(host) {
       btn.setAttribute("aria-label", "\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430");
     }
     productColorSetVisibleByColumn(wrapsAll, masterCols);
-    alignProductSwatchTooltips(track, host);
     return;
   }
   productColorSetVisibleByColumn(wrapsAll, colsFit);
@@ -416,7 +441,6 @@ function layoutOneAdaptiveColorRow(host) {
   }
   refreshMorePopover(moreWrap, wraps, colsFit, headingLine);
   bindProductColorMoreWrap(moreWrap);
-  alignProductSwatchTooltips(track, host);
 }
 function layoutProductAdaptiveColorRows(root) {
   const scope = root && root.querySelectorAll ? root : document;
@@ -425,8 +449,13 @@ function layoutProductAdaptiveColorRows(root) {
 function setupProductAdaptiveColorRows(productMainEl) {
   teardownProductAdaptiveColorRows();
   if (!productMainEl || !productMainEl.querySelector(".product-size-colors-adaptive")) return;
+  let resizeRaf = 0;
   const run = function() {
-    layoutProductAdaptiveColorRows(productMainEl);
+    if (resizeRaf) cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(function() {
+      resizeRaf = 0;
+      layoutProductAdaptiveColorRows(productMainEl);
+    });
   };
   run();
   requestAnimationFrame(run);
@@ -439,7 +468,7 @@ function setupProductAdaptiveColorRows(productMainEl) {
       run();
     });
     ro.observe(productMainEl);
-    productMainEl.querySelectorAll(".product-size-color-list, .product-size-colors-adaptive").forEach(function(row) {
+    productMainEl.querySelectorAll(".product-size-color-swatches, .product-size-colors-adaptive").forEach(function(row) {
       ro.observe(row);
     });
   }
@@ -796,11 +825,30 @@ function renderProductColorOverflowPopover(allColors, headingLine) {
   const head = headingLine && String(headingLine).trim() ? '<span class="product-color-more-pop-heading">' + escapeHtml(String(headingLine).trim()) + "</span>" : "";
   return '<span class="product-color-more-wrap" hidden data-heading="' + escapeAttr(headingLine || "") + '"><button type="button" class="product-color-more-circle" aria-label="\u041F\u043E\u043A\u0430\u0437\u0430\u0442\u044C \u0441\u043A\u0440\u044B\u0442\u044B\u0435 \u0446\u0432\u0435\u0442\u0430" aria-haspopup="listbox" aria-expanded="false">+0</button><span class="product-color-more-popover" role="listbox" tabindex="-1">' + head + rows + "</span></span>";
 }
-function buildProductColorsAdaptiveRow(masterOrder, rowColors, headingLine) {
+function productPaletteColumnCount(masterOrder, activeVariants) {
+  const order = Array.isArray(masterOrder) ? masterOrder : [];
+  const indexByKey = new Map();
+  order.forEach(function(c, idx) {
+    indexByKey.set(c.key, idx);
+  });
+  let maxIdx = -1;
+  (Array.isArray(activeVariants) ? activeVariants : []).forEach(function(v) {
+    const key = catalogColorKey(v);
+    if (!key || !indexByKey.has(key)) return;
+    maxIdx = Math.max(maxIdx, indexByKey.get(key));
+  });
+  return Math.max(maxIdx + 1, 1);
+}
+function renderProductColorCountLabel(count) {
+  return '<span class="product-size-colors-total" title="\u0412\u0441\u0435\u0433\u043E \u043E\u0442\u0442\u0435\u043D\u043A\u043E\u0432">' + escapeHtml(colorCountLabelRu(count)) + "</span>";
+}
+function buildProductColorsAdaptiveRow(masterOrder, rowColors, headingLine, paletteCols, options) {
+  const opts = options && typeof options === "object" ? options : {};
+  const includeTotal = opts.includeTotal !== false;
   const master = Array.isArray(masterOrder) ? masterOrder : [];
   const row = Array.isArray(rowColors) ? rowColors : [];
   if (!row.length) return "";
-  const cols = Math.max(master.length, 1);
+  const cols = Math.max(1, Number(paletteCols) > 0 ? Number(paletteCols) : master.length || 1);
   const rowKeyToIndex = new Map();
   master.forEach(function(c, idx) {
     rowKeyToIndex.set(c.key, idx);
@@ -813,7 +861,7 @@ function buildProductColorsAdaptiveRow(masterOrder, rowColors, headingLine) {
     trackHtml += renderProductSwatchButton(c, idx >= 0 ? idx : null);
   });
   const overflow = renderProductColorOverflowPopover(row, headingLine);
-  const total = '<span class="product-size-colors-total" title="\u0412\u0441\u0435\u0433\u043E \u043E\u0442\u0442\u0435\u043D\u043A\u043E\u0432">' + escapeHtml(colorCountLabelRu(row.length)) + "</span>";
+  const total = includeTotal ? renderProductColorCountLabel(row.length) : "";
   return '<div class="product-size-colors-adaptive" data-color-cols="' + cols + '"><div class="product-size-colors-track-clip"><div class="product-size-colors-track product-color-align-track" style="--product-color-cols:' + cols + '">' + trackHtml + "</div></div>" + overflow + total + "</div>";
 }
 function buildVariantsHtml(variants) {
@@ -823,6 +871,7 @@ function buildVariantsHtml(variants) {
   });
   if (!active.length) return "";
   const masterOrder = buildMasterColorOrder(active);
+  const paletteCols = productPaletteColumnCount(masterOrder, active);
   const bySize = {};
   active.forEach(function(v) {
     if (!v.size_value) return;
@@ -835,24 +884,26 @@ function buildVariantsHtml(variants) {
   let html = '<div class="product-variants">';
   const sizes = sortSizeLabels(Object.keys(bySize));
   if (sizes.length) {
-    html += '<div class="product-spec-group product-spec-group--sizes-colors"><p class="product-spec-heading">\u0420\u0430\u0437\u043C\u0435\u0440\u044B \u0438 \u0446\u0432\u0435\u0442\u0430</p><ul class="product-size-color-list">';
+    html += '<div class="product-spec-group product-spec-group--sizes-colors"><p class="product-spec-heading">\u0420\u0430\u0437\u043C\u0435\u0440\u044B \u0438 \u0446\u0432\u0435\u0442\u0430</p><div class="product-spec-content"><table class="product-size-color-table"><tbody>';
     sizes.forEach(function(size) {
       const meta = bySize[size];
       const hint = meta && meta.hint ? ' <span class="product-size-equiv">\u2248 ' + escapeHtml(meta.hint) + "</span>" : "";
       const colors = uniqueColorsForSize(active, size, masterOrder);
-      let chips = "";
+      let swatchCell = "";
+      let totalCell = '<td class="product-size-color-total-cell"></td>';
       if (!colors.length) {
-        chips = '<span class="product-size-colors-empty">\u0446\u0432\u0435\u0442 \u043D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D</span>';
+        swatchCell = '<span class="product-size-colors-empty">\u0446\u0432\u0435\u0442 \u043D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D</span>';
       } else {
-        chips = buildProductColorsAdaptiveRow(masterOrder, colors, "\u0420\u0430\u0437\u043C\u0435\u0440 " + size);
+        swatchCell = buildProductColorsAdaptiveRow(masterOrder, colors, "\u0420\u0430\u0437\u043C\u0435\u0440 " + size, paletteCols, { includeTotal: false });
+        totalCell = '<td class="product-size-color-total-cell">' + renderProductColorCountLabel(colors.length) + "</td>";
       }
-      html += '<li class="product-size-color-row"><span class="product-size-color-label">' + escapeHtml(size) + hint + '</span><div class="product-size-colors">' + chips + "</div></li>";
+      html += '<tr class="product-size-color-row"><th scope="row" class="product-size-color-label">' + escapeHtml(size) + hint + '</th><td class="product-size-color-swatches"><div class="product-size-colors">' + swatchCell + "</div></td>" + totalCell + "</tr>";
     });
-    html += "</ul></div>";
+    html += "</tbody></table></div></div>";
   } else {
     const flat = uniqueColorsAll(active, masterOrder);
     if (flat.length) {
-      html += '<div class="product-spec-group product-spec-group--sizes-colors"><p class="product-spec-heading">\u0426\u0432\u0435\u0442\u0430</p><div class="product-size-color-row product-size-color-row--solo"><div class="product-size-colors">' + buildProductColorsAdaptiveRow(masterOrder, flat, "\u0412\u0441\u0435 \u0446\u0432\u0435\u0442\u0430") + "</div></div></div>";
+      html += '<div class="product-spec-group product-spec-group--sizes-colors"><p class="product-spec-heading">\u0426\u0432\u0435\u0442\u0430</p><div class="product-spec-content"><div class="product-size-color-row product-size-color-row--solo"><div class="product-size-colors">' + buildProductColorsAdaptiveRow(masterOrder, flat, "\u0412\u0441\u0435 \u0446\u0432\u0435\u0442\u0430", paletteCols) + "</div></div></div></div>";
     }
   }
   html += "</div>";
@@ -860,15 +911,15 @@ function buildVariantsHtml(variants) {
 }
 function buildAttributesHtml(attributes) {
   if (!Array.isArray(attributes) || !attributes.length) return "";
-  let html = '<div class="product-spec-group product-spec-group--attributes"><p class="product-spec-heading">\u0425\u0430\u0440\u0430\u043A\u0442\u0435\u0440\u0438\u0441\u0442\u0438\u043A\u0438</p><ul class="product-attr-rows">';
+  let html = '<div class="product-spec-group product-spec-group--attributes"><p class="product-spec-heading">\u0425\u0430\u0440\u0430\u043A\u0442\u0435\u0440\u0438\u0441\u0442\u0438\u043A\u0438</p><div class="product-spec-content"><table class="product-attr-table"><tbody>';
   attributes.forEach((attr) => {
     if (!attr || !attr.name && !attr.value) return;
     const name = (attr.name != null ? String(attr.name).trim() : "") || "\u2014";
     const rawVal = attr.value != null ? String(attr.value) : "";
     const valueInner = rawVal.trim() ? formatProductSpecMultilineHtml(rawVal) : '<p class="product-spec-para">\u2014</p>';
-    html += '<li class="product-attr-row"><span class="product-attr-name">' + escapeHtml(name) + ':</span><div class="product-attr-value">' + valueInner + "</div></li>";
+    html += '<tr class="product-attr-row"><th scope="row" class="product-attr-name">' + escapeHtml(name) + ':</th><td class="product-attr-value">' + valueInner + "</td></tr>";
   });
-  html += "</ul></div>";
+  html += "</tbody></table></div></div>";
   return html;
 }
 async function getProductsByIds(ids) {

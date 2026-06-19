@@ -3180,6 +3180,12 @@ const Admin = (() => {
       me.textContent = "\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0439 \u0440\u0435\u0434\u0430\u043A\u0442\u043E\u0440: " + u;
     }
   }
+  function resetProductModalScroll() {
+    const modal = document.getElementById("product-modal");
+    const form = document.getElementById("product-form");
+    if (modal) modal.scrollTop = 0;
+    if (form) form.scrollTop = 0;
+  }
   async function openProductModal(product) {
     const modal = document.getElementById("product-modal");
     const title = document.getElementById("modal-title");
@@ -3216,6 +3222,7 @@ const Admin = (() => {
     const delBtn = document.getElementById("delete-product-btn");
     if (delBtn) delBtn.hidden = !editingProductId;
     openModal(modal);
+    resetProductModalScroll();
     if (product) {
       try {
         const r = await apiFetch("/api/product/" + encodeURIComponent(product.id));
@@ -3317,6 +3324,7 @@ const Admin = (() => {
         requestAnimationFrame(resolve);
       });
     });
+    resetProductModalScroll();
     captureProductModalBaseline();
   }
   function closeProductModalAfterSave() {
