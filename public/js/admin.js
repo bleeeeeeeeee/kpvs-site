@@ -53,6 +53,39 @@ const Admin = (() => {
   let products = [];
   let editingProductId = null;
   let productImages = [];
+  function sortProductImagesPrimaryFirst(images) {
+    const list = (Array.isArray(images) ? images : []).map(function(img, i) {
+      return {
+        url: img && img.url != null ? String(img.url).trim() : "",
+        alt_text: img && img.alt_text != null ? String(img.alt_text) : "",
+        is_primary: Boolean(img && img.is_primary),
+        sort_order: img && img.sort_order != null && Number.isFinite(Number(img.sort_order)) ? Number(img.sort_order) : i
+      };
+    }).filter(function(img) {
+      return img.url;
+    });
+    if (!list.length) return [];
+    list.sort(function(a, b) {
+      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+      return String(a.url).localeCompare(String(b.url), "ru");
+    });
+    let primaryIdx = list.findIndex(function(img) {
+      return img.is_primary;
+    });
+    if (primaryIdx < 0) primaryIdx = 0;
+    if (primaryIdx > 0) {
+      const primary = list.splice(primaryIdx, 1)[0];
+      list.unshift(primary);
+    }
+    return list.map(function(img, i) {
+      return {
+        url: img.url,
+        alt_text: img.alt_text,
+        is_primary: i === 0,
+        sort_order: i
+      };
+    });
+  }
   let productVariants = [];
   let productCollections = [];
   let productAttributes = [];
@@ -2588,9 +2621,9 @@ const Admin = (() => {
     list.querySelectorAll('input[type="radio"][name="primary-image"]').forEach(function(radio) {
       radio.addEventListener("change", function() {
         const idx = Number(radio.value);
-        productImages = productImages.map(function(img, i) {
+        productImages = sortProductImagesPrimaryFirst(productImages.map(function(img, i) {
           return Object.assign({}, img, { is_primary: i === idx });
-        });
+        }));
         renderImagesList();
       });
     });
@@ -2605,11 +2638,7 @@ const Admin = (() => {
         confirmMsg += "? \u042D\u0442\u043E \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u043D\u0435\u043B\u044C\u0437\u044F \u043E\u0442\u043C\u0435\u043D\u0438\u0442\u044C.";
         if (!confirm(confirmMsg)) return;
         productImages.splice(idx, 1);
-        if (productImages.length && !productImages.some(function(i) {
-          return i.is_primary;
-        })) {
-          productImages[0].is_primary = true;
-        }
+        productImages = sortProductImagesPrimaryFirst(productImages);
         renderImagesList();
       });
     });
@@ -2835,17 +2864,7 @@ const Admin = (() => {
     }).sort(function(a, b) {
       return a - b;
     });
-    const images = (Array.isArray(snap.images) ? snap.images : []).map(function(im) {
-      return {
-        url: im.url != null ? String(im.url).trim() : "",
-        alt_text: im.alt_text != null ? String(im.alt_text) : "",
-        is_primary: Boolean(im.is_primary),
-        sort_order: im.sort_order != null && Number.isFinite(Number(im.sort_order)) ? Number(im.sort_order) : 0
-      };
-    }).sort(function(a, b) {
-      if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
-      return String(a.url).localeCompare(String(b.url), "ru");
-    });
+    const images = sortProductImagesPrimaryFirst(Array.isArray(snap.images) ? snap.images : []);
     const materials = (Array.isArray(snap.materials) ? snap.materials : []).map(function(m) {
       const pct = m.percent != null && Number.isFinite(Number(m.percent)) ? Number(m.percent) : 0;
       return {
@@ -2945,7 +2964,7 @@ const Admin = (() => {
     if (brandSel) populateBrandSelect(brandSel, d.brand_id);
     const activeChk = document.getElementById("product-active");
     if (activeChk) activeChk.checked = d.is_active !== false;
-    productImages = Array.isArray(d.images) ? d.images.slice() : [];
+    productImages = sortProductImagesPrimaryFirst(d.images);
     productVariants = Array.isArray(d.variants) ? d.variants.slice() : [];
     productAttributes = Array.isArray(d.attributes) ? d.attributes.slice() : [];
     productMaterials = Array.isArray(d.materials) ? d.materials.slice() : [];
@@ -3209,6 +3228,7 @@ const Admin = (() => {
       })) {
         productImages[0].is_primary = true;
       }
+      productImages = sortProductImagesPrimaryFirst(productImages);
       renderImagesList();
       notify("\u0418\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043D\u044B", "success");
     } catch (err) {
@@ -3374,7 +3394,7 @@ const Admin = (() => {
           }
           populateBrandSelect(brandSel, full.brand_id);
           productMaterials = productMaterialsFromStored(full);
-          productImages = Array.isArray(full.images) ? full.images.map(function(img) {
+          productImages = sortProductImagesPrimaryFirst(Array.isArray(full.images) ? full.images.map(function(img) {
             return {
               url: img.url || "",
               alt_text: img.alt_text || "",
@@ -3383,7 +3403,7 @@ const Admin = (() => {
             };
           }).filter(function(i) {
             return i.url;
-          }) : [];
+          }) : []);
           const loadedVariants = Array.isArray(full.variants)
             ? full.variants.map(function(v) {
                 return {
@@ -3584,6 +3604,7 @@ const Admin = (() => {
     })) {
       productImages[0].is_primary = true;
     }
+    productImages = sortProductImagesPrimaryFirst(productImages);
     const materialsStr = materialsToString(mergeProductMaterials(productMaterials));
     const payload = {
       name,
@@ -3746,6 +3767,7 @@ const Admin = (() => {
           if (!productImages.some(function(i) {
             return i.is_primary;
           })) productImages[0].is_primary = true;
+          productImages = sortProductImagesPrimaryFirst(productImages);
           renderImagesList();
           notify("\u0418\u0437\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u0435 \u0434\u043E\u0431\u0430\u0432\u043B\u0435\u043D\u043E", "success");
         } else {

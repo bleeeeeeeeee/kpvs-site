@@ -323,6 +323,18 @@ function requestProductBackAlign() {
     productBackAlignState.schedule();
   }
 }
+function sortGalleryItemsPrimaryFirst(items) {
+  const list = Array.isArray(items) ? items.slice() : [];
+  if (!list.length) return list;
+  const primaryIdx = list.findIndex(function(x) {
+    return x && x.primary;
+  });
+  if (primaryIdx > 0) {
+    const primary = list.splice(primaryIdx, 1)[0];
+    list.unshift(primary);
+  }
+  return list;
+}
 let productAdaptiveColorsState = null;
 let productAdaptiveLayoutLock = false;
 const PRODUCT_COLOR_MORE_RESERVE_PX = 30;
@@ -1027,11 +1039,12 @@ async function loadProduct() {
     if (!galleryItems.length) {
       galleryItems.push({ url: fallbackSrc, primary: true });
     }
-    let startIdx = galleryItems.findIndex(function(x) {
+    const orderedGalleryItems = sortGalleryItemsPrimaryFirst(galleryItems);
+    let startIdx = orderedGalleryItems.findIndex(function(x) {
       return x.primary;
     });
     if (startIdx < 0) startIdx = 0;
-    const imageUrls = galleryItems.map(function(x) {
+    const imageUrls = orderedGalleryItems.map(function(x) {
       return x.url;
     });
     const stageSrc = imageUrls[startIdx] || fallbackSrc;
@@ -1040,7 +1053,7 @@ async function loadProduct() {
     let thumbsHtml = "";
     if (showNav) {
       thumbsHtml += '<div class="product-gallery product-gallery--thumbs" role="tablist">';
-      galleryItems.forEach(function(item, ix) {
+      orderedGalleryItems.forEach(function(item, ix) {
         const active = ix === startIdx ? " is-active" : "";
         thumbsHtml += '<button type="button" role="tab" class="product-gallery-thumb' + active + '" data-gallery-idx="' + ix + '" aria-label="\u0424\u043E\u0442\u043E ' + (ix + 1) + '"><img src="' + escapeAttr(item.url) + '" alt="" loading="lazy" decoding="async" width="88" height="88"></button>';
       });

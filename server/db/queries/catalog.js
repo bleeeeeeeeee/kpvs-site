@@ -807,7 +807,7 @@ async function getProduct(pool, identifier, options) {
             SELECT json_agg(json_build_object(
                 'id', pi.id, 'url', pi.url, 'alt_text', pi.alt_text,
                 'is_primary', pi.is_primary, 'sort_order', pi.sort_order
-            ) ORDER BY pi.sort_order, pi.id)
+            ) ORDER BY pi.is_primary DESC, pi.sort_order, pi.id)
             FROM product_images pi WHERE pi.product_id = p.id
         ) AS images,
         (
@@ -1020,16 +1020,31 @@ async function replaceProductImages(client, productId, images) {
   if (!Array.isArray(images) || !images.length) {
     return findUnreferencedProductImageUrls(client, oldUrls);
   }
-  const hasPrimary = images.some((i) => i.is_primary);
+  const prepared = images
+    .map((img, i) => ({
+      url: typeof img.url === "string" ? img.url.trim() : "",
+      alt_text: img.alt_text || null,
+      is_primary: Boolean(img.is_primary),
+      sort_order: Number.isFinite(Number(img.sort_order)) ? Number(img.sort_order) : i,
+    }))
+    .filter((img) => img.url);
+  prepared.sort((a, b) => {
+    if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
+    return a.url.localeCompare(b.url);
+  });
+  let primaryIdx = prepared.findIndex((img) => img.is_primary);
+  if (primaryIdx < 0) primaryIdx = 0;
+  if (primaryIdx > 0) {
+    const [primary] = prepared.splice(primaryIdx, 1);
+    prepared.unshift(primary);
+  }
   const newUrls = new Set();
-  for (let i = 0; i < images.length; i++) {
-    const img = images[i];
-    const url = typeof img.url === "string" ? img.url.trim() : "";
-    if (!url) continue;
-    newUrls.add(url);
+  for (let i = 0; i < prepared.length; i++) {
+    const img = prepared[i];
+    newUrls.add(img.url);
     await client.query(
       "INSERT INTO product_images (product_id, url, alt_text, is_primary, sort_order) VALUES ($1,$2,$3,$4,$5)",
-      [productId, url, img.alt_text || null, hasPrimary ? Boolean(img.is_primary) : i === 0, img.sort_order ?? i]
+      [productId, img.url, img.alt_text, i === 0, i]
     );
   }
   const candidates = oldUrls.filter((url) => !newUrls.has(url));

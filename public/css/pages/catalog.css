@@ -41,6 +41,11 @@
   font-weight: 500;
 }
 
+.catalog-page .card-img {
+  object-fit: contain;
+  object-position: center;
+}
+
 .catalog-page .card-price,
 .catalog-page .card-price--muted {
   display: none !important;
