@@ -470,7 +470,9 @@
           try {
             localStorage.removeItem(TOKEN_KEY);
           } catch (_) {}
-          if (window.KpvsListsSync && window.KpvsListsSync.clearSyncState) {
+          if (window.KpvsListsSync && window.KpvsListsSync.clearGuestLists) {
+            window.KpvsListsSync.clearGuestLists();
+          } else if (window.KpvsListsSync && window.KpvsListsSync.clearSyncState) {
             window.KpvsListsSync.clearSyncState();
           }
           hideLogoutConfirm(built);

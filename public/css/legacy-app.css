@@ -3323,7 +3323,7 @@ html.modal-open body .notification * {
 .admin-page .admin-catalog-controls .admin-active-filters {
     width: 100%;
     margin-top: 0.35rem;
-    padding: 0.65rem 0.75rem;
+    padding: 0.65rem 0 0;
 }
 
 .admin-toolbar-row-search {
@@ -6853,10 +6853,11 @@ select option.admin-select-action-option,
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    margin-top: 1rem;
-    padding: 0.75rem 0;
-    background: var(--bg-secondary);
-    border-radius: 0.5rem;
+    margin-top: 0.65rem;
+    padding: 0.65rem 0 0;
+    background: transparent;
+    border-top: 1px solid var(--border-color);
+    border-radius: 0;
     align-items: center;
 }
 

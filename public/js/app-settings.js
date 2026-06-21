@@ -222,6 +222,111 @@
     return changed;
   }
 
+  function mergeListItems(primary, secondary) {
+    var out = normalizeItems(primary).slice();
+    var seen = {};
+    for (var i = 0; i < out.length; i++) seen[out[i].id] = 1;
+    var extra = normalizeItems(secondary);
+    for (var j = 0; j < extra.length; j++) {
+      if (!seen[extra[j].id]) {
+        seen[extra[j].id] = 1;
+        out.push(extra[j]);
+      }
+    }
+    return out;
+  }
+
+  function ruItemsWord(n) {
+    var abs = Math.abs(Number(n) || 0);
+    var mod100 = abs % 100;
+    var mod10 = abs % 10;
+    if (mod100 > 10 && mod100 < 20) return "\u0442\u043E\u0432\u0430\u0440\u043E\u0432";
+    if (mod10 > 1 && mod10 < 5) return "\u0442\u043E\u0432\u0430\u0440\u0430";
+    if (mod10 === 1) return "\u0442\u043E\u0432\u0430\u0440";
+    return "\u0442\u043E\u0432\u0430\u0440\u043E\u0432";
+  }
+
+  function guestListsPromptMessage(cartN, favN) {
+    var bits = [];
+    if (cartN > 0) bits.push(cartN + " " + ruItemsWord(cartN) + " \u0432 \u043A\u043E\u0440\u0437\u0438\u043D\u0435");
+    if (favN > 0) bits.push(favN + " " + ruItemsWord(favN) + " \u0432 \u0438\u0437\u0431\u0440\u0430\u043D\u043D\u043E\u043C");
+    if (!bits.length) return "";
+    return (
+      "\u0412 \u044D\u0442\u043E\u0439 \u0441\u0435\u0441\u0441\u0438\u0438 \u0431\u0435\u0437 \u0432\u0445\u043E\u0434\u0430 \u0432\u044B \u0434\u043E\u0431\u0430\u0432\u0438\u043B\u0438 " +
+      bits.join(" \u0438 ") +
+      ". \u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C " +
+      (bits.length > 1 ? "\u0438\u0445" : "\u044D\u0442\u043E") +
+      " \u043A \u0434\u0430\u043D\u043D\u044B\u043C \u0430\u043A\u043A\u0430\u0443\u043D\u0442\u0430?"
+    );
+  }
+
+  function promptGuestListsMerge(cartN, favN) {
+    return new Promise(function(resolve) {
+      var msg = guestListsPromptMessage(cartN, favN);
+      if (!msg) {
+        resolve(false);
+        return;
+      }
+      var existing = document.getElementById("kpvs-guest-lists-merge-modal");
+      if (existing) existing.remove();
+      var modal = document.createElement("div");
+      modal.className = "modal";
+      modal.id = "kpvs-guest-lists-merge-modal";
+      modal.innerHTML =
+        '<div class="modal-content modal-content--cart-favorites">' +
+        '<div class="modal-header"><h2>\u0421\u0438\u043D\u0445\u0440\u043E\u043D\u0438\u0437\u0430\u0446\u0438\u044F \u0441\u043F\u0438\u0441\u043A\u043E\u0432</h2></div>' +
+        '<div class="modal-body"><p class="catalog-empty" style="text-align:left;max-width:none;">' +
+        msg +
+        "</p></div>" +
+        '<div class="modal-footer catalog-filter-modal-footer">' +
+        '<button type="button" class="btn btn--outline" data-action="account-only">\u041D\u0435\u0442, \u0442\u043E\u043B\u044C\u043A\u043E \u0430\u043A\u043A\u0430\u0443\u043D\u0442</button>' +
+        '<button type="button" class="btn btn--primary" data-action="merge">\u0414\u043E\u0431\u0430\u0432\u0438\u0442\u044C</button>' +
+        "</div></div>";
+      document.body.appendChild(modal);
+      if (window.KpvsModalOverlay) window.KpvsModalOverlay.lock();
+      function close(wantMerge) {
+        if (window.kpvsDismissTopModal) window.kpvsDismissTopModal(modal);
+        else modal.remove();
+        resolve(!!wantMerge);
+      }
+      setTimeout(function() {
+        modal.classList.add("show");
+      }, 10);
+      modal.querySelector('[data-action="merge"]').addEventListener("click", function() {
+        close(true);
+      });
+      modal.querySelector('[data-action="account-only"]').addEventListener("click", function() {
+        close(false);
+      });
+      modal.addEventListener("click", function(e) {
+        if (e.target === modal) close(false);
+      });
+    });
+  }
+
+  function finishLoginLists(serverData, local, mergeGuest) {
+    var prefResolved = resolvePreferences(serverData.preferences, local.preferences);
+    var serverCart = normalizeItems(serverData.cart);
+    var serverFav = normalizeItems(serverData.favorites);
+    var outCart = mergeGuest ? mergeListItems(serverCart, local.cart) : serverCart;
+    var outFav = mergeGuest ? mergeListItems(serverFav, local.favorites) : serverFav;
+    var outPrefs = prefResolved.preferences;
+    persistLocal(outCart, outFav, outPrefs, true);
+    return putUserData(outCart, outFav, outPrefs).then(function(saved) {
+      var fp = fingerprint(outCart, outFav, outPrefs);
+      if (saved) {
+        fp = fingerprint(
+          normalizeItems(saved.cart),
+          normalizeItems(saved.favorites),
+          saved.preferences || outPrefs
+        );
+      }
+      setSyncedFingerprint(fp);
+      lastFingerprint = fp;
+      return true;
+    });
+  }
+
   function applyServerPayload(data, local) {
     var prefResolved = resolvePreferences(data.preferences, local.preferences);
     var outCart = normalizeItems(data.cart);
@@ -306,7 +411,13 @@
           var syncedFp = getSyncedFingerprint();
 
           if (!syncedFp) {
-            return applyServerPayload(data, local);
+            var guestHasLists = local.cart.length > 0 || local.favorites.length > 0;
+            if (!guestHasLists) {
+              return applyServerPayload(data, local);
+            }
+            return promptGuestListsMerge(local.cart.length, local.favorites.length).then(function(wantMerge) {
+              return finishLoginLists(data, local, wantMerge);
+            });
           }
 
           if (syncedFp !== localFp) {
@@ -397,6 +508,12 @@
     return true;
   }
 
+  function clearGuestLists() {
+    var prefs = readPreferencesLocal();
+    persistLocal([], [], prefs, true);
+    clearSyncedFingerprint();
+  }
+
   function clearSyncState() {
     clearSyncedFingerprint();
   }
@@ -410,7 +527,8 @@
     refreshBefore: refreshBefore,
     applyTheme: applyTheme,
     persistPrunedList: persistPrunedList,
-    clearSyncState: clearSyncState
+    clearSyncState: clearSyncState,
+    clearGuestLists: clearGuestLists
   };
 
   document.addEventListener("DOMContentLoaded", function() {
