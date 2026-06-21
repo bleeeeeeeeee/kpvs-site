@@ -16,6 +16,7 @@ const Catalog = (() => {
     brands: [],
     seasons: [],
     sizes: [],
+    sizeCategoryId: null,
     sizeLabels: {},
     colors: [],
     collections: []
@@ -108,11 +109,16 @@ const Catalog = (() => {
           categories: normalizeStoredCategoryFilters(f.categories),
           brands: Array.isArray(f.brands) ? f.brands.slice() : [],
           seasons: Array.isArray(f.seasons) ? f.seasons.slice() : [],
-          sizes: Array.isArray(f.sizes) ? f.sizes.slice() : [],
+          sizes: Array.isArray(f.sizes) ? f.sizes.map(String) : [],
+          sizeCategoryId: f.sizeCategoryId != null && String(f.sizeCategoryId).trim() !== "" ? String(f.sizeCategoryId) : null,
           sizeLabels: f.sizeLabels && typeof f.sizeLabels === "object" ? Object.assign({}, f.sizeLabels) : {},
           colors: Array.isArray(f.colors) ? f.colors.slice() : [],
           collections: Array.isArray(f.collections) ? f.collections.slice() : []
         };
+        if (activeFilters.sizes.length && !activeFilters.sizeCategoryId) {
+          activeFilters.sizes = [];
+          activeFilters.sizeLabels = {};
+        }
       }
     } catch {
     }
@@ -194,6 +200,86 @@ const Catalog = (() => {
       });
     });
     return adj;
+  }
+  function parentCategoryNameById(id) {
+    if (id == null || String(id).trim() === "") return "";
+    const row = catalogCategories.find(function(c) {
+      return String(c.id) === String(id);
+    });
+    return row && row.name ? String(row.name) : "";
+  }
+  function applySizeFilterSnapshot(snapshot) {
+    const snap = snapshot && typeof snapshot === "object" ? snapshot : {};
+    const sizes = Array.isArray(snap.sizes) ? snap.sizes : [];
+    activeFilters.sizeCategoryId =
+      snap.categoryId != null && String(snap.categoryId).trim() !== "" ? String(snap.categoryId) : null;
+    activeFilters.sizes = sizes
+      .map(function(s) {
+        return s && s.id != null ? String(s.id) : "";
+      })
+      .filter(Boolean);
+    const labels = {};
+    sizes.forEach(function(s) {
+      if (!s || s.id == null) return;
+      const id = String(s.id);
+      const label = s.label != null ? String(s.label).trim() : "";
+      if (label) labels[id] = label;
+    });
+    activeFilters.sizeLabels = labels;
+  }
+  function sizeFilterTagLabel(id) {
+    const key = String(id);
+    const label =
+      (activeFilters.sizeLabels && (activeFilters.sizeLabels[key] || activeFilters.sizeLabels[id])) || "";
+    if (label) return label;
+    return key;
+  }
+  function clearSizeFilterId(id) {
+    const key = String(id);
+    activeFilters.sizes = activeFilters.sizes.filter(function(x) {
+      return String(x) !== key;
+    });
+    if (activeFilters.sizeLabels) {
+      delete activeFilters.sizeLabels[key];
+      delete activeFilters.sizeLabels[id];
+    }
+    if (!activeFilters.sizes.length) {
+      activeFilters.sizeCategoryId = null;
+      activeFilters.sizeLabels = {};
+    }
+  }
+  let sizeFilterLabelsResolvePromise = null;
+  function ensureSizeFilterLabelsResolved() {
+    if (!activeFilters.sizes.length || !activeFilters.sizeCategoryId) return Promise.resolve();
+    const missing = activeFilters.sizes.filter(function(id) {
+      return !sizeFilterTagLabel(id) || sizeFilterTagLabel(id) === String(id);
+    });
+    if (!missing.length) return Promise.resolve();
+    if (sizeFilterLabelsResolvePromise) return sizeFilterLabelsResolvePromise;
+    sizeFilterLabelsResolvePromise = fetch(
+      "/api/sizes?category_id=" + encodeURIComponent(activeFilters.sizeCategoryId) + "&scope=catalog"
+    )
+      .then(function(r) {
+        return r.ok ? r.json() : [];
+      })
+      .then(function(rows) {
+        const format =
+          window.KpvsSizeCascade && typeof window.KpvsSizeCascade.formatSizePrimaryLabel === "function"
+            ? window.KpvsSizeCascade.formatSizePrimaryLabel
+            : null;
+        (Array.isArray(rows) ? rows : []).forEach(function(row) {
+          if (!row || row.id == null) return;
+          const id = String(row.id);
+          if (missing.indexOf(id) === -1 && missing.indexOf(String(row.id)) === -1) return;
+          const label = format ? format(row) : String(row.value != null ? row.value : id);
+          if (label) activeFilters.sizeLabels[id] = label;
+        });
+      })
+      .catch(function() {})
+      .finally(function() {
+        sizeFilterLabelsResolvePromise = null;
+      });
+    return sizeFilterLabelsResolvePromise;
   }
   function variantMatchesFilteredSizes(variantSizeId, filterSizeIds) {
     if (!filterSizeIds || !filterSizeIds.length) return false;
@@ -730,7 +816,8 @@ const Catalog = (() => {
   function renderActiveFilterTags() {
     const container = document.getElementById("active-filters");
     if (!container) return;
-    const tags = [];
+    const paint = function() {
+      const tags = [];
     if (currentSearch) {
       tags.push({ label: "\u041F\u043E\u0438\u0441\u043A: \xAB" + currentSearch + "\xBB", clear: function() {
         currentSearch = "";
@@ -778,14 +865,11 @@ const Catalog = (() => {
       } });
     });
     activeFilters.sizes.forEach(function(id) {
-      const label =
-        (activeFilters.sizeLabels && activeFilters.sizeLabels[id]) ||
-        (activeFilters.sizeLabels && activeFilters.sizeLabels[String(id)]) ||
-        id;
-      tags.push({ label: "\u0420\u0430\u0437\u043C\u0435\u0440: " + label, clear: function() {
-        activeFilters.sizes = activeFilters.sizes.filter(function(x) {
-          return x !== id;
-        });
+      const sizeSectionName = parentCategoryNameById(activeFilters.sizeCategoryId);
+      const label = sizeFilterTagLabel(id);
+      const prefix = sizeSectionName ? "\u0420\u0430\u0437\u043C\u0435\u0440 (" + sizeSectionName + "): " : "\u0420\u0430\u0437\u043C\u0435\u0440: ";
+      tags.push({ label: prefix + label, clear: function() {
+        clearSizeFilterId(id);
         saveCatalogStateToStorage();
         renderProducts();
       } });
@@ -834,7 +918,7 @@ const Catalog = (() => {
     if (clearAll) {
       clearAll.addEventListener("click", function() {
         currentSearch = "";
-        activeFilters = { categories: [], brands: [], seasons: [], sizes: [], sizeLabels: {}, colors: [], collections: [] };
+        activeFilters = { categories: [], brands: [], seasons: [], sizes: [], sizeCategoryId: null, sizeLabels: {}, colors: [], collections: [] };
         const inp = document.getElementById("catalog-search");
         if (inp) inp.value = "";
         updateSearchClear();
@@ -842,6 +926,8 @@ const Catalog = (() => {
         renderProducts();
       });
     }
+    };
+    ensureSizeFilterLabelsResolved().then(paint);
   }
   function openFilterModal() {
     const existing = document.getElementById("catalog-filter-modal");
@@ -924,7 +1010,9 @@ const Catalog = (() => {
         mode: "multi",
         filterLayout: true,
         inputName: "size",
+        checkedCategoryId: activeFilters.sizeCategoryId,
         checkedIds: activeFilters.sizes,
+        checkedLabels: activeFilters.sizeLabels,
         onChange: function() {
           if (catSizeGroup) updateGroupCount(catSizeGroup);
         }
@@ -973,27 +1061,13 @@ const Catalog = (() => {
       activeFilters.seasons = Array.from(modal.querySelectorAll('input[name="season"]:checked')).map(function(i) {
         return i.value;
       });
-      const sizeLabels = {};
-      const sizeInputs = modal.querySelectorAll('input[name="size_id"]:checked, input[name="size"]:checked');
-      activeFilters.sizes = [];
-      sizeInputs.forEach(function(inp) {
-        const id = String(inp.value || "").trim();
-        if (!id) return;
-        activeFilters.sizes.push(id);
-        const valSpan = inp.parentElement && inp.parentElement.querySelector(".size-cascade-check-value");
-        const span = valSpan || (inp.parentElement && inp.parentElement.querySelector("span"));
-        if (span && span.textContent) sizeLabels[id] = span.textContent.trim();
-      });
-      if (!activeFilters.sizes.length && catalogFilterSizeCascadeHandle && typeof catalogFilterSizeCascadeHandle.getCheckedIds === "function") {
-        activeFilters.sizes = catalogFilterSizeCascadeHandle.getCheckedIds();
-        activeFilters.sizes.forEach(function(id) {
-          const inp = modal.querySelector('input[name="size"][value="' + CSS.escape(String(id)) + '"]');
-          const valSpan = inp && inp.parentElement && inp.parentElement.querySelector(".size-cascade-check-value");
-          const span = valSpan || (inp && inp.parentElement && inp.parentElement.querySelector("span"));
-          if (span && span.textContent) sizeLabels[id] = span.textContent.trim();
-        });
+      if (catalogFilterSizeCascadeHandle && typeof catalogFilterSizeCascadeHandle.getCheckedSnapshot === "function") {
+        applySizeFilterSnapshot(catalogFilterSizeCascadeHandle.getCheckedSnapshot());
+      } else {
+        activeFilters.sizes = [];
+        activeFilters.sizeLabels = {};
+        activeFilters.sizeCategoryId = null;
       }
-      activeFilters.sizeLabels = sizeLabels;
       activeFilters.colors = Array.from(modal.querySelectorAll('input[name="color"]:checked')).map(function(i) {
         return i.value;
       });
@@ -1005,7 +1079,7 @@ const Catalog = (() => {
       renderProducts();
     });
     modal.querySelector(".catalog-filter-clear-btn").addEventListener("click", function() {
-      activeFilters = { categories: [], brands: [], seasons: [], sizes: [], sizeLabels: {}, colors: [], collections: [] };
+      activeFilters = { categories: [], brands: [], seasons: [], sizes: [], sizeCategoryId: null, sizeLabels: {}, colors: [], collections: [] };
       window.kpvsDismissTopModal(modal);
       saveCatalogStateToStorage();
       renderProducts();

@@ -102,6 +102,8 @@ const Admin = (() => {
     brands: [],
     seasons: [],
     sizes: [],
+    sizeCategoryId: null,
+    sizeLabels: {},
     colors: [],
     collections: [],
     active: "",
@@ -1888,6 +1890,196 @@ const Admin = (() => {
       return i.value;
     });
   }
+  function adminParentCategoryNameById(id) {
+    if (id == null || String(id).trim() === "") return "";
+    const row = categories.find(function(c) {
+      return String(c.id) === String(id);
+    });
+    return row && row.name ? String(row.name) : "";
+  }
+  function applyAdminSizeFilterSnapshot(snapshot) {
+    const snap = snapshot && typeof snapshot === "object" ? snapshot : {};
+    const sizes = Array.isArray(snap.sizes) ? snap.sizes : [];
+    state.sizeCategoryId =
+      snap.categoryId != null && String(snap.categoryId).trim() !== "" ? String(snap.categoryId) : null;
+    state.sizes = sizes
+      .map(function(s) {
+        return s && s.id != null ? String(s.id) : "";
+      })
+      .filter(Boolean);
+    const labels = {};
+    sizes.forEach(function(s) {
+      if (!s || s.id == null) return;
+      const id = String(s.id);
+      const label = s.label != null ? String(s.label).trim() : "";
+      if (label) labels[id] = label;
+    });
+    state.sizeLabels = labels;
+  }
+  function adminSizeFilterTagLabel(id) {
+    const key = String(id);
+    const label = (state.sizeLabels && (state.sizeLabels[key] || state.sizeLabels[id])) || "";
+    return label || key;
+  }
+  function clearAdminSizeFilterId(id) {
+    const key = String(id);
+    state.sizes = state.sizes.filter(function(x) {
+      return String(x) !== key;
+    });
+    if (state.sizeLabels) {
+      delete state.sizeLabels[key];
+      delete state.sizeLabels[id];
+    }
+    if (!state.sizes.length) {
+      state.sizeCategoryId = null;
+      state.sizeLabels = {};
+    }
+  }
+  function renderAdminActiveFilterTags() {
+    const container = document.getElementById("admin-active-filters");
+    if (!container || effectiveAdminSearchScope() === "users") return;
+    const tags = [];
+    const genderLabels = {
+      mens: "\u041C\u0443\u0436\u0441\u043A\u043E\u0439",
+      womens: "\u0416\u0435\u043D\u0441\u043A\u0438\u0439",
+      unisex: "\u0423\u043D\u0438\u0441\u0435\u043A\u0441"
+    };
+    if (state.gender) {
+      tags.push({
+        label: "\u041F\u043E\u043B: " + (genderLabels[state.gender] || state.gender),
+        clear: function() {
+          state.gender = "";
+        }
+      });
+    }
+    if (state.active) {
+      const activeLabels = { active: "\u0412\u0438\u0434\u0438\u043C\u044B\u0435", inactive: "\u0421\u043A\u0440\u044B\u0442\u044B\u0435" };
+      tags.push({
+        label: "\u0412\u0438\u0434\u0438\u043C\u043E\u0441\u0442\u044C: " + (activeLabels[state.active] || state.active),
+        clear: function() {
+          state.active = "";
+        }
+      });
+    }
+    state.categories.forEach(function(val) {
+      const cat = categories.find(function(c) {
+        return String(c.id) === String(val) || c.slug === val;
+      });
+      tags.push({
+        label: "\u041A\u0430\u0442\u0435\u0433\u043E\u0440\u0438\u044F: " + (cat ? cat.name : val),
+        clear: function() {
+          state.categories = state.categories.filter(function(x) {
+            return x !== val;
+          });
+        }
+      });
+    });
+    state.brands.forEach(function(val) {
+      const brand = brands.find(function(b) {
+        return String(b.id) === String(val) || b.slug === val;
+      });
+      tags.push({
+        label: "\u0411\u0440\u0435\u043D\u0434: " + (brand ? brand.name : val),
+        clear: function() {
+          state.brands = state.brands.filter(function(x) {
+            return x !== val;
+          });
+        }
+      });
+    });
+    state.seasons.forEach(function(s) {
+      const label = s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+      tags.push({
+        label: "\u0421\u0435\u0437\u043E\u043D: " + label,
+        clear: function() {
+          state.seasons = state.seasons.filter(function(x) {
+            return x !== s;
+          });
+        }
+      });
+    });
+    state.sizes.forEach(function(id) {
+      const sectionName = adminParentCategoryNameById(state.sizeCategoryId);
+      const prefix = sectionName ? "\u0420\u0430\u0437\u043C\u0435\u0440 (" + sectionName + "): " : "\u0420\u0430\u0437\u043C\u0435\u0440: ";
+      tags.push({
+        label: prefix + adminSizeFilterTagLabel(id),
+        clear: function() {
+          clearAdminSizeFilterId(id);
+        }
+      });
+    });
+    state.colors.forEach(function(id) {
+      const color = availableColors.find(function(c) {
+        return String(c.id) === String(id);
+      });
+      tags.push({
+        label: "\u0426\u0432\u0435\u0442: " + (color ? color.name : id),
+        clear: function() {
+          state.colors = state.colors.filter(function(x) {
+            return String(x) !== String(id);
+          });
+        }
+      });
+    });
+    state.collections.forEach(function(id) {
+      const col = availableCollections.find(function(c) {
+        return String(c.id) === String(id);
+      });
+      tags.push({
+        label: "\u041F\u043E\u0434\u0431\u043E\u0440\u043A\u0430: " + (col ? col.name || col.slug || id : id),
+        clear: function() {
+          state.collections = state.collections.filter(function(x) {
+            return String(x) !== String(id);
+          });
+        }
+      });
+    });
+    if (!tags.length) {
+      container.style.display = "none";
+      container.innerHTML = "";
+      return;
+    }
+    container.style.display = "flex";
+    container.innerHTML =
+      tags
+        .map(function(t, i) {
+          return (
+            '<span class="active-filter-tag" data-idx="' +
+            i +
+            '"><span class="active-filter-label">' +
+            escapeHtml(t.label) +
+            '</span><button type="button" class="active-filter-remove" data-idx="' +
+            i +
+            '" aria-label="\u0423\u0431\u0440\u0430\u0442\u044C \u0444\u0438\u043B\u044C\u0442\u0440">\xD7</button></span>'
+          );
+        })
+        .join("") +
+      '<button type="button" class="active-filter-clear-all">\u0421\u0431\u0440\u043E\u0441\u0438\u0442\u044C \u0432\u0441\u0451</button>';
+    container.querySelectorAll(".active-filter-remove").forEach(function(btn) {
+      btn.addEventListener("click", function() {
+        tags[Number(btn.dataset.idx)].clear();
+        saveStateToStorage();
+        fetchProducts();
+      });
+    });
+    const clearAll = container.querySelector(".active-filter-clear-all");
+    if (clearAll) {
+      clearAll.addEventListener("click", function() {
+        state.gender = "";
+        state.active = "";
+        state.categories = [];
+        state.brands = [];
+        state.seasons = [];
+        state.sizes = [];
+        state.sizeCategoryId = null;
+        state.sizeLabels = {};
+        state.colors = [];
+        state.collections = [];
+        saveStateToStorage();
+        fetchProducts();
+      });
+    }
+  }
   function loadStateFromStorage() {
     try {
       const saved = sessionStorage.getItem("adminFilters");
@@ -1898,6 +2090,12 @@ const Admin = (() => {
       if (!Array.isArray(state.brands)) state.brands = [];
       if (!Array.isArray(state.seasons)) state.seasons = [];
       if (!Array.isArray(state.sizes)) state.sizes = [];
+      if (state.sizeCategoryId != null && String(state.sizeCategoryId).trim() === "") state.sizeCategoryId = null;
+      if (!state.sizeLabels || typeof state.sizeLabels !== "object") state.sizeLabels = {};
+      if (state.sizes.length && !state.sizeCategoryId) {
+        state.sizes = [];
+        state.sizeLabels = {};
+      }
       if (!Array.isArray(state.colors)) state.colors = [];
       if (!Array.isArray(state.collections)) state.collections = [];
     } catch {
@@ -1952,12 +2150,14 @@ const Admin = (() => {
       if (!r.ok) throw new Error("\u041A\u043E\u0434 " + r.status);
       products = await r.json();
       if (!skipProductsDom) renderProducts();
+      renderAdminActiveFilterTags();
     } catch (err) {
       if (!skipProductsDom) {
         products = [];
         setTableStatus("\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0442\u043E\u0432\u0430\u0440\u044B. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043F\u043E\u0434\u043A\u043B\u044E\u0447\u0435\u043D\u0438\u0435 \u043A \u0441\u0435\u0440\u0432\u0435\u0440\u0443.");
         notify(err.message || "\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044C \u0442\u043E\u0432\u0430\u0440\u044B", "error");
       }
+      renderAdminActiveFilterTags();
     }
   }
   function renderProducts() {
@@ -2261,7 +2461,9 @@ const Admin = (() => {
         mode: "multi",
         filterLayout: true,
         inputName: "size_id",
+        checkedCategoryId: state.sizeCategoryId,
         checkedIds: state.sizes,
+        checkedLabels: state.sizeLabels,
         onChange: function() {
           if (sizeGroupEl) updateGroupCount(sizeGroupEl);
         }
@@ -2307,9 +2509,13 @@ const Admin = (() => {
       state.seasons = Array.from(modal.querySelectorAll('input[name="season"]:checked')).map(function(i) {
         return i.value;
       });
-      state.sizes = adminFilterSizeCascadeHandle && typeof adminFilterSizeCascadeHandle.getCheckedIds === "function" ? adminFilterSizeCascadeHandle.getCheckedIds() : Array.from(modal.querySelectorAll('input[name="size_id"]:checked')).map(function(i) {
-        return i.value;
-      });
+      if (adminFilterSizeCascadeHandle && typeof adminFilterSizeCascadeHandle.getCheckedSnapshot === "function") {
+        applyAdminSizeFilterSnapshot(adminFilterSizeCascadeHandle.getCheckedSnapshot());
+      } else {
+        state.sizes = [];
+        state.sizeLabels = {};
+        state.sizeCategoryId = null;
+      }
       state.colors = Array.from(modal.querySelectorAll('input[name="color_id"]:checked')).map(function(i) {
         return i.value;
       });
@@ -2328,6 +2534,8 @@ const Admin = (() => {
       state.brands = [];
       state.seasons = [];
       state.sizes = [];
+      state.sizeCategoryId = null;
+      state.sizeLabels = {};
       state.colors = [];
       state.collections = [];
       saveStateToStorage();
@@ -2355,6 +2563,8 @@ const Admin = (() => {
     state.brands = [];
     state.seasons = [];
     state.sizes = [];
+    state.sizeCategoryId = null;
+    state.sizeLabels = {};
     state.colors = [];
     state.collections = [];
     state.active = "";

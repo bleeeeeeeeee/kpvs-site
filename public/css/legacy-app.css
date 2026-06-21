@@ -3320,6 +3320,12 @@ html.modal-open body .notification * {
     margin-bottom: 0.5rem;
 }
 
+.admin-page .admin-catalog-controls .admin-active-filters {
+    width: 100%;
+    margin-top: 0.35rem;
+    padding: 0.65rem 0.75rem;
+}
+
 .admin-toolbar-row-search {
     margin-bottom: 0.65rem !important;
     align-items: center;

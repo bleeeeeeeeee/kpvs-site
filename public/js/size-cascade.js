@@ -262,6 +262,7 @@
   }
   function renderFlatSizeList(colSizes, groups, mode, inputName, checkedSet, opt) {
     const filterLayout = !!(opt && opt.filterLayout);
+    const categoryId = opt && opt.categoryId != null ? String(opt.categoryId) : "";
     colSizes.innerHTML = "";
     if (!groups || !groups.length) {
       const empty = document.createElement("p");
@@ -307,8 +308,13 @@
           lab.innerHTML = inner;
           const inp = lab.querySelector("input");
           inp.addEventListener("change", function() {
-            if (inp.checked) checkedSet.add(id);
-            else checkedSet.delete(id);
+            if (typeof opt.onToggle === "function") {
+              opt.onToggle(id, primary, inp.checked, categoryId);
+            } else if (inp.checked) {
+              checkedSet.add(id);
+            } else {
+              checkedSet.delete(id);
+            }
             if (typeof opt.onChange === "function") opt.onChange();
           });
           appendTarget.appendChild(lab);
@@ -334,11 +340,76 @@
       return Promise.resolve([]);
     };
     const inputName = opt.inputName || "size_id";
+    const isFilterMulti = filterLayout && mode === "multi";
     const checkedSet = new Set((opt.checkedIds || []).map(String));
+    const checkedMap = new Map();
+    let filterCheckedCategoryId =
+      opt.checkedCategoryId != null && String(opt.checkedCategoryId).trim() !== ""
+        ? String(opt.checkedCategoryId).trim()
+        : null;
+    const initialLabels =
+      opt.checkedLabels && typeof opt.checkedLabels === "object" ? opt.checkedLabels : {};
+    if (isFilterMulti) {
+      if (Array.isArray(opt.checkedEntries)) {
+        opt.checkedEntries.forEach(function(entry) {
+          if (!entry || entry.id == null) return;
+          const id = String(entry.id);
+          const catId =
+            entry.categoryId != null && String(entry.categoryId).trim() !== ""
+              ? String(entry.categoryId).trim()
+              : filterCheckedCategoryId || "";
+          if (!catId) return;
+          filterCheckedCategoryId = catId;
+          checkedMap.set(id, {
+            label: entry.label != null ? String(entry.label).trim() : "",
+            categoryId: catId
+          });
+        });
+      } else {
+        (opt.checkedIds || []).forEach(function(rawId) {
+          const id = String(rawId);
+          if (!id || !filterCheckedCategoryId) return;
+          checkedMap.set(id, {
+            label: initialLabels[id] || initialLabels[String(rawId)] || "",
+            categoryId: filterCheckedCategoryId
+          });
+        });
+      }
+    }
     const defCat = opt.defaultCategoryId != null && String(opt.defaultCategoryId).trim() !== "" ? String(opt.defaultCategoryId).trim() : "";
     const cache = new Map();
     let selectedCatId = null;
     let selectCategorySeq = 0;
+    function checkedSetForCategory(catId) {
+      const ck = String(catId || "");
+      const set = new Set();
+      if (!isFilterMulti) {
+        checkedSet.forEach(function(id) {
+          set.add(id);
+        });
+        return set;
+      }
+      if (!filterCheckedCategoryId || filterCheckedCategoryId !== ck) return set;
+      checkedMap.forEach(function(meta, id) {
+        if (meta && meta.categoryId === ck) set.add(id);
+      });
+      return set;
+    }
+    function handleFilterToggle(sizeId, label, checked, catId) {
+      const ck = String(catId || "");
+      const id = String(sizeId);
+      if (!ck || !id) return;
+      if (checked) {
+        if (filterCheckedCategoryId && filterCheckedCategoryId !== ck) {
+          checkedMap.clear();
+        }
+        filterCheckedCategoryId = ck;
+        checkedMap.set(id, { label: label || "", categoryId: ck });
+      } else {
+        checkedMap.delete(id);
+        if (!checkedMap.size) filterCheckedCategoryId = null;
+      }
+    }
     if (filterLayout) {
       root.innerHTML = '<div class="size-cascade size-cascade--filter"><div class="size-cascade-panels size-cascade-panels--two-cols"><div class="size-cascade-col size-cascade-col--cat"><p class="size-cascade-col-heading">\u0420\u0430\u0437\u0434\u0435\u043B \u043A\u0430\u0442\u0430\u043B\u043E\u0433\u0430</p><div class="size-cascade-col-scroll size-cascade-col-scroll--cat"></div></div><div class="size-cascade-col size-cascade-col--sizes"><p class="size-cascade-col-heading">\u0420\u0430\u0437\u043C\u0435\u0440\u044B</p><div class="size-cascade-col-scroll size-cascade-col-scroll--sizes"></div></div></div></div>';
     } else {
@@ -373,7 +444,9 @@
       if (mySeq !== selectCategorySeq) return;
       const rows = cache.get(ck) || [];
       const groups = groupSizesByType(rows, { euEtalonOnly: filterLayout });
-      renderFlatSizeList(colSizesList, groups, mode, inputName, checkedSet, { onChange: fireChange, filterLayout: filterLayout });
+      const renderOpt = { onChange: fireChange, filterLayout: filterLayout, categoryId: ck };
+      if (isFilterMulti) renderOpt.onToggle = handleFilterToggle;
+      renderFlatSizeList(colSizesList, groups, mode, inputName, checkedSetForCategory(ck), renderOpt);
     }
     function renderCats() {
       if (!colCatList) return;
@@ -418,12 +491,20 @@
       });
     }
     renderCats();
-    if (defCat && categories.some(function(c) {
-      return String(c.id) === defCat;
-    })) {
-      void selectCategory(defCat, false);
-    } else if (filterLayout && categories.length) {
-      void selectCategory(String(categories[0].id), false);
+    const initialCatId =
+      filterCheckedCategoryId && categories.some(function(c) {
+        return String(c.id) === filterCheckedCategoryId;
+      })
+        ? filterCheckedCategoryId
+        : defCat && categories.some(function(c) {
+            return String(c.id) === defCat;
+          })
+          ? defCat
+          : filterLayout && categories.length
+            ? String(categories[0].id)
+            : "";
+    if (initialCatId) {
+      void selectCategory(initialCatId, false);
     }
     const api = {
       destroy: function() {
@@ -435,7 +516,34 @@
     };
     if (mode === "multi") {
       api.getCheckedIds = function() {
+        if (isFilterMulti) return Array.from(checkedMap.keys());
         return Array.from(checkedSet);
+      };
+      api.getCheckedSnapshot = function() {
+        if (!isFilterMulti) {
+          return {
+            categoryId: null,
+            sizes: Array.from(checkedSet).map(function(id) {
+              return { id: id, label: "" };
+            })
+          };
+        }
+        return {
+          categoryId: filterCheckedCategoryId,
+          sizes: Array.from(checkedMap.entries()).map(function(pair) {
+            return { id: pair[0], label: pair[1] && pair[1].label ? pair[1].label : "" };
+          })
+        };
+      };
+      api.clearChecked = function() {
+        if (isFilterMulti) {
+          checkedMap.clear();
+          filterCheckedCategoryId = null;
+          if (selectedCatId) void selectCategory(selectedCatId, true);
+        } else {
+          checkedSet.clear();
+        }
+        fireChange();
       };
     }
     return api;
@@ -554,6 +662,7 @@
     mount,
     mountVariantCell,
     groupSizesByType,
+    formatSizePrimaryLabel,
     escapeHtml
   };
 })(typeof window !== "undefined" ? window : globalThis);
